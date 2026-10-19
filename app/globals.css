@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/*
+ * Colors match Jace and Jace Social: cool greys with a green accent. Dark is
+ * the default; <html data-theme="light"> switches to the matching light set
+ * (see ThemeToggle and the inline script in app/layout.tsx).
+ */
+@custom-variant dark (&:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *));
+
+:root {
+  --background: #111317;
+  --foreground: #e6e8eb;
+  --panel: #1c1f26;
+  --line: #2a2f38;
+  --muted: #8b919c;
+  --accent: #3ddc84;
+  --accent-hover: #5ae69a;
+  --on-accent: #0c1410;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --background: #f4f5f7;
+  --foreground: #16181d;
+  --panel: #ffffff;
+  --line: #dfe2e7;
+  --muted: #5d6470;
+  --accent: #1f9d5a;
+  --accent-hover: #188049;
+  --on-accent: #ffffff;
+  --danger: #dc2626;
+  --warn: #b45309;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-warn: var(--warn);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* Game boards handle their own touch gestures (swipes, taps, drags). */
+.touch-game {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.animate-pop { animation: pop 140ms ease-out; }
+
+@keyframes flip-in {
+  0% { transform: rotateX(90deg); }
+  100% { transform: rotateX(0deg); }
+}
+.animate-flip-in { animation: flip-in 220ms ease-out; }
