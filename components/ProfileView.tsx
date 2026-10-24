@@ -5,7 +5,8 @@ import { Avatar } from "@/components/Avatar";
 import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import { SyncStatus } from "@/components/SyncStatus";
-import { GAMES } from "@/lib/games";
+import { MultiplayerRecord } from "@/components/MultiplayerRecord";
+import { SOLO_GAMES } from "@/lib/games";
 import { timeAgo } from "@/lib/format";
 import { useBests } from "@/lib/useBest";
 
@@ -62,7 +63,7 @@ export function ProfileView() {
           </p>
         </div>
         <ul className="grid gap-3 sm:grid-cols-2">
-          {GAMES.map((game) => {
+          {SOLO_GAMES.map((game) => {
             const best = bests[game.id];
             const plays = history.filter((s) => s.game === game.id).length;
             return (
@@ -89,6 +90,7 @@ export function ProfileView() {
           })}
         </ul>
       </section>
+      {user && <MultiplayerRecord />}
     </div>
   );
 }

@@ -1,13 +1,43 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { seededRandom } from "@/lib/multiplayer/rng";
 
 /** Every game component takes these props. Call `onFinish` once when a game ends. */
 export type GameProps = {
   onFinish: (score: number, durationMs: number) => void;
   /** The player's personal best, to show "New best!" in the game-over card. */
   best: number | null;
+  /** Races only: everyone gets the same board, words or pieces from this seed. */
+  seed?: number;
+  /** Races only: the current score while playing, shown to opponents. */
+  onProgress?: (score: number) => void;
+  /** Races only: the game ended without a score (lost a Minesweeper or Word Guess round). */
+  onFail?: () => void;
+  /** Races only: a game that never ends by itself (2048) stops after this long. */
+  timeLimitMs?: number;
 };
+
+/**
+ * Set by the race view: in a race there's one attempt, so game-over cards
+ * say "waiting for the others" instead of "Play again".
+ */
+export const RaceContext = createContext(false);
+
+/**
+ * Random numbers for a game: seeded in a race so every player gets the same
+ * sequence, Math.random otherwise. Call `.reset()` at the start of each game.
+ */
+export function useGameRandom(seed?: number) {
+  return useMemo(() => {
+    let next = seed === undefined ? Math.random : seededRandom(seed);
+    const rand = () => next();
+    rand.reset = () => {
+      if (seed !== undefined) next = seededRandom(seed);
+    };
+    return rand as (() => number) & { reset: () => void };
+  }, [seed]);
+}
 
 /** Current time in ms, for timing games (kept out of render code). */
 export const now = () => performance.now();
@@ -147,6 +177,7 @@ export function GameOver({
   extra?: ReactNode;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
+  const race = useContext(RaceContext);
   useEffect(() => {
     // Short delay so the key that ended the game doesn't also press the button.
     const t = setTimeout(() => ref.current?.focus({ preventScroll: true }), 250);
@@ -156,14 +187,20 @@ export function GameOver({
     <Overlay>
       <p className="text-sm font-medium text-muted">{title}</p>
       <p className="text-4xl font-bold tabular-nums">{score}</p>
-      {isBest && (
+      {isBest && !race && (
         <p className="animate-pop rounded-full bg-accent px-3 py-1 text-xs font-semibold text-on-accent">New best!</p>
       )}
       {extra}
-      <button ref={ref} type="button" onClick={onAgain} className={primaryButton}>
-        Play again
-      </button>
-      <p className="text-xs text-muted">or press Enter</p>
+      {race ? (
+        <p className="text-sm text-muted">Waiting for the others to finish…</p>
+      ) : (
+        <>
+          <button ref={ref} type="button" onClick={onAgain} className={primaryButton}>
+            Play again
+          </button>
+          <p className="text-xs text-muted">or press Enter</p>
+        </>
+      )}
     </Overlay>
   );
 }

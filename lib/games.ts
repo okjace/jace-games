@@ -13,6 +13,24 @@
 
 export type Better = "higher" | "lower";
 
+/**
+ * How a game is played with friends (see lib/rooms.ts):
+ * - "race": everyone plays the same seeded board at once; best result wins.
+ * - "turns": the server runs the game with a rules module in lib/multiplayer/rules.
+ * - "live": real time; the host's browser runs the game and the others send input.
+ */
+export type MultiMode = "race" | "turns" | "live";
+
+export type MultiplayerDef = {
+  mode: MultiMode;
+  min: number;
+  max: number;
+  /** Turn-based games can also be played by passing one device around. */
+  local?: boolean;
+  /** Races end after this long, with unfinished players last. */
+  timeLimitSec?: number;
+};
+
 export type GameDef = {
   id: string;
   name: string;
@@ -31,9 +49,22 @@ export type GameDef = {
     /** The shortest plausible game, in ms, that could earn this score. */
     minDurationMs: (score: number) => number;
   };
+  /** Set for games that can be played with friends. */
+  multiplayer?: MultiplayerDef;
+  /** false for multiplayer-only games: no solo play, scores or Jace leaderboard. */
+  solo?: boolean;
 };
 
 const n = (v: number) => v.toLocaleString("en-US");
+
+/** Score fields for multiplayer-only games, which keep wins instead of scores. */
+const MULTIPLAYER_ONLY = {
+  solo: false,
+  better: "higher" as const,
+  scoreLabel: "Wins",
+  format: (s: number) => `${n(s)} win${s === 1 ? "" : "s"}`,
+  limits: { min: 0, max: 0, minDurationMs: () => Infinity },
+};
 
 export const GAMES: GameDef[] = [
   {
@@ -149,7 +180,22 @@ export const GAMES: GameDef[] = [
     addedAt: "2026-10-19",
     limits: { min: 0, max: 250, minDurationMs: () => 29_000 },
   },
+  {
+    id: "connect4",
+    name: "Connect Four",
+    description: "Drop discs and line up four in a row before your friend does.",
+    icon: "🔴",
+    ...MULTIPLAYER_ONLY,
+    addedAt: "2026-10-24",
+    multiplayer: { mode: "turns", min: 2, max: 2, local: true },
+  },
 ];
+
+/** Games with solo play, scores and a Jace leaderboard. */
+export const SOLO_GAMES = GAMES.filter((g) => g.solo !== false);
+
+/** Games that can be played with friends. */
+export const MULTIPLAYER_GAMES = GAMES.filter((g) => g.multiplayer);
 
 export function getGame(id: string): GameDef | undefined {
   return GAMES.find((g) => g.id === id);

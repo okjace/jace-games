@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { Leaderboard } from "@/components/Leaderboard";
+import { WinsBoard } from "@/components/WinsBoard";
 import { GAMES, getGame } from "@/lib/games";
 
 export function LeaderboardTabs({ initial }: { initial: string }) {
   const [active, setActive] = useState(initial);
+  const [board, setBoard] = useState<"scores" | "wins">("scores");
   const game = getGame(active) ?? GAMES[0];
+  const showWins = game.solo === false || (board === "wins" && !!game.multiplayer);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const select = (id: string) => {
@@ -63,7 +66,9 @@ export function LeaderboardTabs({ initial }: { initial: string }) {
             <h2 className="text-lg font-semibold">
               {game.icon} {game.name}
             </h2>
-            <p className="text-xs text-muted">{game.better === "higher" ? "Higher is better" : "Lower is better"} · top 50</p>
+            <p className="text-xs text-muted">
+              {showWins ? "Most multiplayer wins" : `${game.better === "higher" ? "Higher is better" : "Lower is better"} · top 50`}
+            </p>
           </div>
           <Link
             href={`/play/${game.id}`}
@@ -72,7 +77,22 @@ export function LeaderboardTabs({ initial }: { initial: string }) {
             Play
           </Link>
         </div>
-        <Leaderboard key={game.id} game={game} limit={50} />
+        {game.multiplayer && game.solo !== false && (
+          <div className="mb-4 inline-flex rounded-full border border-line p-1 text-sm" role="group" aria-label="Leaderboard type">
+            {(["scores", "wins"] as const).map((b) => (
+              <button
+                key={b}
+                type="button"
+                aria-pressed={board === b}
+                onClick={() => setBoard(b)}
+                className={`rounded-full px-3 py-1 font-medium ${board === b ? "bg-foreground/[.08]" : "text-muted hover:text-foreground"}`}
+              >
+                {b === "scores" ? "Best scores" : "Most wins"}
+              </button>
+            ))}
+          </div>
+        )}
+        {showWins ? <WinsBoard key={`w-${game.id}`} gameId={game.id} limit={50} /> : <Leaderboard key={game.id} game={game} limit={50} />}
       </section>
     </div>
   );

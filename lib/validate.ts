@@ -22,7 +22,7 @@ export function validateSubmission(raw: unknown, now = Date.now()): ValidationRe
   if (!id) return { ok: false, id: null, reason: "Missing or invalid external_id." };
 
   const game = typeof r.game === "string" ? getGame(r.game) : undefined;
-  if (!game) return { ok: false, id, reason: "Unknown game." };
+  if (!game || game.solo === false) return { ok: false, id, reason: "Unknown game." };
 
   const score = r.score;
   if (typeof score !== "number" || !Number.isInteger(score)) {
@@ -55,4 +55,17 @@ export function validateSubmission(raw: unknown, now = Date.now()): ValidationRe
       duration_ms: Math.round(duration),
     },
   };
+}
+
+/** Checks one finished game's score and length against the game's limits. Returns why it's implausible, or null. */
+export function checkScore(gameId: string, score: unknown, durationMs: unknown): string | null {
+  const game = getGame(gameId);
+  if (!game) return "Unknown game.";
+  if (typeof score !== "number" || !Number.isInteger(score)) return "Score must be a whole number.";
+  if (score < game.limits.min || score > game.limits.max) return `Score is outside ${game.name}'s range.`;
+  if (typeof durationMs !== "number" || !Number.isFinite(durationMs) || durationMs <= 0 || durationMs > DAY_MS) {
+    return "Missing or invalid game length.";
+  }
+  if (durationMs < game.limits.minDurationMs(score)) return "That game was too short for this score.";
+  return null;
 }

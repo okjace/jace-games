@@ -3,10 +3,21 @@ import { NextResponse, type NextRequest } from "next/server";
 import { JaceNeedsScope, JaceUnauthorized, JaceUnavailable } from "./jace";
 import { clearSessionCookie, getSession, type Session } from "./session";
 
+/**
+ * This app's origin as the browser sees it: APP_URL if set, otherwise from
+ * the Host header (req.nextUrl.origin is always "localhost" in dev, even
+ * when the page was opened on 127.0.0.1).
+ */
+export function appOrigin(req: NextRequest): string {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  const proto = req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "");
+  return host ? `${proto}://${host}` : req.nextUrl.origin;
+}
+
 /** Where Jace sends people back to after signing in. Must be registered in Jace exactly. */
 export function redirectUri(req: NextRequest): string {
-  const base = (process.env.APP_URL || req.nextUrl.origin).replace(/\/$/, "");
-  return `${base}/api/auth/callback`;
+  return `${appOrigin(req)}/api/auth/callback`;
 }
 
 /** Only same-site paths, so `next` can't be used as an open redirect. */

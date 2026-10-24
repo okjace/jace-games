@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
+import { Fullscreen } from "@/components/Fullscreen";
 import { GAME_COMPONENTS } from "@/components/games";
 import { Leaderboard } from "@/components/Leaderboard";
+import { LocalPlay } from "@/components/room/LocalPlay";
+import { PlayWithFriends } from "@/components/room/PlayWithFriends";
+import { WinsBoard } from "@/components/WinsBoard";
 import { useScores } from "@/components/ScoresProvider";
 import { SyncStatus } from "@/components/SyncStatus";
 import { getGame } from "@/lib/games";
@@ -15,6 +19,8 @@ export function PlayView({ gameId }: { gameId: string }) {
   const Game = GAME_COMPONENTS[game.id];
   const { history, record, user } = useScores();
   const [round, setRound] = useState(0);
+  // Multiplayer-only games (Connect Four, Chess, …) have no solo mode, scores or Jace leaderboard.
+  const multiOnly = game.solo === false;
 
   const mine = useMemo(() => history.filter((s) => s.game === game.id), [history, game.id]);
   const best = useMemo(() => bestOf(game, history), [game, history]);
@@ -46,15 +52,35 @@ export function PlayView({ gameId }: { gameId: string }) {
             <p className="text-sm text-muted">{game.description}</p>
           </div>
         </div>
-        <SyncStatus />
+        {!multiOnly && <SyncStatus />}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="rounded-2xl border border-line bg-panel/40 p-3 sm:p-6" aria-label={`${game.name} game`}>
-          {Game ? <Game onFinish={onFinish} best={best?.score ?? null} /> : <p>This game is missing its component.</p>}
-        </section>
+        <Fullscreen label={game.name} shortcut={!["wordle", "minesweeper"].includes(game.id)}>
+          <section className="rounded-2xl border border-line bg-panel/40 p-3 sm:p-6" aria-label={`${game.name} game`}>
+            {multiOnly ? (
+              <>
+                <p className="mb-4 text-center text-sm text-muted">Pass and play on this device, or play online with friends.</p>
+                <LocalPlay gameId={game.id} multiplayer={game.multiplayer!} />
+              </>
+            ) : Game ? (
+              <Game onFinish={onFinish} best={best?.score ?? null} />
+            ) : (
+              <p>This game is missing its component.</p>
+            )}
+          </section>
+        </Fullscreen>
 
         <aside className="flex flex-col gap-4">
+          {game.multiplayer && <PlayWithFriends gameId={game.id} multiplayer={game.multiplayer} />}
+          {game.multiplayer && (
+            <div className="rounded-2xl border border-line bg-panel p-5">
+              <h2 className="mb-3 text-sm font-semibold">Most wins</h2>
+              <WinsBoard gameId={game.id} limit={5} />
+            </div>
+          )}
+          {!multiOnly && (
+          <>
           <div className="rounded-2xl border border-line bg-panel p-5">
             <p className="text-sm text-muted">Personal best</p>
             <p className="mt-1 text-3xl font-bold tabular-nums text-accent">{best ? game.format(best.score) : "—"}</p>
@@ -98,6 +124,8 @@ export function PlayView({ gameId }: { gameId: string }) {
             </div>
             <Leaderboard game={game} limit={10} refreshKey={round} />
           </div>
+          </>
+          )}
         </aside>
       </div>
     </div>
