@@ -65,17 +65,18 @@ Fill in `.env.local`, then run `npm run dev` and open http://localhost:3000.
 | `SESSION_SECRET`     | yes      | 32+ random characters used to encrypt the session cookie. Generate with `openssl rand -base64 32`. Changing it signs everyone out. |
 | `APP_URL`            | no       | This app's public URL, used to build the redirect URI `<APP_URL>/api/auth/callback`. Defaults to the URL of the incoming request. Set it in production if you use more than one domain. |
 | `JACE_URL`           | no       | The Jace base URL. Defaults to `https://jaceo.vercel.app`. |
-| `SUPABASE_URL`       | yes*     | The Jace Games Supabase project URL. Rooms and match results live there. |
+| `SUPABASE_URL`       | yes*     | The Jace Games Supabase project URL. Rooms, match results and community games live there. |
 | `SUPABASE_SECRET_KEY` | yes*    | That project's **secret** key (server only). |
 | `NEXT_PUBLIC_SUPABASE_URL` | yes* | The same project URL, for Realtime in the browser. |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes* | That project's **publishable** key, for Realtime in the browser. |
 | `JACE_SOCIAL_URL`    | no       | Defaults to `https://jace-social.vercel.app`. |
 | `JACE_SOCIAL_APP_KEY` | no      | Shared secret with Jace Social (its `JACE_GAMES_APP_KEY`). Without it, friend invites show "coming soon". |
 | `CRON_SECRET`        | no       | Vercel sends it to the daily room cleanup cron; set it so nobody else can call that route. |
+| `SITE_OWNER_JACE_ID` | no       | The Jace user id (the `sub` from userinfo) of the site owner. That account can take community games down and put them back, and sees reports. Without it nobody can. |
 
-\* Required in production for multiplayer. In development without them, rooms use an in-memory store and a local live relay ([`lib/realtime/devBus.ts`](lib/realtime/devBus.ts)), so everything can be tried locally.
+\* Required in production for multiplayer and the Game Studio. In development without them, rooms use an in-memory store and a local live relay ([`lib/realtime/devBus.ts`](lib/realtime/devBus.ts)), so everything can be tried locally.
 
-Put the same variables in Vercel → Project → Settings → Environment Variables. None of them use the `NEXT_PUBLIC_` prefix, so none reach the client bundle. `.env*` files are gitignored (except `.env.example`).
+Put the same variables in Vercel → Project → Settings → Environment Variables. Only the two `NEXT_PUBLIC_SUPABASE_*` values reach the browser, and both are safe to expose; every secret stays on the server. `.env*` files are gitignored (except `.env.example`).
 
 ### Setting up Supabase
 
@@ -136,6 +137,51 @@ JACE_URL=http://localhost:4000 npm run dev
 ```
 
 The mock's authorize endpoint lets you pick one of two accounts, "oldplayer" or "friend". To be both at once, open the app on `localhost` in one tab and `127.0.0.1` in another (they keep separate cookies). The mock also stands in for Jace Social's friends API: set `JACE_SOCIAL_URL` to the mock and `JACE_SOCIAL_APP_KEY=dev-app-key`. Start it with `MOCK_SCORES=off` to behave like Jace before its scores API shipped (scores endpoints return 404), or `MOCK_BANNED=1` to test the banned path.
+
+## Game Studio
+
+People make their own games at `/studio`, with a code editor (CodeMirror, HTML with inline JavaScript and CSS) or Scratch-style blocks (Blockly 13.3.0, the same version Jace Social's bot editor uses). Published games are listed at `/community`, and multiplayer ones can be played in rooms like the built-in games. Data lives in Supabase ([`supabase/migrations/002_studio.sql`](supabase/migrations/002_studio.sql)): row-level security on with no policies, so only the server (secret key) can read or write. Without Supabase, development falls back to memory.
+
+- **Templates**: Dodge (arcade), Lights Out (puzzle), Cookie Rush (clicker), Paddle Duel (2 players, live) and Blank, in code. Dodge, Cookie Rush, a 2-player tap race and Blank also come as blocks.
+- **Blocks** compile to JavaScript that runs on a small engine ([`lib/studio/blockRuntime.ts`](lib/studio/blockRuntime.ts)): a 480×360 canvas, emoji or shape sprites with position, size and speed, events (start, keys, taps, every frame, timers, messages), score and game over. "Convert to code" turns a blocks game into a code game (one way).
+- **Versions**: every save that changes the code keeps a version (the last 30); the editor can restore any of them. Publishing copies the draft to what players get, so saving a draft never breaks the published game.
+- **Moderation**: banned or muted Jace accounts can't publish (Jace's userinfo is asked again on every publish). Signed-in players can report a game; the site owner (`SITE_OWNER_JACE_ID`) sees reports on the game's page and can take it down.
+
+### The game SDK
+
+Every game gets `window.jace`:
+
+| | |
+| --- | --- |
+| `jace.player.name` | Who's playing. |
+| `jace.submitScore(n)` | A whole-number score, higher is better. Solo, the player's best goes on the game's leaderboard (labelled unverified). In a race, it's the player's live score. |
+| `jace.gameOver()` | The round is over. In a race, the last submitted score becomes the result (none = did not finish). |
+| `jace.onReady(cb)` | Calls `cb` once the page is ready. |
+| `jace.seed`, `jace.random()` | A seed and a seeded random function; everyone in a room gets the same ones. |
+| `jace.room` | `null` when playing alone. In a room: `mode` (`"race"` or `"live"`), `isHost`, `mySeat`, `players` (`{ seat, name, you, host }`). |
+| `jace.room.send(event, data)` | Sends to the other players over the room's channel. |
+| `jace.room.on(event, (data, fromSeat) => …)` | Hears them. Returns an unsubscribe function. |
+| `jace.gameOver({ winners: [seat] })` | Live games: the host ends the game and names the winners. |
+
+In **race** rooms everyone plays their own copy and the highest result wins. In **live** rooms the game shares its own state with `jace.room` (usually the host runs the game and sends it out); only the host's `gameOver` counts.
+
+### Sandbox
+
+Community games are untrusted code, so they run in `<iframe sandbox="allow-scripts allow-pointer-lock" srcdoc>` ([`components/studio/GameFrame.tsx`](components/studio/GameFrame.tsx)):
+
+- No `allow-same-origin`: the game runs on an opaque origin, so `document.cookie`, `localStorage` and IndexedDB throw, and it can't touch this site's pages or cookies. No `allow-top-navigation`, `allow-popups`, `allow-forms` or `allow-modals`.
+- The document starts with a Content-Security-Policy (`default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'`), so `fetch`, XHR, WebSocket, EventSource and loading anything from another site all fail. Images, sounds and fonts go in the game as `data:` URLs.
+- The SDK talks to the page with `postMessage` only. The page accepts messages only when `event.source` is its own iframe, and checks every one: scores must be finite numbers (at most one a second); room messages need an event name matching `[A-Za-z0-9_:.-]{1,32}` and JSON data up to 8 KB, at most 20 a second.
+- If a game navigates its frame to another page (which would leave the CSP behind), the page notices the second load and stops it.
+
+### Limits
+
+- 256 KB per game (HTML plus blocks), 60-character names, 500-character descriptions.
+- 20 new games an hour and 100 games per person.
+- Scores: whole numbers within ±1,000,000,000; 10 a minute per game per player (in-memory per server instance, a speed bump rather than a guarantee).
+- 10 reports an hour per person, one per game.
+- Plays are counted once per person per game every 30 minutes.
+- Rooms for community games: 2 to 8 players.
 
 ## Scripts
 

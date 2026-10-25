@@ -81,7 +81,7 @@ export function Results({
           ) : (
             <p className="self-center text-sm text-muted">Waiting for the host to start a rematch…</p>
           )}
-          <Link href={game ? `/play/${game.id}` : "/"} className={secondary}>
+          <Link href={game ? `/play/${game.id}` : data.room.game.startsWith("c:") ? `/community/${data.room.game.slice(2)}` : "/"} className={secondary}>
             Back to {data.room.gameName}
           </Link>
         </div>
