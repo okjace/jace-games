@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { RoomError, createRoom } from "@/lib/rooms";
 import { getSession } from "@/lib/session";
+import "@/lib/studioRooms";
 
 /** Creates a room for a game: { game } → { code }. Playing online needs a Jace account. */
 export async function POST(req: NextRequest): Promise<NextResponse> {

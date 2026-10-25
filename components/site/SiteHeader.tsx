@@ -10,6 +10,8 @@ import { ThemeToggle } from "./ThemeToggle";
 const LINKS = [
   { href: "/", label: "Games" },
   { href: "/leaderboards", label: "Leaderboards" },
+  { href: "/community", label: "Community" },
+  { href: "/studio", label: "Studio" },
 ];
 
 export function signInHref(next: string): string {

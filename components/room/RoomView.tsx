@@ -7,6 +7,7 @@ import { TURN_COMPONENTS } from "@/components/multi";
 import { LIVE_COMPONENTS } from "@/components/multi/live";
 import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
+import { CommunityRoomPlay } from "@/components/studio/CommunityRoom";
 import { getGame } from "@/lib/games";
 import { Lobby } from "./Lobby";
 import { RaceView } from "./RaceView";
@@ -56,6 +57,7 @@ export function RoomView({ code }: { code: string }) {
 
   const game = getGame(data.room.game);
   const icon = game?.icon ?? "🎮";
+  const home = game ? `/play/${game.id}` : data.room.game.startsWith("c:") ? `/community/${data.room.game.slice(2)}` : "/";
 
   if (!user) {
     return (
@@ -73,7 +75,7 @@ export function RoomView({ code }: { code: string }) {
   const leave = async () => {
     if (data.room.status === "playing" && !confirm("Leave this game? You'll forfeit.")) return;
     await act("leave");
-    window.location.href = game ? `/play/${game.id}` : "/";
+    window.location.href = home;
   };
 
   return (
@@ -109,7 +111,7 @@ export function RoomView({ code }: { code: string }) {
           <p className="font-semibold">
             {data.room.status === "lobby" ? "This room is full." : "This game has already started."}
           </p>
-          <Link href={game ? `/play/${game.id}` : "/"} className={`${primary} mt-4`}>
+          <Link href={home} className={`${primary} mt-4`}>
             Start your own
           </Link>
         </div>
@@ -143,6 +145,14 @@ function Playing({
     .filter((p) => !p.left || data.room.mode === "turns")
     .map((p) => ({ seat: p.seat, name: p.username, picture: p.picture, you: p.userId === data.me!.userId, left: p.left }));
   const label = data.room.gameName;
+
+  if (data.room.game.startsWith("c:")) {
+    return (
+      <Fullscreen label={label} shortcut={false}>
+        <CommunityRoomPlay data={data} channel={channel} act={act} onError={onError} />
+      </Fullscreen>
+    );
+  }
 
   if (data.room.mode === "turns") {
     const Board = TURN_COMPONENTS[data.room.game];
