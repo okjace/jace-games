@@ -28,6 +28,15 @@ const scores = [
   { id: "o-1", user_id: "u-ada", game: "snake", score: 57, created_at: "2025-06-01T10:00:00.000Z" },
   { id: "o-2", user_id: "u-linus", game: "memory", score: 12, created_at: "2025-06-02T10:00:00.000Z" },
 ];
+const invites = [];
+const presence = {};
+const SOCIAL_UUIDS = { "u-oldplayer": "00000000-0000-4000-8000-000000000001", "u-friend": "00000000-0000-4000-8000-000000000002" };
+const friendCard = (a, extra = {}) => ({ uuid: SOCIAL_UUIDS[a.sub], name: a.username, handle: a.username, picture: null, status: "online", activity: null, jace_sub: a.sub, jace_username: a.username, ...extra });
+const MC_ONLY = { uuid: "00000000-0000-4000-8000-00000000beef", name: "Steve", handle: "steve", picture: null, status: "offline", activity: null, jace_sub: null, jace_username: null };
+const SOCIAL_FRIENDS = {
+  "u-oldplayer": [friendCard(FRIEND), MC_ONLY],
+  "u-friend": [friendCard(USER, { status: "idle" })],
+};
 const externalIds = new Set();
 const codes = new Map(); // code -> account
 const tokens = new Map([["mock-access-token", USER], ["mock-access-token-friend", FRIEND]]);
@@ -78,6 +87,28 @@ createServer(async (req, res) => {
     codes.delete(form.get("code"));
     const token = [...tokens].find(([, a]) => a === account)[0];
     return json(res, 200, { access_token: token, token_type: "Bearer", expires_in: 365 * 86400, scope: "profile scores" });
+  }
+  // Mock of Jace Social's Jace Games integration (jace_social/server
+  // /api/v1/integrations/games): set JACE_SOCIAL_URL to this server and
+  // JACE_SOCIAL_APP_KEY to "dev-app-key". GET /_invites lists what was sent.
+  if (url.pathname === "/_invites") return json(res, 200, { invites, presence });
+  if (url.pathname.startsWith("/api/v1/integrations/games/")) {
+    if (req.headers["x-jace-app-key"] !== "dev-app-key") return json(res, 401, { error: "invalid_app_key" });
+    if (!authed) return json(res, 401, { error: "invalid_token" });
+    const what = url.pathname.split("/").pop();
+    const friends = SOCIAL_FRIENDS[me.sub] ?? [];
+    if (what === "friends") return json(res, 200, { linked: true, friends });
+    const body = JSON.parse((await readBody(req)) || "{}");
+    if (what === "invite") {
+      if (!friends.some((f) => f.uuid === body.to)) return json(res, 403, { error: "not_friends" });
+      if (!/^[A-Z0-9]{4,8}$/.test(body.code ?? "") || !/\/r\//.test(body.url ?? "")) return json(res, 400, { error: "invalid_request", error_description: "bad invite" });
+      invites.push({ from: me.username, ...body, at: new Date().toISOString() });
+      return json(res, 200, { ok: true });
+    }
+    if (what === "presence") {
+      presence[me.username] = body.activity ?? null;
+      return json(res, 200, { ok: true });
+    }
   }
   if (!authed) return json(res, 401, { error: "invalid_token" });
   if (url.pathname === "/api/oauth/userinfo") return json(res, 200, me);

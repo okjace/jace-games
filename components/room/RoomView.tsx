@@ -25,6 +25,8 @@ export function RoomView({ code }: { code: string }) {
   const { data, error, gone, channel, online, act } = useRoom(code, me);
   const [notice, setNotice] = useState<string | null>(null);
   const triedJoin = useRef(false);
+  const playing = data?.me && data.room.status === "playing" ? data.room.gameName : null;
+  usePresence(user ? playing : null);
 
   // Coming from an invite link: join straight away if there's room.
   useEffect(() => {
@@ -201,4 +203,19 @@ function Playing({
       </div>
     </Fullscreen>
   );
+}
+
+/** Tells Jace Social friends what you're playing (refreshed every 2 minutes, cleared when you stop). */
+function usePresence(game: string | null) {
+  useEffect(() => {
+    if (!game) return;
+    const send = (activity: string | null) =>
+      fetch("/api/presence", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ activity }), keepalive: true }).catch(() => {});
+    void send(`Playing ${game}`);
+    const t = setInterval(() => void send(`Playing ${game}`), 120_000);
+    return () => {
+      clearInterval(t);
+      void send(null);
+    };
+  }, [game]);
 }

@@ -23,11 +23,27 @@ Next.js 16 (App Router), TypeScript and Tailwind 4, deployed on Vercel.
 
 Every game works with a keyboard (arrow keys/WASD, Enter to restart) and on a touchscreen (swipes, taps, on-screen pads).
 
+### Multiplayer
+
+Every game can be played with friends, in one of three ways:
+
+| Mode | Games | How it works |
+| ---- | ----- | ------------ |
+| Race | 2048, Minesweeper, Word Guess, Typing, Reaction, Flappy, Breakout, Block Stacker (with garbage attacks) | Everyone plays the same seeded board at once, sees each other's live score, and the server ranks the results. Timed races count your score when time runs out. |
+| Turns | Memory Match, Connect Four, Chess, Checkers, Battleship, Dots and Boxes, Draw & Guess | The server referees every move with a rules module in [`lib/multiplayer/rules`](lib/multiplayer/rules) and only sends each player what they may see. Also playable by passing one device around (except Draw & Guess). |
+| Live | Pong, Snake (2–4 player arena) | The host's browser runs the game and broadcasts it about 30 times a second; the others send their input. |
+
+Create a room with **Play with friends** on a game page, then share the link (`/r/<code>`), the code, or invite Jace Social friends from the lobby. Wins are kept per game (the "Most wins" leaderboards and the profile); they don't go to Jace's single-player leaderboards. Rooms expire after a day.
+
+Every game page also has a **Fullscreen** button (or press F). Where the browser can't go fullscreen (iPhone), it covers the page instead.
+
 ### Adding a game
 
 1. Add an entry to `GAMES` in [`lib/games.ts`](lib/games.ts): id, name, description, icon, `better` (`"higher"` or `"lower"`), how to format the score, `addedAt` (shows a "New" badge for a month), and `limits` for server-side validation.
 2. Write the component in `components/games/`. It receives `{ onFinish(score, durationMs), best }` and calls `onFinish` once when a game ends.
 3. Register it in [`components/games/index.ts`](components/games/index.ts).
+
+For multiplayer, add `multiplayer: { mode, min, max }` to the entry. A race needs nothing else as long as the game uses `useGameRandom(seed)` for randomness and calls `onProgress`/`onFail`. A turn-based game needs a rules module (registered in [`lib/multiplayer/registry.ts`](lib/multiplayer/registry.ts), with tests in [`tests/rules.test.ts`](tests/rules.test.ts)) and a board in `components/multi`. A live game needs a component in [`components/multi/live.ts`](components/multi/live.ts).
 
 ## Setup
 
@@ -49,8 +65,29 @@ Fill in `.env.local`, then run `npm run dev` and open http://localhost:3000.
 | `SESSION_SECRET`     | yes      | 32+ random characters used to encrypt the session cookie. Generate with `openssl rand -base64 32`. Changing it signs everyone out. |
 | `APP_URL`            | no       | This app's public URL, used to build the redirect URI `<APP_URL>/api/auth/callback`. Defaults to the URL of the incoming request. Set it in production if you use more than one domain. |
 | `JACE_URL`           | no       | The Jace base URL. Defaults to `https://jaceo.vercel.app`. |
+| `SUPABASE_URL`       | yes*     | The Jace Games Supabase project URL. Rooms and match results live there. |
+| `SUPABASE_SECRET_KEY` | yes*    | That project's **secret** key (server only). |
+| `NEXT_PUBLIC_SUPABASE_URL` | yes* | The same project URL, for Realtime in the browser. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes* | That project's **publishable** key, for Realtime in the browser. |
+| `JACE_SOCIAL_URL`    | no       | Defaults to `https://jace-social.vercel.app`. |
+| `JACE_SOCIAL_APP_KEY` | no      | Shared secret with Jace Social (its `JACE_GAMES_APP_KEY`). Without it, friend invites show "coming soon". |
+| `CRON_SECRET`        | no       | Vercel sends it to the daily room cleanup cron; set it so nobody else can call that route. |
+
+\* Required in production for multiplayer. In development without them, rooms use an in-memory store and a local live relay ([`lib/realtime/devBus.ts`](lib/realtime/devBus.ts)), so everything can be tried locally.
 
 Put the same variables in Vercel → Project → Settings → Environment Variables. None of them use the `NEXT_PUBLIC_` prefix, so none reach the client bundle. `.env*` files are gitignored (except `.env.example`).
+
+### Setting up Supabase
+
+1. Create a project named "jace-games" (Data API on, "Automatically expose new tables" off, automatic RLS on). Realtime's public channel access must be allowed, which is the default.
+2. Run the SQL files in [`supabase/migrations`](supabase/migrations) in order (SQL editor, or `supabase db push`). Every table has row-level security on and no policies, so only the server's secret key can read or write.
+3. Copy the project URL, publishable key and secret key into the env vars above.
+
+Live channels are named with an unguessable per-room secret that only room members get. Anything that matters (moves, results, wins) goes through the server; the channels only carry "something changed" pings, live scores, drawing strokes and live game frames.
+
+### Jace Social friends
+
+The lobby lists your Jace Social friends and sends invites as Jace Social DMs, through Jace Social's server-to-server API (`/api/v1/integrations/games/{friends,invite,presence}`, see its README). Jace Games calls it from the server with the player's Jace token and `JACE_SOCIAL_APP_KEY`. While you're in a game, your friends see "Playing <game> on Jace Games".
 
 ### Registering Jace Games in Jace
 
@@ -98,7 +135,7 @@ node scripts/mock-jace.mjs
 JACE_URL=http://localhost:4000 npm run dev
 ```
 
-The mock's authorize endpoint signs you in straight away. Start it with `MOCK_SCORES=off` to behave like Jace today (scores endpoints return 404), or `MOCK_BANNED=1` to test the banned path.
+The mock's authorize endpoint lets you pick one of two accounts, "oldplayer" or "friend". To be both at once, open the app on `localhost` in one tab and `127.0.0.1` in another (they keep separate cookies). The mock also stands in for Jace Social's friends API: set `JACE_SOCIAL_URL` to the mock and `JACE_SOCIAL_APP_KEY=dev-app-key`. Start it with `MOCK_SCORES=off` to behave like Jace before its scores API shipped (scores endpoints return 404), or `MOCK_BANNED=1` to test the banned path.
 
 ## Scripts
 
@@ -106,6 +143,7 @@ The mock's authorize endpoint signs you in straight away. Start it with `MOCK_SC
 - `npm run build`: production build
 - `npm run lint`: ESLint
 - `npm run typecheck`: TypeScript
+- `npm test`: tests for the turn-based rules modules
 
 ## Links
 
