@@ -403,7 +403,7 @@ async function handleLeaveDuringGame(
     await finishTurns(updated, players, remaining.map((p) => p.seat), undefined, `${leaver.username} left.`);
   } else if (room.mode === "turns") {
     const rules = rulesFor(room);
-    const forfeit = (rules as Rules & { forfeit?: (s: unknown, seat: number, ctx: Ctx) => unknown })?.forfeit;
+    const forfeit = rules?.forfeit;
     if (forfeit && room.state) {
       const next = forfeit(room.state, leaver.seat, ctxFor(room, 3));
       const after = await roomStore().updateRoom(room.id, { state: next as RoomRow["state"], version: updated.version + 1 }, updated.version);

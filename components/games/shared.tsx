@@ -14,8 +14,11 @@ export type GameProps = {
   onProgress?: (score: number) => void;
   /** Races only: the game ended without a score (lost a Minesweeper or Word Guess round). */
   onFail?: () => void;
-  /** Races only: a game that never ends by itself (2048) stops after this long. */
-  timeLimitMs?: number;
+  /** Versus races (Block Stacker): send garbage to opponents and receive theirs. */
+  versus?: {
+    attack: (lines: number) => void;
+    onAttack: (fn: (lines: number) => void) => () => void;
+  };
 };
 
 /**
@@ -23,6 +26,17 @@ export type GameProps = {
  * say "waiting for the others" instead of "Play again".
  */
 export const RaceContext = createContext(false);
+
+/** The "Play again" button, or in a race a note that the others are still playing. */
+export function AgainButton({ onClick }: { onClick: () => void }) {
+  const race = useContext(RaceContext);
+  if (race) return <p className="text-sm text-muted">Waiting for the others to finish…</p>;
+  return (
+    <button type="button" onClick={onClick} className={primaryButton} autoFocus>
+      Play again
+    </button>
+  );
+}
 
 /**
  * Random numbers for a game: seeded in a race so every player gets the same

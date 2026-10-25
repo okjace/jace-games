@@ -29,6 +29,8 @@ export type MultiplayerDef = {
   local?: boolean;
   /** Races end after this long, with unfinished players last. */
   timeLimitSec?: number;
+  /** Races: how to show a player's live progress, if not as a score. */
+  progress?: (value: number) => string;
 };
 
 export type GameDef = {
@@ -77,6 +79,7 @@ export const GAMES: GameDef[] = [
     format: (s) => `${n(s)} food`,
     addedAt: "2025-01-01",
     // 20×20 board; the snake moves at most one cell every 70 ms.
+    multiplayer: { mode: "live", min: 2, max: 4 },
     limits: { min: 0, max: 399, minDurationMs: (s) => s * 70 },
   },
   {
@@ -88,6 +91,7 @@ export const GAMES: GameDef[] = [
     scoreLabel: "Moves",
     format: (s) => `${n(s)} moves`,
     addedAt: "2025-01-01",
+    multiplayer: { mode: "turns", min: 2, max: 4, local: true },
     limits: { min: 8, max: 999, minDurationMs: (s) => s * 250 },
   },
   {
@@ -99,6 +103,7 @@ export const GAMES: GameDef[] = [
     scoreLabel: "Score",
     format: (s) => n(s),
     addedAt: "2026-10-19",
+    multiplayer: { mode: "race", min: 2, max: 8, timeLimitSec: 180 },
     limits: { min: 0, max: 4_000_000, minDurationMs: (s) => s * 1.5 },
   },
   {
@@ -110,6 +115,7 @@ export const GAMES: GameDef[] = [
     scoreLabel: "Score",
     format: (s) => n(s),
     addedAt: "2026-10-19",
+    multiplayer: { mode: "race", min: 2, max: 4, timeLimitSec: 300 },
     limits: { min: 0, max: 2_000_000, minDurationMs: (s) => s * 0.4 },
   },
   {
@@ -121,6 +127,7 @@ export const GAMES: GameDef[] = [
     scoreLabel: "Time",
     format: (s) => `${n(s)}s`,
     addedAt: "2026-10-19",
+    multiplayer: { mode: "race", min: 2, max: 8, timeLimitSec: 300, progress: (p) => `${p}% cleared` },
     limits: { min: 1, max: 9_999, minDurationMs: (s) => s * 900 },
   },
   {
@@ -133,17 +140,19 @@ export const GAMES: GameDef[] = [
     format: (s) => `${n(s)} pipes`,
     addedAt: "2026-10-19",
     // A new pipe arrives every ~1.4 s.
+    multiplayer: { mode: "race", min: 2, max: 8, timeLimitSec: 240 },
     limits: { min: 0, max: 9_999, minDurationMs: (s) => s * 1_200 },
   },
   {
     id: "breakout",
     name: "Breakout",
     description: "Bounce the ball, smash every brick, keep the paddle moving.",
-    icon: "🏓",
+    icon: "💥",
     better: "higher",
     scoreLabel: "Score",
     format: (s) => n(s),
     addedAt: "2026-10-19",
+    multiplayer: { mode: "race", min: 2, max: 8, timeLimitSec: 240 },
     limits: { min: 0, max: 99_999, minDurationMs: (s) => s * 8 },
   },
   {
@@ -155,6 +164,7 @@ export const GAMES: GameDef[] = [
     scoreLabel: "Guesses",
     format: (s) => `${s}/6`,
     addedAt: "2026-10-19",
+    multiplayer: { mode: "race", min: 2, max: 8, timeLimitSec: 300, progress: (p) => `${p} guess${p === 1 ? "" : "es"}` },
     limits: { min: 1, max: 6, minDurationMs: (s) => s * 1_000 },
   },
   {
@@ -167,6 +177,7 @@ export const GAMES: GameDef[] = [
     format: (s) => `${n(s)} ms`,
     addedAt: "2026-10-19",
     // Faster than ~100 ms is anticipation, not reaction.
+    multiplayer: { mode: "race", min: 2, max: 8, timeLimitSec: 120, progress: (p) => `${p}/5 tries` },
     limits: { min: 100, max: 5_000, minDurationMs: () => 5 * 1_000 },
   },
   {
@@ -178,7 +189,62 @@ export const GAMES: GameDef[] = [
     scoreLabel: "WPM",
     format: (s) => `${n(s)} WPM`,
     addedAt: "2026-10-19",
+    multiplayer: { mode: "race", min: 2, max: 8, timeLimitSec: 60 },
     limits: { min: 0, max: 250, minDurationMs: () => 29_000 },
+  },
+  {
+    id: "chess",
+    name: "Chess",
+    description: "The classic. Full rules: castling, en passant, promotion and every kind of draw.",
+    icon: "♟️",
+    ...MULTIPLAYER_ONLY,
+    addedAt: "2026-10-24",
+    multiplayer: { mode: "turns", min: 2, max: 2, local: true },
+  },
+  {
+    id: "checkers",
+    name: "Checkers",
+    description: "Jump your friend's pieces, crown kings, and clear the board.",
+    icon: "⚫",
+    ...MULTIPLAYER_ONLY,
+    addedAt: "2026-10-24",
+    multiplayer: { mode: "turns", min: 2, max: 2, local: true },
+  },
+  {
+    id: "battleship",
+    name: "Battleship",
+    description: "Hide your fleet, then hunt theirs one shot at a time.",
+    icon: "🚢",
+    ...MULTIPLAYER_ONLY,
+    addedAt: "2026-10-24",
+    multiplayer: { mode: "turns", min: 2, max: 2, local: true },
+  },
+  {
+    id: "dots",
+    name: "Dots and Boxes",
+    description: "Draw lines, close boxes, and steal the board from up to three friends.",
+    icon: "🔲",
+    ...MULTIPLAYER_ONLY,
+    addedAt: "2026-10-24",
+    multiplayer: { mode: "turns", min: 2, max: 4, local: true },
+  },
+  {
+    id: "draw",
+    name: "Draw & Guess",
+    description: "One person draws, everyone else races to guess the word.",
+    icon: "🎨",
+    ...MULTIPLAYER_ONLY,
+    addedAt: "2026-10-24",
+    multiplayer: { mode: "turns", min: 3, max: 8 },
+  },
+  {
+    id: "pong",
+    name: "Pong",
+    description: "Real-time paddle duel. First to 7 wins.",
+    icon: "🏓",
+    ...MULTIPLAYER_ONLY,
+    addedAt: "2026-10-24",
+    multiplayer: { mode: "live", min: 2, max: 2 },
   },
   {
     id: "connect4",

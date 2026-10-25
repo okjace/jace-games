@@ -141,7 +141,7 @@ function Playing({
   const seat = data.me!.seat;
   const players = data.players
     .filter((p) => !p.left || data.room.mode === "turns")
-    .map((p) => ({ seat: p.seat, name: p.username, picture: p.picture, you: p.userId === data.me!.userId, left: p.left }));
+    .map((p) => ({ seat: p.seat, name: p.username, picture: p.picture, you: p.userId === data.me!.userId, left: p.left, userId: p.userId }));
   const label = data.room.gameName;
 
   if (data.room.mode === "turns") {
@@ -160,10 +160,12 @@ function Playing({
             channel={channel}
             clockSkew={data.clockSkew}
             onMove={async (move) => {
-              setBusy(true);
+              const tick = !!(move as { tick?: boolean } | null)?.tick;
+              if (!tick) setBusy(true);
               const r = await act("move", { move, version: data.room.version });
               setBusy(false);
-              onError(r.ok ? null : (r.error ?? null));
+              // Timer ticks race between players; losing that race is fine.
+              if (!tick) onError(r.ok ? null : (r.error ?? null));
             }}
           />
         </div>

@@ -21,6 +21,8 @@ export type Rules<S = unknown, M = unknown, V = unknown> = {
   /** What `seat` (null = a spectator) is allowed to see. */
   view: (state: S, seat: number | null) => V;
   status: (state: S) => Status;
+  /** Optional: someone left a game with 3+ players. Default: the game ends. */
+  forfeit?: (state: S, seat: number, ctx: Ctx) => S;
 };
 
 export function isError(x: unknown): x is { error: string } {

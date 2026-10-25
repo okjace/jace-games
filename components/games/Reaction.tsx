@@ -7,7 +7,8 @@ const ROUNDS = 5;
 
 type Phase = "intro" | "wait" | "go" | "early" | "result" | "done";
 
-export default function Reaction({ onFinish, best }: GameProps) {
+export default function Reaction({ onFinish, best, seed, onProgress, onFail }: GameProps) {
+  const race = seed !== undefined;
   const [phase, setPhase] = useState<Phase>("intro");
   const [times, setTimes] = useState<number[]>([]);
   const [wasBest, setWasBest] = useState(false);
@@ -45,10 +46,14 @@ export default function Reaction({ onFinish, best }: GameProps) {
         setWasBest(beats(avg, best, "lower"));
         // Taps under 100 ms are guesses, not reactions; those runs aren't saved.
         if (next.every((x) => x >= 100)) onFinish(avg, performance.now() - startedAt.current);
-      } else setPhase("result");
+        else onFail?.();
+      } else {
+        setPhase("result");
+        onProgress?.(next.length);
+      }
     } else if (phase === "early" || phase === "result") {
       arm();
-    } else if (phase === "done") {
+    } else if (phase === "done" && !race) {
       setPhase("intro");
       setTimes([]);
     }
@@ -119,7 +124,7 @@ export default function Reaction({ onFinish, best }: GameProps) {
               <p className="animate-pop rounded-full bg-accent px-3 py-1 text-xs font-semibold text-on-accent">New best!</p>
             )}
             {tooFast && <p className="text-sm text-warn">A tap under 100 ms looks like a guess, so this run wasn&apos;t saved.</p>}
-            <p className="text-sm text-muted">Tap or press Enter to play again.</p>
+            <p className="text-sm text-muted">{race ? "Waiting for the others to finish…" : "Tap or press Enter to play again."}</p>
           </>
         )}
       </div>

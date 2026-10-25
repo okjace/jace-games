@@ -1,6 +1,6 @@
 import type { RoomChannel } from "@/lib/realtime/client";
 
-export type SeatInfo = { seat: number; name: string; picture?: string | null; you?: boolean; left?: boolean };
+export type SeatInfo = { seat: number; name: string; picture?: string | null; you?: boolean; left?: boolean; userId?: string };
 
 /** Props for a turn-based game's board. The same board is used online and for pass-and-play. */
 export type TurnGameProps<V = unknown, M = unknown> = {

@@ -12,4 +12,10 @@ const turn = (load: () => Promise<{ default: ComponentType<TurnGameProps<any, an
 /** Boards for turn-based games (lib/multiplayer/registry.ts has their rules). */
 export const TURN_COMPONENTS: Record<string, AnyTurnGame> = {
   connect4: turn(() => import("./ConnectFour")),
+  memory: turn(() => import("./MemoryMatch")),
+  checkers: turn(() => import("./Checkers")),
+  chess: turn(() => import("./Chess")),
+  battleship: turn(() => import("./Battleship")),
+  dots: turn(() => import("./Dots")),
+  draw: turn(() => import("./DrawGuess")),
 };

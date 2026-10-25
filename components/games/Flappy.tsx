@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GameOver, Overlay, Stats, beats, primaryButton, setupCanvas, themeColors, useKeys, type GameProps } from "./shared";
+import { GameOver, Overlay, Stats, beats, primaryButton, setupCanvas, themeColors, useGameRandom, useKeys, type GameProps } from "./shared";
 
 const W = 360;
 const H = 540;
@@ -17,7 +17,8 @@ const PIPE_EVERY = 1.4; // s
 
 type Pipe = { x: number; gapY: number; passed: boolean };
 
-export default function Flappy({ onFinish, best }: GameProps) {
+export default function Flappy({ onFinish, best, seed, onProgress }: GameProps) {
+  const rand = useGameRandom(seed);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [phase, setPhase] = useState<"idle" | "running" | "over">("idle");
   const [score, setScore] = useState(0);
@@ -78,16 +79,17 @@ export default function Flappy({ onFinish, best }: GameProps) {
   }, [draw]);
 
   const start = useCallback(() => {
+    rand.reset();
     Object.assign(g.current, { y: H / 2, vy: FLAP, pipes: [], score: 0, spawnIn: 0.6, startedAt: performance.now() });
     setScore(0);
     setPhase("running");
-  }, []);
+  }, [rand]);
 
   const flap = useCallback(() => {
     if (phase === "running") g.current.vy = FLAP;
     else if (phase === "idle") start();
-    else if (phase === "over" && performance.now() - g.current.overAt > 500) start();
-  }, [phase, start]);
+    else if (phase === "over" && seed === undefined && performance.now() - g.current.overAt > 500) start();
+  }, [phase, start, seed]);
 
   useEffect(() => {
     if (phase !== "running") return;
@@ -103,7 +105,7 @@ export default function Flappy({ onFinish, best }: GameProps) {
       if (s.spawnIn <= 0) {
         s.spawnIn += PIPE_EVERY;
         const margin = 70;
-        s.pipes.push({ x: W, gapY: margin + GAP / 2 + Math.random() * (H - GROUND - 2 * margin - GAP), passed: false });
+        s.pipes.push({ x: W, gapY: margin + GAP / 2 + rand() * (H - GROUND - 2 * margin - GAP), passed: false });
       }
       for (const p of s.pipes) {
         p.x -= SPEED * dt;
@@ -111,6 +113,7 @@ export default function Flappy({ onFinish, best }: GameProps) {
           p.passed = true;
           s.score += 1;
           setScore(s.score);
+          onProgress?.(s.score);
         }
       }
       s.pipes = s.pipes.filter((p) => p.x > -PIPE_W);
@@ -133,7 +136,7 @@ export default function Flappy({ onFinish, best }: GameProps) {
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [phase, draw, onFinish, best]);
+  }, [phase, draw, onFinish, best, onProgress, rand]);
 
   useKeys((e) => {
     if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || (e.key === "Enter" && phase !== "running")) {

@@ -2,17 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TYPING_WORDS } from "@/lib/words";
-import { GameOver, Stats, beats, type GameProps } from "./shared";
+import { GameOver, Stats, beats, useGameRandom, type GameProps } from "./shared";
 
 const SECONDS = 30;
 
-function makeWords(count = 120): string[] {
-  return Array.from({ length: count }, () => TYPING_WORDS[Math.floor(Math.random() * TYPING_WORDS.length)]);
+function makeWords(rand: () => number = Math.random, count = 120): string[] {
+  return Array.from({ length: count }, () => TYPING_WORDS[Math.floor(rand() * TYPING_WORDS.length)]);
 }
 
 /** 30-second typing test. WPM counts correctly typed words (5 characters = 1 word). */
-export default function Typing({ onFinish, best }: GameProps) {
-  const [words, setWords] = useState<string[]>(() => makeWords());
+export default function Typing({ onFinish, best, seed, onProgress }: GameProps) {
+  const rand = useGameRandom(seed);
+  const [words, setWords] = useState<string[]>(() => makeWords(rand));
   const [typed, setTyped] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -45,6 +46,11 @@ export default function Typing({ onFinish, best }: GameProps) {
     const t = setInterval(() => {
       const elapsed = (performance.now() - startedAt) / 1000;
       setLeft(Math.max(0, Math.ceil(SECONDS - elapsed)));
+      if (onProgress && elapsed > 3) {
+        // Live words-per-minute so far, for opponents in a race.
+        const { typed: tw, words: all } = state.current;
+        onProgress(Math.round((score(tw, all).wpm * SECONDS) / Math.min(elapsed, SECONDS)));
+      }
       if (elapsed >= SECONDS) {
         clearInterval(t);
         const { typed: tw, input: cur, words: all } = state.current;
@@ -57,7 +63,7 @@ export default function Typing({ onFinish, best }: GameProps) {
       }
     }, 100);
     return () => clearInterval(t);
-  }, [startedAt, done, score, onFinish, best]);
+  }, [startedAt, done, score, onFinish, best, onProgress]);
 
   // Keep the current word in view.
   useEffect(() => {
@@ -67,14 +73,15 @@ export default function Typing({ onFinish, best }: GameProps) {
   }, [typed.length]);
 
   const reset = useCallback(() => {
-    setWords(makeWords());
+    rand.reset();
+    setWords(makeWords(rand));
     setTyped([]);
     setInput("");
     setStartedAt(null);
     setLeft(SECONDS);
     setDone(null);
     setTimeout(() => inputRef.current?.focus(), 0);
-  }, []);
+  }, [rand]);
 
   useEffect(() => {
     if (!done) return;

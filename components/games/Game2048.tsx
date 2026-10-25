@@ -1,21 +1,21 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { GameOver, Stats, beats, keyToDir, secondaryButton, useKeys, useSwipe, type Dir, type GameProps } from "./shared";
+import { GameOver, Stats, beats, keyToDir, secondaryButton, useGameRandom, useKeys, useSwipe, type Dir, type GameProps } from "./shared";
 
 const N = 4;
 type Board = number[]; // N*N, 0 = empty
 
-function addTile(board: Board): Board {
+function addTile(board: Board, rand: () => number): Board {
   const empty = board.flatMap((v, i) => (v === 0 ? [i] : []));
   if (empty.length === 0) return board;
   const next = [...board];
-  next[empty[Math.floor(Math.random() * empty.length)]] = Math.random() < 0.9 ? 2 : 4;
+  next[empty[Math.floor(rand() * empty.length)]] = rand() < 0.9 ? 2 : 4;
   return next;
 }
 
-function newBoard(): Board {
-  return addTile(addTile(Array(N * N).fill(0)));
+function newBoard(rand: () => number): Board {
+  return addTile(addTile(Array(N * N).fill(0), rand), rand);
 }
 
 /** Slides one row toward index 0, merging equal neighbours once. */
@@ -70,8 +70,9 @@ const TILE_STYLES: Record<number, string> = {
   2048: "bg-accent text-on-accent ring-4 ring-accent/40",
 };
 
-export default function Game2048({ onFinish, best }: GameProps) {
-  const [board, setBoard] = useState<Board>(() => newBoard());
+export default function Game2048({ onFinish, best, seed, onProgress }: GameProps) {
+  const rand = useGameRandom(seed);
+  const [board, setBoard] = useState<Board>(() => newBoard(rand));
   const [score, setScore] = useState(0);
   const [over, setOver] = useState(false);
   const [wasBest, setWasBest] = useState(false);
@@ -94,23 +95,25 @@ export default function Game2048({ onFinish, best }: GameProps) {
       const res = move(board, dir);
       if (!res.moved) return;
       if (startedAt.current === null) startedAt.current = performance.now();
-      const withTile = addTile(res.board);
+      const withTile = addTile(res.board, rand);
       setLastNew(withTile.findIndex((v, i) => v !== 0 && res.board[i] === 0));
       setBoard(withTile);
       const s = score + res.gained;
       setScore(s);
+      onProgress?.(s);
       if (!canMove(withTile)) finish(s);
     },
-    [board, over, score, finish],
+    [board, over, score, finish, rand, onProgress],
   );
 
   const reset = useCallback(() => {
-    setBoard(newBoard());
+    rand.reset();
+    setBoard(newBoard(rand));
     setScore(0);
     setOver(false);
     setLastNew(null);
     startedAt.current = null;
-  }, []);
+  }, [rand]);
 
   useKeys((e) => {
     const d = keyToDir(e.key);

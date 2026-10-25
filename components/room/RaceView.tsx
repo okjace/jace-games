@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GAME_COMPONENTS } from "@/components/games";
 import { RaceContext } from "@/components/games/shared";
 import { SEAT_COLORS } from "@/components/multi/types";
@@ -33,6 +33,12 @@ export function RaceView({
   const sentAt = useRef(0);
   const finished = data.players.find((p) => p.userId === meId)?.finished ?? false;
   const [submitted, setSubmitted] = useState(finished);
+  const [timeUp, setTimeUp] = useState(false);
+  const progressRef = useRef<number | null>(null);
+  const startedRef = useRef(0);
+  useEffect(() => {
+    startedRef.current = performance.now();
+  }, []);
 
   useEffect(() => {
     if (!channel) return;
@@ -42,16 +48,24 @@ export function RaceView({
     });
   }, [channel]);
 
+  // A few updates a second is plenty, but the latest one always goes out.
+  const trailing = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onProgress = useCallback(
     (score: number) => {
+      progressRef.current = score;
       setProgress((cur) => ({ ...cur, [meId]: score }));
-      const now = Date.now();
-      if (now - sentAt.current < 250) return; // a few updates a second is plenty
-      sentAt.current = now;
-      channel?.send("progress", { userId: meId, score });
+      const send = () => {
+        sentAt.current = Date.now();
+        trailing.current = null;
+        channel?.send("progress", { userId: meId, score: progressRef.current });
+      };
+      const wait = 250 - (Date.now() - sentAt.current);
+      if (wait <= 0) send();
+      else if (!trailing.current) trailing.current = setTimeout(send, wait);
     },
     [channel, meId],
   );
+  useEffect(() => () => void (trailing.current && clearTimeout(trailing.current)), []);
 
   const onFinish = useCallback(
     async (score: number, durationMs: number) => {
@@ -69,30 +83,71 @@ export function RaceView({
     onError(r.ok ? null : (r.error ?? null));
   }, [act, onError]);
 
-  // Countdown for timed races; when time's up, ask the server to wrap up.
+  // Versus races (Block Stacker): garbage goes to one random opponent.
+  const opponents = data.players.filter((p) => !p.left && p.userId !== meId).map((p) => p.userId);
+  const opponentsKey = opponents.join(",");
+  const versus = useMemo(() => {
+    if (game.id !== "tetris" || !channel) return undefined;
+    const ids = opponentsKey ? opponentsKey.split(",") : [];
+    return {
+      attack: (lines: number) => {
+        if (ids.length) channel.send("attack", { to: ids[Math.floor(Math.random() * ids.length)], lines });
+      },
+      onAttack: (fn: (lines: number) => void) =>
+        channel.on("attack", (p) => {
+          const { to, lines } = p as { to: string; lines: number };
+          if (to === meId && Number.isInteger(lines) && lines > 0 && lines <= 4) fn(lines);
+        }),
+    };
+  }, [game.id, channel, opponentsKey, meId]);
+
+  // Countdown for timed races. When it runs out, whatever you have counts:
+  // your current score where higher is better, otherwise you didn't finish.
   const deadlineIso = data.room.deadline;
   const skew = data.clockSkew;
+  const submittedRef = useRef(submitted);
+  useEffect(() => {
+    submittedRef.current = submitted;
+  }, [submitted]);
   useEffect(() => {
     if (!deadlineIso) return;
     const deadline = Date.parse(deadlineIso) - skew;
+    let stopped = false;
     let asked = false;
     const t = setInterval(() => {
-      const ms = deadline - Date.now();
+      // The server allows 3 s of grace after the shown time.
+      const ms = deadline - 3000 - Date.now();
       setLeft(Math.max(0, Math.ceil(ms / 1000)));
-      if (ms <= 0 && !asked) {
+      if (ms <= 0 && !stopped) {
+        stopped = true;
+        setTimeUp(true);
+        if (!submittedRef.current) {
+          submittedRef.current = true;
+          setSubmitted(true);
+          const score = progressRef.current;
+          void (game.better === "higher" && score !== null
+            ? act("result", { score, durationMs: performance.now() - startedRef.current })
+            : act("result", { dnf: true }));
+        }
+      }
+      if (ms <= -3500 && !asked) {
         asked = true;
         void act("finalize");
       }
     }, 250);
     return () => clearInterval(t);
-  }, [deadlineIso, skew, act]);
+  }, [deadlineIso, skew, act, game.better]);
 
-  const timeLimitSec = Number(data.room.settings.timeLimitSec) || 0;
   const players = data.players.filter((p) => !p.left);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-      <section className="rounded-2xl border border-line bg-panel/40 p-3 sm:p-6">
+      <section className="relative rounded-2xl border border-line bg-panel/40 p-3 sm:p-6">
+        {timeUp && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-background/80 backdrop-blur-sm">
+            <p className="text-2xl font-bold">Time&apos;s up!</p>
+          </div>
+        )}
         <RaceContext.Provider value={true}>
           {Game && (
             <Game
@@ -102,7 +157,7 @@ export function RaceView({
               onProgress={onProgress}
               onFinish={submitted ? () => {} : onFinish}
               onFail={submitted ? () => {} : onFail}
-              timeLimitMs={timeLimitSec ? timeLimitSec * 1000 : undefined}
+              versus={versus}
             />
           )}
         </RaceContext.Provider>
@@ -127,7 +182,7 @@ export function RaceView({
                   {p.userId === meId && <span className="text-muted"> (you)</span>}
                 </span>
                 <span className="font-mono font-semibold tabular-nums">
-                  {progress[p.userId] !== undefined ? game.format(progress[p.userId]) : "—"}
+                  {progress[p.userId] !== undefined ? (game.multiplayer?.progress ?? game.format)(progress[p.userId]) : "—"}
                 </span>
                 {p.finished && <span title="Finished">✅</span>}
               </li>

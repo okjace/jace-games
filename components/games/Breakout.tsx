@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GameOver, Overlay, Stats, beats, primaryButton, setupCanvas, themeColors, useKeys, type GameProps } from "./shared";
+import { GameOver, Overlay, Stats, beats, primaryButton, setupCanvas, themeColors, useGameRandom, useKeys, type GameProps } from "./shared";
 
 const W = 400;
 const H = 520;
@@ -28,7 +28,8 @@ function makeBricks(): Brick[] {
   return out;
 }
 
-export default function Breakout({ onFinish, best }: GameProps) {
+export default function Breakout({ onFinish, best, seed, onProgress }: GameProps) {
+  const rand = useGameRandom(seed);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [phase, setPhase] = useState<"idle" | "running" | "over">("idle");
   const [hud, setHud] = useState({ score: 0, lives: 3, level: 1 });
@@ -91,13 +92,14 @@ export default function Breakout({ onFinish, best }: GameProps) {
     const s = g.current;
     if (!s.stuck) return;
     const speed = 300 + (s.level - 1) * 40;
-    const angle = (-Math.PI / 2) + (Math.random() - 0.5) * 0.8;
+    const angle = -Math.PI / 2 + (rand() - 0.5) * 0.8;
     s.vx = Math.cos(angle) * speed;
     s.vy = Math.sin(angle) * speed;
     s.stuck = false;
   };
 
   const start = useCallback(() => {
+    rand.reset();
     Object.assign(g.current, {
       px: W / 2,
       stuck: true,
@@ -109,7 +111,7 @@ export default function Breakout({ onFinish, best }: GameProps) {
     });
     setHud({ score: 0, lives: 3, level: 1 });
     setPhase("running");
-  }, []);
+  }, [rand]);
 
   useEffect(() => {
     if (phase !== "running") return;
@@ -169,6 +171,7 @@ export default function Breakout({ onFinish, best }: GameProps) {
             if (overlapX < overlapY) s.vx = -s.vx;
             else s.vy = -s.vy;
             setHud((h) => ({ ...h, score: s.score }));
+            onProgress?.(s.score);
             break;
           }
         }
@@ -196,7 +199,7 @@ export default function Breakout({ onFinish, best }: GameProps) {
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [phase, draw, onFinish, best]);
+  }, [phase, draw, onFinish, best, onProgress]);
 
   useKeys((e) => {
     const s = g.current;
@@ -206,7 +209,7 @@ export default function Breakout({ onFinish, best }: GameProps) {
       else if (e.key === " " || e.key === "ArrowUp") launch();
       else return;
       e.preventDefault();
-    } else if (e.key === "Enter" || e.key === " ") {
+    } else if ((e.key === "Enter" || e.key === " ") && (phase === "idle" || seed === undefined)) {
       e.preventDefault();
       start();
     }

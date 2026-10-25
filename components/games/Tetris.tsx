@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GameOver, Overlay, Stats, beats, primaryButton, setupCanvas, themeColors, useKeys, type GameProps } from "./shared";
+import { GameOver, Overlay, Stats, beats, primaryButton, setupCanvas, themeColors, useGameRandom, useKeys, type GameProps } from "./shared";
 
 const COLS = 10;
 const ROWS = 20;
@@ -45,6 +45,7 @@ const COLORS: Record<string, string> = {
   Z: "#f87171",
   J: "#60a5fa",
   L: "#fb923c",
+  G: "#6b717c",
 };
 const LINE_POINTS = [0, 100, 300, 500, 800];
 
@@ -53,10 +54,14 @@ type Piece = { kind: string; shape: Shape; x: number; y: number };
 const rotate = (s: Shape): Shape => s[0].map((_, i) => s.map((row) => row[i]).reverse());
 const rotateCcw = (s: Shape): Shape => rotate(rotate(rotate(s)));
 
-function bag(): string[] {
+// Lines sent to opponents in a versus race for clearing 1–4 lines at once.
+const ATTACK = [0, 0, 1, 2, 4];
+const GARBAGE = "G";
+
+function bag(rand: () => number = Math.random): string[] {
   const b = Object.keys(SHAPES);
   for (let i = b.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rand() * (i + 1));
     [b[i], b[j]] = [b[j], b[i]];
   }
   return b;
@@ -67,7 +72,9 @@ function spawn(kind: string): Piece {
   return { kind, shape, x: Math.floor((COLS - shape[0].length) / 2), y: kind === "I" ? 0 : -1 };
 }
 
-export default function Tetris({ onFinish, best }: GameProps) {
+export default function Tetris({ onFinish, best, seed, onProgress, versus }: GameProps) {
+  const rand = useGameRandom(seed);
+  const [incoming, setIncoming] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const nextRef = useRef<HTMLCanvasElement>(null);
   const [phase, setPhase] = useState<"idle" | "running" | "paused" | "over">("idle");
@@ -80,6 +87,7 @@ export default function Tetris({ onFinish, best }: GameProps) {
     queue: [] as string[],
     score: 0,
     lines: 0,
+    garbage: 0,
     startedAt: 0,
     dropAcc: 0,
     last: 0,
@@ -97,7 +105,7 @@ export default function Tetris({ onFinish, best }: GameProps) {
 
   const nextKind = () => {
     const s = g.current;
-    if (s.queue.length < 2) s.queue.push(...bag());
+    if (s.queue.length < 2) s.queue.push(...bag(rand));
     return s.queue.shift()!;
   };
 
@@ -166,6 +174,15 @@ export default function Tetris({ onFinish, best }: GameProps) {
 
   const level = () => Math.floor(g.current.lines / 10);
 
+  // Versus: garbage from opponents queues up and lands with the next piece.
+  useEffect(() => {
+    if (!versus) return;
+    return versus.onAttack((lines) => {
+      g.current.garbage = Math.min(20, g.current.garbage + lines);
+      setIncoming(g.current.garbage);
+    });
+  }, [versus]);
+
   const end = useCallback(() => {
     const s = g.current;
     setPhase("over");
@@ -192,7 +209,25 @@ export default function Tetris({ onFinish, best }: GameProps) {
       s.score += LINE_POINTS[cleared] * (level() + 1);
       s.lines += cleared;
       s.grid = [...Array.from({ length: cleared }, () => Array<string | null>(COLS).fill(null)), ...kept];
+      // Clearing lines cancels incoming garbage first, then attacks.
+      let attack = ATTACK[cleared];
+      const cancel = Math.min(attack, s.garbage);
+      s.garbage -= cancel;
+      attack -= cancel;
+      if (attack > 0) versus?.attack(attack);
+    } else if (s.garbage > 0) {
+      // Garbage rises from the bottom, each row with one gap.
+      const n = Math.min(s.garbage, ROWS - 2);
+      s.garbage = 0;
+      if (s.grid.slice(0, n).some((row) => row.some(Boolean))) return false; // pushed over the top
+      const rows = Array.from({ length: n }, () => {
+        const gap = Math.floor(Math.random() * COLS);
+        return Array.from({ length: COLS }, (_, x) => (x === gap ? null : GARBAGE));
+      });
+      s.grid = [...s.grid.slice(n), ...rows];
     }
+    setIncoming(s.garbage);
+    onProgress?.(s.score);
     s.piece = spawn(nextKind());
     setHud({ score: s.score, lines: s.lines, level: level() });
     return !collides(s.piece);
@@ -241,7 +276,10 @@ export default function Tetris({ onFinish, best }: GameProps) {
   const start = useCallback(() => {
     const s = g.current;
     s.grid = Array.from({ length: ROWS }, () => Array<string | null>(COLS).fill(null));
-    s.queue = bag();
+    rand.reset();
+    s.queue = bag(rand);
+    s.garbage = 0;
+    setIncoming(0);
     s.piece = spawn(s.queue.shift()!);
     s.score = 0;
     s.lines = 0;
@@ -249,7 +287,7 @@ export default function Tetris({ onFinish, best }: GameProps) {
     s.dropAcc = 0;
     setHud({ score: 0, lines: 0, level: 0 });
     setPhase("running");
-  }, []);
+  }, [rand]);
 
   useEffect(() => {
     if (phase !== "running") return;
@@ -298,7 +336,7 @@ export default function Tetris({ onFinish, best }: GameProps) {
       } else if (e.key === "p" || e.key === "Escape") setPhase("paused");
     } else if (phase === "paused" && (e.key === "p" || e.key === "Escape" || e.key === "Enter")) {
       setPhase("running");
-    } else if ((phase === "idle" || phase === "over") && (e.key === "Enter" || e.key === " ")) {
+    } else if ((phase === "idle" || (phase === "over" && seed === undefined)) && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
       start();
     }
@@ -369,7 +407,7 @@ export default function Tetris({ onFinish, best }: GameProps) {
               { label: "Score", value: hud.score.toLocaleString() },
               { label: "Lines", value: hud.lines },
               { label: "Level", value: hud.level + 1 },
-              { label: "Best", value: best?.toLocaleString() ?? "—", accent: true },
+              ...(versus ? [{ label: "Incoming", value: incoming }] : [{ label: "Best", value: best?.toLocaleString() ?? "—", accent: true }]),
             ]}
           />
           {phase === "running" && (

@@ -2,13 +2,13 @@
 
 import { useCallback, useRef, useState } from "react";
 import { WORDLE_ANSWERS } from "@/lib/words";
-import { GameOver, Overlay, beats, primaryButton, useKeys, type GameProps } from "./shared";
+import { AgainButton, beats, GameOver, Overlay, useGameRandom, useKeys, type GameProps } from "./shared";
 
 const LEN = 5;
 const TRIES = 6;
 type Mark = "hit" | "near" | "miss";
 
-const pick = () => WORDLE_ANSWERS[Math.floor(Math.random() * WORDLE_ANSWERS.length)];
+const pick = (rand: () => number = Math.random) => WORDLE_ANSWERS[Math.floor(rand() * WORDLE_ANSWERS.length)];
 
 /** Marks a guess like Wordle does, handling repeated letters correctly. */
 function mark(guess: string, answer: string): Mark[] {
@@ -35,8 +35,9 @@ const MARK_CLASS: Record<Mark, string> = {
 
 const KEY_ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
 
-export default function Wordle({ onFinish, best }: GameProps) {
-  const [answer, setAnswer] = useState(pick);
+export default function Wordle({ onFinish, best, seed, onProgress, onFail }: GameProps) {
+  const rand = useGameRandom(seed);
+  const [answer, setAnswer] = useState(() => pick(rand));
   const [guesses, setGuesses] = useState<string[]>([]);
   const [current, setCurrent] = useState("");
   const [state, setState] = useState<"playing" | "won" | "lost">("playing");
@@ -45,12 +46,13 @@ export default function Wordle({ onFinish, best }: GameProps) {
   const startedAt = useRef<number | null>(null);
 
   const reset = useCallback(() => {
-    setAnswer(pick());
+    rand.reset();
+    setAnswer(pick(rand));
     setGuesses([]);
     setCurrent("");
     setState("playing");
     startedAt.current = null;
-  }, []);
+  }, [rand]);
 
   const submit = () => {
     if (current.length !== LEN) {
@@ -67,12 +69,13 @@ export default function Wordle({ onFinish, best }: GameProps) {
       onFinish(next.length, performance.now() - (startedAt.current ?? performance.now()));
     } else if (next.length >= TRIES) {
       setState("lost");
-    }
+      onFail?.();
+    } else onProgress?.(next.length);
   };
 
   const press = (key: string) => {
     if (state !== "playing") {
-      if (key === "enter") reset();
+      if (key === "enter" && seed === undefined) reset();
       return;
     }
     if (key === "enter") return submit();
@@ -142,9 +145,7 @@ export default function Wordle({ onFinish, best }: GameProps) {
             <p className="text-sm text-muted">The word was</p>
             <p className="text-3xl font-bold uppercase tracking-widest">{answer}</p>
             <p className="text-xs text-muted">Only solved words count toward your score.</p>
-            <button type="button" onClick={reset} className={primaryButton} autoFocus>
-              Play again
-            </button>
+            <AgainButton onClick={reset} />
           </Overlay>
         )}
       </div>

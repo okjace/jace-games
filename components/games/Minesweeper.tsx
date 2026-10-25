@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GameOver, now, Overlay, Stats, beats, primaryButton, type GameProps } from "./shared";
+import { seededRandom } from "@/lib/multiplayer/rng";
+import { AgainButton, GameOver, now, Overlay, Stats, beats, type GameProps } from "./shared";
 
 const SIZE = 9;
 const MINES = 10;
@@ -26,11 +27,11 @@ const emptyBoard = (): Cell[] =>
   Array.from({ length: SIZE * SIZE }, () => ({ mine: false, open: false, flag: false, near: 0 }));
 
 /** Places mines anywhere except the first cell clicked and its neighbours. */
-function placeMines(board: Cell[], safe: number): Cell[] {
+function placeMines(board: Cell[], safe: number, rand: () => number = Math.random): Cell[] {
   const banned = new Set([safe, ...neighbours(safe)]);
   const spots = board.map((_, i) => i).filter((i) => !banned.has(i));
   for (let i = spots.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rand() * (i + 1));
     [spots[i], spots[j]] = [spots[j], spots[i]];
   }
   const mines = new Set(spots.slice(0, MINES));
@@ -56,8 +57,19 @@ function flood(board: Cell[], start: number): Cell[] {
 
 const NUM_COLORS = ["", "text-sky-400", "text-accent", "text-danger", "text-violet-400", "text-amber-500", "text-cyan-400", "text-foreground", "text-muted"];
 
-export default function Minesweeper({ onFinish, best }: GameProps) {
-  const [board, setBoard] = useState<Cell[]>(emptyBoard);
+const START = Math.floor((SIZE * SIZE) / 2);
+
+/**
+ * In a race everyone gets the same field: mines come from the seed, and the
+ * middle is already opened so nobody gets a luckier first click.
+ */
+function raceBoard(seed: number): Cell[] {
+  return flood(placeMines(emptyBoard(), START, seededRandom(seed)), START);
+}
+
+export default function Minesweeper({ onFinish, best, seed, onProgress, onFail }: GameProps) {
+  const race = seed !== undefined;
+  const [board, setBoard] = useState<Cell[]>(() => (race ? raceBoard(seed) : emptyBoard()));
   const [state, setState] = useState<"ready" | "playing" | "won" | "lost">("ready");
   const [flagMode, setFlagMode] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -73,10 +85,10 @@ export default function Minesweeper({ onFinish, best }: GameProps) {
   }, [state]);
 
   const reset = useCallback(() => {
-    setBoard(emptyBoard());
+    setBoard(seed !== undefined ? raceBoard(seed) : emptyBoard());
     setState("ready");
     setElapsed(0);
-  }, []);
+  }, [seed]);
 
   const finishIfWon = (b: Cell[]) => {
     if (b.every((c) => c.mine || c.open)) {
@@ -96,7 +108,7 @@ export default function Minesweeper({ onFinish, best }: GameProps) {
     if (state === "won" || state === "lost") return;
     let b = board;
     if (state === "ready") {
-      b = placeMines(board, i);
+      if (!race) b = placeMines(board, i);
       startedAt.current = now();
       setState("playing");
     }
@@ -116,12 +128,16 @@ export default function Minesweeper({ onFinish, best }: GameProps) {
       if (b[t].mine) {
         setBoard(b.map((c, k) => (c.mine || k === t ? { ...c, open: true } : c)));
         setState("lost");
+        onFail?.();
         return;
       }
       b = flood(b, t);
     }
     setBoard(b);
-    finishIfWon(b);
+    if (!finishIfWon(b)) {
+      const safe = SIZE * SIZE - MINES;
+      onProgress?.(Math.round((b.filter((c) => c.open && !c.mine).length / safe) * 100));
+    }
   };
 
   const toggleFlag = (i: number) => {
@@ -213,10 +229,8 @@ export default function Minesweeper({ onFinish, best }: GameProps) {
         {state === "lost" && (
           <Overlay>
             <p className="text-2xl font-bold">Boom!</p>
-            <p className="text-sm text-muted">Only cleared boards count. Try again?</p>
-            <button type="button" onClick={reset} className={primaryButton} autoFocus>
-              Play again
-            </button>
+            <p className="text-sm text-muted">Only cleared boards count.</p>
+            <AgainButton onClick={reset} />
           </Overlay>
         )}
         {state === "won" && <GameOver title="Field cleared!" score={`${elapsed}s`} isBest={wasBest} onAgain={reset} />}

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import type { ComponentType } from "react";
 import type { RoomChannel } from "@/lib/realtime/client";
 import type { SeatInfo } from "./types";
@@ -20,5 +21,8 @@ export type LiveGameProps = {
   onEnd: (winners: number[], scores?: Record<string, number>) => void;
 };
 
-/** Live games by id; filled in as they're added. */
-export const LIVE_COMPONENTS: Record<string, ComponentType<LiveGameProps>> = {};
+/** Live games by id. */
+export const LIVE_COMPONENTS: Record<string, ComponentType<LiveGameProps>> = {
+  pong: dynamic(() => import("./Pong"), { ssr: false }),
+  snake: dynamic(() => import("./SnakeArena"), { ssr: false }),
+};
