@@ -2,6 +2,12 @@
 -- Like Jace Social, every table has row-level security on and no policies,
 -- so only the server (secret key) can read or write. Players go through
 -- Jace Games' /api/rooms routes.
+--
+-- Everything lives in its own schema, jace_games, so Jace Games can share a
+-- Supabase project with Jace without touching its tables. Add jace_games to
+-- Settings → Data API → Exposed schemas so the server can reach it.
+create schema if not exists jace_games;
+set search_path to jace_games, public;
 
 create table if not exists rooms (
   id uuid primary key default gen_random_uuid(),
@@ -58,3 +64,10 @@ create index if not exists match_results_user_idx on match_results (user_id);
 alter table rooms enable row level security;
 alter table room_players enable row level security;
 alter table match_results enable row level security;
+
+-- Only the server's secret key (service_role) can use the schema. anon and
+-- authenticated get nothing, so the browser can't reach these tables even
+-- with the publishable key, on top of RLS being on with no policies.
+grant usage on schema jace_games to service_role;
+grant all on all tables in schema jace_games to service_role;
+grant all on all sequences in schema jace_games to service_role;

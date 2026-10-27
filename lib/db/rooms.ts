@@ -79,13 +79,19 @@ function supabaseUrl(): string | undefined {
   return process.env.SUPABASE_URL?.trim().replace(/\/(rest|realtime|auth)\/v1.*$/, "").replace(/\/+$/, "") || undefined;
 }
 
-let client: SupabaseClient | null = null;
-export function supabase(): SupabaseClient {
+/**
+ * Jace Games keeps its tables in their own Postgres schema, so it can share
+ * a Supabase project (Jace's) without touching anything else in it.
+ */
+export const DB_SCHEMA = "jace_games";
+
+let client: SupabaseClient<any, typeof DB_SCHEMA> | null = null; // eslint-disable-line @typescript-eslint/no-explicit-any
+export function supabase(): SupabaseClient<any, typeof DB_SCHEMA> { // eslint-disable-line @typescript-eslint/no-explicit-any
   if (!client) {
     const url = supabaseUrl();
     const key = process.env.SUPABASE_SECRET_KEY;
     if (!url || !key) throw new Error("SUPABASE_URL and SUPABASE_SECRET_KEY must be set (see README.md).");
-    client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    client = createClient(url, key, { db: { schema: DB_SCHEMA }, auth: { persistSession: false, autoRefreshToken: false } });
   }
   return client;
 }
