@@ -2,12 +2,6 @@
 -- (unverified) high scores, and reports. Same rules as 001: row-level
 -- security on and no policies, so only the server (secret key) can read or
 -- write. Everyone goes through Jace Games' /api/studio routes.
---
--- Like 001, everything lives in its own schema, jace_games, so Jace Games can share a
--- Supabase project with Jace without touching its tables. Add jace_games to
--- Settings → Data API → Exposed schemas so the server can reach it.
-create schema if not exists jace_games;
-set search_path to jace_games, public;
 
 create table if not exists community_games (
   id uuid primary key default gen_random_uuid(),
@@ -63,7 +57,7 @@ create table if not exists reports (
 
 -- Counting plays in one statement, so two at once can't lose one.
 create or replace function community_add_play(game uuid) returns void
-language sql set search_path = jace_games as $$
+language sql as $$
   update community_games set plays = plays + 1 where id = game;
 $$;
 revoke execute on function community_add_play(uuid) from public, anon, authenticated;
@@ -73,10 +67,3 @@ alter table community_games enable row level security;
 alter table community_versions enable row level security;
 alter table community_scores enable row level security;
 alter table reports enable row level security;
-
--- Only the server's secret key (service_role) can use the schema. anon and
--- authenticated get nothing, so the browser can't reach these tables even
--- with the publishable key, on top of RLS being on with no policies.
-grant usage on schema jace_games to service_role;
-grant all on all tables in schema jace_games to service_role;
-grant all on all sequences in schema jace_games to service_role;

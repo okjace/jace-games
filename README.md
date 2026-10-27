@@ -65,10 +65,10 @@ Fill in `.env.local`, then run `npm run dev` and open http://localhost:3000.
 | `SESSION_SECRET`     | yes      | 32+ random characters used to encrypt the session cookie. Generate with `openssl rand -base64 32`. Changing it signs everyone out. |
 | `APP_URL`            | no       | This app's public URL, used to build the redirect URI `<APP_URL>/api/auth/callback`. Defaults to the URL of the incoming request. Set it in production if you use more than one domain. |
 | `JACE_URL`           | no       | The Jace base URL. Defaults to `https://jaceo.vercel.app`. |
-| `SUPABASE_URL`       | yes*     | Jace's Supabase project URL. Rooms, match results and community games live there, in the `jace_games` schema. |
-| `SUPABASE_SECRET_KEY` | yes*    | A **secret** key made for Jace Games in that project (server only). |
+| `SUPABASE_URL`       | yes*     | The Jace Games Supabase project URL. Rooms, match results and community games live there. |
+| `SUPABASE_SECRET_KEY` | yes*    | That project's **secret** key (server only). |
 | `NEXT_PUBLIC_SUPABASE_URL` | yes* | The same project URL, for Realtime in the browser. |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes* | A **publishable** key made for Jace Games in that project, for Realtime in the browser. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes* | That project's **publishable** key, for Realtime in the browser. |
 | `JACE_SOCIAL_URL`    | no       | Defaults to `https://jace-social.vercel.app`. |
 | `JACE_SOCIAL_APP_KEY` | no      | Shared secret with Jace Social (its `JACE_GAMES_APP_KEY`). Without it, friend invites show "coming soon". |
 | `CRON_SECRET`        | no       | Vercel sends it to the daily room cleanup cron; set it so nobody else can call that route. |
@@ -80,14 +80,9 @@ Put the same variables in Vercel → Project → Settings → Environment Variab
 
 ### Setting up Supabase
 
-Jace Games shares Jace's Supabase project but keeps everything in its own Postgres schema, `jace_games`, so it never touches Jace's tables, storage buckets or keys. (Jace's own data is on Neon; it only uses Supabase for file storage.)
-
-1. In Jace's Supabase project, run the SQL files in [`supabase/migrations`](supabase/migrations) in order (SQL editor, or `supabase db push`). They create the `jace_games` schema and its tables; nothing outside that schema changes. Every table has row-level security on and no policies, and only `service_role` (the secret key) is granted the schema, so the browser can't read or write it.
-2. Settings → Data API → **Exposed schemas**: add `jace_games` (keep `public` and anything else already there). This only lets the server's secret key reach the new schema through the API; it doesn't change what Jace can do.
-3. Settings → API Keys: make a **new** secret key and publishable key just for Jace Games, so they can be rotated without touching Jace's. Put them, and the project URL, in the env vars above.
-4. Realtime's public channel access must be allowed (the default). Jace Games' channels are all named `jg-room:<secret>`, so they can't collide with anything else in the project.
-
-To remove Jace Games from the project later: `drop schema jace_games cascade;`, then remove it from Exposed schemas and delete its two keys.
+1. Create a project named "jace-games" (Data API on, "Automatically expose new tables" off, automatic RLS on). Realtime's public channel access must be allowed, which is the default.
+2. Run the SQL files in [`supabase/migrations`](supabase/migrations) in order (SQL editor, or `supabase db push`). Every table has row-level security on and no policies, so only the server's secret key can read or write.
+3. Copy the project URL, publishable key and secret key into the env vars above.
 
 Live channels are named with an unguessable per-room secret that only room members get. Anything that matters (moves, results, wins) goes through the server; the channels only carry "something changed" pings, live scores, drawing strokes and live game frames.
 
