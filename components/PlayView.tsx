@@ -58,11 +58,20 @@ export function PlayView({ gameId }: { gameId: string }) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Fullscreen label={game.name} shortcut={!["wordle", "minesweeper"].includes(game.id)}>
           <section className="rounded-2xl border border-line bg-panel/40 p-3 sm:p-6" aria-label={`${game.name} game`}>
-            {multiOnly ? (
+            {multiOnly && game.multiplayer?.mode === "turns" ? (
               <>
                 <p className="mb-4 text-center text-sm text-muted">Pass and play on this device, or play online with friends.</p>
                 <LocalPlay gameId={game.id} multiplayer={game.multiplayer!} />
               </>
+            ) : multiOnly ? (
+              // Real-time games (Pong) need a second device, so there's no pass and play.
+              <div className="flex flex-col items-center gap-2 py-12 text-center">
+                <span aria-hidden="true" className="text-6xl">
+                  {game.icon}
+                </span>
+                <p className="font-semibold">{game.name} is played online with a friend.</p>
+                <p className="text-sm text-muted">Use “Play with friends” to make a room, then send them the link.</p>
+              </div>
             ) : Game ? (
               <Game onFinish={onFinish} best={best?.score ?? null} />
             ) : (
