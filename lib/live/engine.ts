@@ -1,8 +1,10 @@
 import "server-only";
 import { createHash, randomBytes, randomInt } from "crypto";
 import { liveStore, type LiveGameRow, type LivePlayerRow } from "@/lib/db/live";
+import { lockerStore } from "@/lib/db/liveLocker";
 import { mapStore } from "@/lib/db/liveMaps";
 import { studioStore } from "@/lib/db/studio";
+import { cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar } from "./locker";
 import { DEFAULT_MAP, cleanMap, type TowerMap } from "./maps";
 import { broadcast } from "@/lib/realtime/server";
 import type { Session } from "@/lib/session";
@@ -93,6 +95,10 @@ type PlayerData = PartyData & {
   lastTap?: number;
   recent?: number[];
   last?: Record<string, unknown> | null;
+  /** The icon and frame they show (from their locker, or picked when joining). */
+  avatar?: Avatar;
+  /** Locker XP this game gave them (set when it ends). */
+  xp?: number;
 };
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -107,6 +113,8 @@ async function getGame(code: string): Promise<LiveGameRow> {
   if (!g) throw new LiveError("No game with that code. Check it with your host.", 404);
   return g;
 }
+
+const avatarOf = (p: LivePlayerRow): Avatar | null => (dataOf(p).avatar as Avatar | undefined) ?? null;
 
 function ranked(players: LivePlayerRow[]): LivePlayerRow[] {
   return [...players].sort((a, b) => b.score - a.score || (a.finished_at ?? "~").localeCompare(b.finished_at ?? "~") || a.joined_at.localeCompare(b.joined_at));
@@ -217,7 +225,7 @@ export async function createLiveGame(
   throw new LiveError("Couldn't start a game.");
 }
 
-export async function joinLiveGame(code: string, rawName: unknown, session: Session | null): Promise<{ token: string; playerId: string }> {
+export async function joinLiveGame(code: string, rawName: unknown, session: Session | null, rawAvatar?: unknown): Promise<{ token: string; playerId: string }> {
   const g = await getGame(code);
   if (g.status === "ended") throw new LiveError("That game has ended.", 409);
   const name = cleanName(rawName ?? session?.user.username);
@@ -228,6 +236,13 @@ export async function joinLiveGame(code: string, rawName: unknown, session: Sess
   const token = randomBytes(24).toString("base64url");
   const added = await store.addPlayer({ game_id: g.id, name, user_id: session?.user.id ?? null, token_hash: sha(token) });
   if (added === "name_taken") throw new LiveError("Someone already has that name here. Try another.", 409);
+  // What they show: their locker when signed in, otherwise a starter icon they picked.
+  let avatar = cleanAvatar(rawAvatar, 1, null);
+  if (session) {
+    const locker = await lockerStore().get(session.user.id).catch(() => null);
+    if (locker) avatar = cleanAvatar(locker, levelInfo(locker.xp).level, safePicture(session.user.picture));
+  }
+  await store.updatePlayer(g.id, added.id, { data: { avatar } });
   await push(g, "players");
   return { token, playerId: added.id };
 }
@@ -253,7 +268,7 @@ export type HostView = {
   current: (Question & { index: number }) | null;
   counts: number[] | null;
   answeredCount: number;
-  players: { id: string; name: string; score: number; correct: number; answered: number; streak: number; finished: boolean }[];
+  players: { id: string; name: string; score: number; correct: number; answered: number; streak: number; finished: boolean; avatar: Avatar | null }[];
   serverNow: number;
 };
 
@@ -293,7 +308,7 @@ export async function hostView(code: string, session: Session): Promise<HostView
     current,
     counts,
     answeredCount,
-    players: players.map((p) => ({ id: p.id, name: p.name, score: p.score, correct: p.correct, answered: p.answered, streak: p.streak, finished: !!p.finished_at })),
+    players: players.map((p) => ({ id: p.id, name: p.name, score: p.score, correct: p.correct, answered: p.answered, streak: p.streak, finished: !!p.finished_at, avatar: avatarOf(p) })),
     serverNow: Date.now(),
   };
 }
@@ -307,9 +322,9 @@ export type PlayerView = {
   solo: { setId: string | null; minutes: number; shuffle: boolean; mapId: string | null; gameId: string | null } | null;
   phase: string;
   topic: string;
-  me: { id: string; name: string; score: number; rank: number; streak: number; correct: number; answered: number };
+  me: { id: string; name: string; score: number; rank: number; streak: number; correct: number; answered: number; avatar: Avatar | null; xp: number | null };
   playerCount: number;
-  top: { name: string; score: number; you: boolean }[];
+  top: { name: string; score: number; you: boolean; avatar: Avatar | null }[];
   endsAt: number | null;
   /** Classic: the question being played (no answers), what I answered, and at reveal the right answer. */
   question: (PlayerQuestion & { index: number; total: number }) | null;
@@ -380,9 +395,9 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
       : null,
     phase: s.phase,
     topic: topicOf(g),
-    me: { id: me.id, name: me.name, score: me.score, rank, streak: me.streak, correct: me.correct, answered: me.answered },
+    me: { id: me.id, name: me.name, score: me.score, rank, streak: me.streak, correct: me.correct, answered: me.answered, avatar: avatarOf(me), xp: d.xp ?? null },
     playerCount: all.length,
-    top: sorted.slice(0, 5).map((p) => ({ name: p.name, score: p.score, you: p.id === me.id })),
+    top: sorted.slice(0, 5).map((p) => ({ name: p.name, score: p.score, you: p.id === me.id, avatar: avatarOf(p) })),
     endsAt: s.endsAt ?? null,
     question: classicQ ? { ...forPlayers(classicQ), index: s.q!, total: s.order!.length } : null,
     myAnswer: classicQ ? (d.answers?.[String(s.q)] ?? null) : null,
@@ -480,7 +495,7 @@ async function step(g: LiveGameRow, action: string): Promise<void> {
       if (g.mode !== "classic" || s.phase !== "reveal") return;
       const q = s.q! + 1;
       if (q >= s.order!.length) {
-        await push(await bump(g, { status: "ended", ended_at: new Date(now).toISOString(), state: { ...s, phase: "ended" } }));
+        await endGame(g);
         return;
       }
       const question = qs[s.order![q]];
@@ -511,17 +526,36 @@ async function step(g: LiveGameRow, action: string): Promise<void> {
 export async function startSoloGame(
   session: Session | null,
   opts: { setId: string | null; mode: LiveMode; settings: Record<string, unknown> },
+  avatar?: unknown,
 ): Promise<{ code: string; token: string }> {
   const host: Session = session ?? { token: "", iat: Date.now(), user: { id: `solo:${randomBytes(9).toString("base64url")}`, username: "Solo", picture: null } };
   const code = await createLiveGame(host, { ...opts, settings: { ...opts.settings, solo: true } });
-  const { token } = await joinLiveGame(code, session?.user.username ?? "You", session);
+  const { token } = await joinLiveGame(code, session?.user.username ?? "You", session, avatar);
   await step(await getGame(code), "start");
   return { code, token };
 }
 
 async function endGame(g: LiveGameRow, winner?: string) {
   const s = stateOf(g);
-  await push(await bump(g, { status: "ended", ended_at: new Date().toISOString(), state: { ...s, phase: "ended", ...(winner ? { winner } : {}) } }));
+  const ended = await bump(g, { status: "ended", ended_at: new Date().toISOString(), state: { ...s, phase: "ended", ...(winner ? { winner } : {}) } });
+  await giveXp(ended);
+  await push(ended);
+}
+
+/** Locker XP for everyone signed in, once, when a game ends. */
+async function giveXp(g: LiveGameRow) {
+  const store = liveStore();
+  const players = ranked(await store.players(g.id));
+  await Promise.all(
+    players.map(async (p, i) => {
+      if (!p.user_id || dataOf(p).xp !== undefined) return;
+      const xp = xpForGame({ correct: p.correct, answered: p.answered, rank: i + 1, players: players.length });
+      await store.updatePlayer(g.id, p.id, { data: { ...dataOf(p), xp } });
+      await lockerStore()
+        .addXp(p.user_id, xp)
+        .catch(() => {});
+    }),
+  );
 }
 
 // ---------- Player actions ----------
@@ -552,7 +586,9 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
     if (!(g.settings as GameSettings).solo) throw new LiveError("Only solo games can do that.", 403);
     if (!["reveal", "next", "tick", "end"].includes(String(body.op))) throw new LiveError("Unknown action.");
     await step(g, String(body.op));
-    return buildPlayerView(await getGame(code), me, await liveStore().players(g.id));
+    // Re-read: ending the game may have changed this player (their XP).
+    const all = await liveStore().players(g.id);
+    return buildPlayerView(await getGame(code), all.find((p) => p.id === me.id) ?? me, all);
   }
   const s = stateOf(g);
   const now = Date.now();

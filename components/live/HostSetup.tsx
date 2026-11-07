@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import { MODES, type LiveMode, type SetSummary } from "@/lib/live/types";
+import { guestAvatar } from "./LiveAvatar";
 import { MapCard, type MapSummaryView } from "./MapList";
 import { card, primary, secondary, setToken } from "./ui";
 
@@ -80,7 +81,7 @@ export function HostSetup() {
   const playSolo = async () => {
     setBusy(true);
     setError(null);
-    const res = await fetch("/api/live/solo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(picks()) }).catch(() => null);
+    const res = await fetch("/api/live/solo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...picks(), avatar: guestAvatar() }) }).catch(() => null);
     const body = await res?.json().catch(() => null);
     if (res?.ok) {
       setToken(body.code, body.token);

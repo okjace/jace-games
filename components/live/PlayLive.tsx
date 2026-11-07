@@ -7,7 +7,9 @@ import { useScores } from "@/components/ScoresProvider";
 import type { PlayerView } from "@/lib/live/engine";
 import { MODES } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
+import type { Avatar } from "@/lib/live/locker";
 import { Answer } from "./Answer";
+import { LiveAvatar, guestAvatar } from "./LiveAvatar";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { PARTY_MODES, PartyPlay } from "./party";
 import { card, getToken, input, primary, secondary, setToken } from "./ui";
@@ -145,7 +147,10 @@ export function PlayLive({ code }: { code: string }) {
     <div ref={playRef} className={full.on ? `${FULLSCREEN_CLASS} bg-background p-4` : ""}>
     <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
       <div className="flex items-center justify-between rounded-2xl border border-line bg-panel px-4 py-3">
-        <span className="truncate font-semibold">{view.me.name}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <LiveAvatar avatar={view.me.avatar} size={30} />
+          <span className="truncate font-semibold">{view.me.name}</span>
+        </span>
         <span className="flex items-center gap-3 text-sm">
           <FullscreenButton on={full.on} toggle={full.toggle} className="-my-2 text-muted hover:text-foreground" />
           {view.me.streak >= 2 && <span title="Streak">🔥 {view.me.streak}</span>}
@@ -177,6 +182,7 @@ export function PlayLive({ code }: { code: string }) {
           <p className="text-muted">
             {score(view, view.me.score)} · {view.me.correct}/{view.me.answered} right
           </p>
+          <XpGained view={view} />
           <Top view={view} />
           <Link href="/live" className={primary}>
             Done
@@ -196,6 +202,12 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 function JoinForm({ code, defaultName, note, onJoined }: { code: string; defaultName: string; note: string | null; onJoined: (token: string) => void }) {
   const [name, setName] = useState(defaultName);
+  // Signed-in players show their locker look (the server applies it); guests their saved pick.
+  const [look, setLook] = useState<Avatar | null>(null);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLook(guestAvatar());
+  }, []);
   const [error, setError] = useState<string | null>(note);
   const [busy, setBusy] = useState(false);
   return (
@@ -207,7 +219,7 @@ function JoinForm({ code, defaultName, note, onJoined }: { code: string; default
         const res = await fetch(`/api/live/games/${code}/join`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name }),
+          body: JSON.stringify({ name, avatar: guestAvatar() }),
         }).catch(() => null);
         const body = await res?.json().catch(() => null);
         setBusy(false);
@@ -217,6 +229,12 @@ function JoinForm({ code, defaultName, note, onJoined }: { code: string; default
     >
       <p className="text-center text-sm text-muted">
         Game <span className="font-mono font-semibold tracking-widest text-foreground">{code}</span>
+      </p>
+      <p className="flex items-center justify-center gap-2 text-sm text-muted">
+        <LiveAvatar avatar={look} size={36} />
+        <Link href="/live/locker" className="text-accent hover:underline">
+          Change your look
+        </Link>
       </p>
       <input value={name} onChange={(e) => setName(e.target.value.slice(0, 20))} placeholder="Your nickname" aria-label="Nickname" autoFocus maxLength={20} className={`${input} h-12 text-center text-lg`} />
       {error && <p className="text-center text-sm text-danger">{error}</p>}
@@ -307,7 +325,7 @@ function SoloResults({ view }: { view: PlayerView }) {
     const res = await fetch("/api/live/solo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ setId: p.setId, mode: view.mode, settings: { minutes: p.minutes, shuffle: p.shuffle, mapId: p.mapId, gameId: p.gameId } }),
+      body: JSON.stringify({ setId: p.setId, mode: view.mode, settings: { minutes: p.minutes, shuffle: p.shuffle, mapId: p.mapId, gameId: p.gameId }, avatar: guestAvatar() }),
     }).catch(() => null);
     const body = await res?.json().catch(() => null);
     if (res?.ok) {
@@ -328,6 +346,7 @@ function SoloResults({ view }: { view: PlayerView }) {
         {def.name}
         {view.me.answered > 0 && !view.noSet ? ` · ${view.me.correct}/${view.me.answered} right` : ""}
       </p>
+      <XpGained view={view} />
       {error && <p className="text-sm text-danger">{error}</p>}
       <div className="flex flex-wrap justify-center gap-2">
         <button type="button" onClick={again} disabled={busy} className={primary}>
@@ -344,12 +363,23 @@ function SoloResults({ view }: { view: PlayerView }) {
   );
 }
 
+/** "+45 XP" after a game, for signed-in players. */
+function XpGained({ view }: { view: PlayerView }) {
+  if (view.me.xp === null) return null;
+  return (
+    <Link href="/live/locker" className="rounded-full bg-accent/15 px-4 py-1.5 text-sm font-bold text-accent hover:bg-accent/25">
+      +{view.me.xp} XP · open your locker →
+    </Link>
+  );
+}
+
 function Top({ view }: { view: PlayerView }) {
   return (
     <ol className="flex w-full flex-col gap-1 text-sm">
       {view.top.map((p, i) => (
         <li key={i} className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${p.you ? "bg-accent/10 ring-1 ring-accent/30" : "bg-foreground/[.03]"}`}>
           <span className="w-5 font-mono text-muted">{i + 1}</span>
+          <LiveAvatar avatar={p.avatar} size={24} />
           <span className="flex-1 truncate">{p.name}</span>
           <span className="font-mono tabular-nums">{score(view, p.score)}</span>
         </li>

@@ -68,6 +68,9 @@ export function LiveHome() {
             <Link href="/live/maps" className={secondary}>
               Make maps
             </Link>
+            <Link href="/live/locker" className={secondary}>
+              🎽 Locker
+            </Link>
           </div>
         </div>
         <form

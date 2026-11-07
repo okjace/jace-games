@@ -7,6 +7,7 @@ import { MODES } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { HtmlFrame } from "./HtmlFrame";
+import { LiveAvatar } from "./LiveAvatar";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
 
 /**
@@ -145,8 +146,9 @@ function Lobby({ view, busy, onStart, onKick }: { view: HostView; busy: boolean;
               type="button"
               onClick={() => confirm(`Remove ${p.name} from the game?`) && onKick(p.id)}
               title="Click to remove"
-              className="animate-pop rounded-full bg-foreground/[.08] px-4 py-2 text-sm font-semibold hover:bg-danger/20 hover:line-through"
+              className="animate-pop flex items-center gap-2 rounded-full bg-foreground/[.08] py-1.5 pl-1.5 pr-4 text-sm font-semibold hover:bg-danger/20 hover:line-through"
             >
+              <LiveAvatar avatar={p.avatar} size={28} />
               {p.name}
             </button>
           </li>
@@ -241,6 +243,7 @@ function SelfPaced({ view, secondsLeft }: { view: HostView; secondsLeft: number 
         {view.players.slice(0, 12).map((p, i) => (
           <li key={p.id} className="flex items-center gap-3 rounded-xl bg-panel px-4 py-3">
             <span className="w-6 text-center font-mono text-muted">{i + 1}</span>
+            <LiveAvatar avatar={p.avatar} size={28} />
             <span className="w-32 truncate font-semibold sm:w-48">{p.name}</span>
             <span className="relative h-6 flex-1 overflow-hidden rounded-full bg-foreground/[.06]">
               <span
@@ -268,6 +271,7 @@ function Board({ view }: { view: HostView }) {
       {view.players.slice(0, 6).map((p, i) => (
         <li key={p.id} className="flex items-center gap-3 rounded-xl bg-panel px-4 py-2">
           <span className="w-6 font-mono text-muted">{i + 1}</span>
+          <LiveAvatar avatar={p.avatar} size={28} />
           <span className="flex-1 truncate font-semibold">{p.name}</span>
           {p.streak >= 3 && <span title={`${p.streak} in a row`}>🔥{p.streak}</span>}
           <span className="font-mono tabular-nums">{p.score.toLocaleString()}</span>
@@ -290,6 +294,7 @@ function Podium({ view }: { view: HostView }) {
           p ? (
             <div key={p.id} className="flex w-28 flex-col items-center gap-2 sm:w-40">
               <span className="text-4xl">{medals[i]}</span>
+              <LiveAvatar avatar={p.avatar} size={56} />
               <span className="w-full truncate text-center font-bold">{p.name}</span>
               <span className="font-mono text-sm text-muted">{fmt(p.score)}</span>
               <div className={`w-full rounded-t-2xl bg-accent/80 ${heights[i]}`} />
@@ -303,6 +308,7 @@ function Podium({ view }: { view: HostView }) {
         {view.players.map((p, i) => (
           <li key={p.id} className="flex items-center gap-3 rounded-lg px-3 py-1.5 odd:bg-foreground/[.03]">
             <span className="w-6 font-mono text-muted">{i + 1}</span>
+            <LiveAvatar avatar={p.avatar} size={24} />
             <span className="flex-1 truncate">{p.name}</span>
             <span className="text-xs text-muted">
               {p.correct}/{p.answered} right
