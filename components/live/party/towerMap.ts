@@ -1,4 +1,4 @@
-import { THEMES, type TowerMap } from "@/lib/live/maps";
+import { DEVICES, THEMES, type TowerMap } from "@/lib/live/maps";
 
 /** Draws a Tower Siege map's ground, road, gate, castle and decorations. Used by the game and the map maker. */
 export function drawMapBase(ctx: CanvasRenderingContext2D, map: TowerMap, cell: number, opts: { grid?: boolean } = {}) {
@@ -44,6 +44,32 @@ export function drawMapBase(ctx: CanvasRenderingContext2D, map: TowerMap, cell: 
   ctx.textBaseline = "middle";
   ctx.font = `${cell * 0.62}px sans-serif`;
   for (const d of map.decor) ctx.fillText(d.icon, (d.x + 0.5) * cell, (d.y + 0.55) * cell);
+  // Devices: road ones sit flat on the road, ground ones on a little plinth.
+  for (const d of map.devices ?? []) {
+    const cx = (d.x + 0.5) * cell;
+    const cy = (d.y + 0.5) * cell;
+    const def = DEVICES[d.kind];
+    if (d.kind === "mud") {
+      ctx.fillStyle = "rgba(92,58,30,0.75)";
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, cell * 0.4, cell * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      continue;
+    }
+    if (def.on === "ground") {
+      ctx.fillStyle = "rgba(0,0,0,0.22)";
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + cell * 0.28, cell * 0.32, cell * 0.12, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.font = `${cell * (def.on === "road" ? 0.5 : 0.6)}px sans-serif`;
+    ctx.fillText(def.icon, cx, cy + cell * 0.04);
+    if (d.kind === "zone" && d.channel) {
+      ctx.fillStyle = "#fff";
+      ctx.font = `bold ${cell * 0.3}px sans-serif`;
+      ctx.fillText(String(d.channel), cx + cell * 0.28, cy - cell * 0.26);
+    }
+  }
   if (map.path.length) {
     const [gx, gy] = map.path[0];
     ctx.font = `${cell * 0.6}px sans-serif`;

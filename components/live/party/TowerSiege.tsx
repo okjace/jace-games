@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { setupCanvas, themeColors } from "@/components/games/shared";
-import { DEFAULT_MAP, type TowerMap } from "@/lib/live/maps";
+import { DEFAULT_MAP, type Rule, type TowerMap, type WhenKind } from "@/lib/live/maps";
 import { Tabs, Toast, useReport, useSaved, type PartyProps } from "./shared";
 import { drawMapBase } from "./towerMap";
 
@@ -22,8 +22,24 @@ const TOWERS: Record<Kind, { icon: string; name: string; cost: number; range: nu
   frost: { icon: "❄️", name: "Frost", cost: 25, range: 2.1, dmg: 0.3, rate: 0.8, slow: 0.5 },
 };
 type Tower = { x: number; y: number; kind: Kind; level: number };
-type Enemy = { id: number; d: number; hp: number; max: number; speed: number; icon: string; slowUntil: number };
-type Saved = { towers: Tower[]; spent: number; bonus: number; wave: number; best: number; kills: number; lives: number };
+type Enemy = { id: number; d: number; hp: number; max: number; speed: number; icon: string; slowUntil: number; /** last road square it stepped on (for traps and zones) */ cell: number };
+type Saved = { towers: Tower[]; spent: number; bonus: number; wave: number; best: number; kills: number; lives: number; started?: boolean };
+
+const MAX_LIVES = 20;
+let nextEnemyId = 0;
+function makeEnemy(kind: "normal" | "fast" | "boss", wave: number): Enemy {
+  const hp = (kind === "boss" ? 25 : kind === "fast" ? 2 : 4) * 1.22 ** (wave - 1);
+  return { id: nextEnemyId++, d: 0, hp, max: hp, speed: kind === "boss" ? 0.8 : kind === "fast" ? 2.4 : 1.4, icon: kind === "boss" ? "🐲" : kind === "fast" ? "🦇" : "👾", slowUntil: 0, cell: -1 };
+}
+
+/** Does a rule fire for this event? */
+function matches(r: Rule, when: WhenKind, n: number): boolean {
+  if (r.when !== when) return false;
+  if (when === "wave" || when === "cleared") return r.n === 0 || r.n === n;
+  if (when === "zone") return r.n === n;
+  if (when === "defeat") return n > 0 && n % r.n === 0;
+  return true;
+}
 
 const upgradeCost = (t: Tower) => Math.round(TOWERS[t.kind].cost * 1.6 ** t.level);
 const stat = (t: Tower) => {
@@ -45,6 +61,7 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
   const W = COLS * CELL;
   const H = ROWS * CELL;
   const onPath = new Set(PATH.map(([x, y]) => `${x},${y}`));
+  const devices = map.devices ?? [];
   const mapRef = useRef(map);
   const [tab, setTab] = useState<"play" | "earn">("earn");
   const [saved, save] = useSaved<Saved>(view.code, "tower", () => ({ towers: [], spent: 0, bonus: 0, wave: 0, best: 0, kills: 0, lives: 10 }));
@@ -73,7 +90,41 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
     if (canvasRef.current) setupCanvas(canvasRef.current, W, H);
   }, [tab, W, H]);
 
-  const say = (text: string, good = true) => setToast({ text, good, id: Date.now() });
+  const say = useCallback((text: string, good = true) => setToast({ text, good, id: Date.now() }), []);
+
+  // The map's rules: "when this happens, do that". Extra enemies sent between waves join the next one.
+  const pendingSpawn = useRef<Enemy[]>([]);
+  const fire = useCallback(
+    (when: WhenKind, n: number) => {
+      const rules = (mapRef.current.rules ?? []).filter((r) => matches(r, when, n));
+      for (const r of rules) {
+        if (r.then === "coins") {
+          save((cur) => ({ ...cur, bonus: cur.bonus + r.amount }));
+          say(`+${r.amount} coins`);
+        } else if (r.then === "heal") save((cur) => ({ ...cur, lives: Math.min(MAX_LIVES, cur.lives + r.amount) }));
+        else if (r.then === "hurt") save((cur) => ({ ...cur, lives: Math.max(0, cur.lives - r.amount) }));
+        else if (r.then === "slow") {
+          const until = performance.now() + r.amount * 1000;
+          for (const e of live.current.enemies) e.slowUntil = Math.max(e.slowUntil, until);
+        } else if (r.then === "spawn") {
+          const wave = Math.max(1, savedRef.current.wave + 1);
+          const extra = Array.from({ length: r.amount }, (_, i) => ({ ...makeEnemy(r.enemy ?? "normal", wave), d: -0.6 * i }));
+          if (live.current.spawnLeft > 0 || live.current.enemies.length) live.current.enemies.push(...extra);
+          else pendingSpawn.current.push(...extra);
+        } else if (r.then === "message" && r.text) say(r.text);
+      }
+    },
+    [save, say],
+  );
+
+  // "When the game starts" rules, once per game (the ref stops a second run before the save lands).
+  const startFired = useRef(false);
+  useEffect(() => {
+    if (saved.started || startFired.current) return;
+    startFired.current = true;
+    save((cur) => ({ ...cur, started: true }));
+    fire("start", 0);
+  }, [saved.started, save, fire]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 1800);
@@ -84,7 +135,12 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
     const n = saved.wave + 1;
     live.current.spawnLeft = 6 + n * 2;
     live.current.nextSpawn = 0;
-    live.current.enemies = [];
+    live.current.enemies = pendingSpawn.current;
+    pendingSpawn.current = [];
+    // Coin wells pay out as each wave starts.
+    const wells = devices.filter((d) => d.kind === "well").length;
+    if (wells) save((cur) => ({ ...cur, bonus: cur.bonus + wells * 5 }));
+    fire("wave", n);
     setRunning(true);
   };
 
@@ -98,8 +154,15 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
       timer = null;
     };
     let last = performance.now();
-    let id = 0;
     const n = savedRef.current.wave + 1;
+    // Road squares with devices on them, by their place along the road.
+    const roadDevices = new Map<number, { kind: string; channel?: number }>();
+    const M0 = mapRef.current;
+    for (const dev of M0.devices ?? []) {
+      const i = M0.path.findIndex(([x, y]) => x === dev.x && y === dev.y);
+      if (i >= 0) roadDevices.set(i, dev);
+    }
+    let defeats = savedRef.current.kills;
     const frame = (now: number, dt: number) => {
       const L = live.current;
       const M = mapRef.current;
@@ -112,20 +175,33 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
         L.nextSpawn = 0.8;
         const boss = n % 5 === 0 && L.spawnLeft === 0;
         const fast = !boss && Math.random() < Math.min(0.4, n * 0.04);
-        const hp = (boss ? 25 : fast ? 2 : 4) * 1.22 ** (n - 1);
-        L.enemies.push({ id: id++, d: 0, hp, max: hp, speed: boss ? 0.8 : fast ? 2.4 : 1.4, icon: boss ? "🐲" : fast ? "🦇" : "👾", slowUntil: 0 });
+        L.enemies.push(makeEnemy(boss ? "boss" : fast ? "fast" : "normal", n));
       }
-      // Move.
+      // Move (mud halves speed), and set off traps and zones on each new road square.
       let leaked = 0;
+      let trapped = 0;
       for (const e of L.enemies) {
-        e.d += e.speed * (now < e.slowUntil ? 0.5 : 1) * dt;
-        if (e.d >= PATH.length - 1) {
+        const onMud = roadDevices.get(Math.max(0, Math.floor(e.d)))?.kind === "mud";
+        e.d += e.speed * (now < e.slowUntil ? 0.5 : 1) * (onMud ? 0.5 : 1) * dt;
+        const cell = Math.floor(e.d);
+        if (cell > e.cell && cell >= 0) {
+          for (let c = e.cell + 1; c <= cell; c++) {
+            const dev = roadDevices.get(c);
+            if (dev?.kind === "spikes") {
+              e.hp -= 3 * 1.15 ** (n - 1);
+              if (e.hp <= 0) trapped++;
+            } else if (dev?.kind === "zone" && dev.channel) fire("zone", dev.channel);
+          }
+          e.cell = cell;
+        }
+        if (e.hp > 0 && e.d >= PATH.length - 1) {
           e.hp = 0;
           leaked++;
+          fire("leak", 0);
         }
       }
       // Towers fire.
-      let killed = 0;
+      let killed = trapped;
       for (const t of s.towers) {
         const key = `${t.x},${t.y}`;
         const cd = (L.cooldowns.get(key) ?? 0) - dt;
@@ -161,6 +237,7 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
       }
       L.enemies = L.enemies.filter((e) => e.hp > 0);
       L.shots = L.shots.filter((sh) => sh.until > now);
+      for (let k = 0; k < killed; k++) fire("defeat", ++defeats);
       if (leaked || killed) {
         save((cur) => {
           const lives = Math.max(0, cur.lives - leaked);
@@ -180,8 +257,11 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
         stop();
         setRunning(false);
         const bonus = 5 + n;
-        save((cur) => ({ ...cur, wave: n, bonus: cur.bonus + bonus, best: Math.max(cur.best, n * 100 + cur.kills * 5) }));
-        say(`Wave ${n} cleared! +${bonus} coins`);
+        // Healing shrines restore a life for every wave cleared.
+        const shrines = (M.devices ?? []).filter((d) => d.kind === "shrine").length;
+        save((cur) => ({ ...cur, wave: n, bonus: cur.bonus + bonus, lives: Math.min(MAX_LIVES, cur.lives + shrines), best: Math.max(cur.best, n * 100 + cur.kills * 5) }));
+        say(`Wave ${n} cleared! +${bonus} coins${shrines ? ` · +${shrines} ❤️` : ""}`);
+        fire("cleared", n);
       }
     };
     timer = setInterval(() => {
@@ -196,7 +276,7 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
       }
     }, 33);
     return stop;
-  }, [running, save]);
+  }, [running, save, say, fire]);
 
   // Redraw when idle.
   useEffect(() => {
@@ -207,7 +287,9 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
     const r = e.currentTarget.getBoundingClientRect();
     const x = Math.floor(((e.clientX - r.left) / r.width) * COLS);
     const y = Math.floor(((e.clientY - r.top) / r.height) * ROWS);
-    if (onPath.has(`${x},${y}`) || map.decor.some((d) => d.x === x && d.y === y)) return setSelected(null);
+    const sign = devices.find((d) => d.x === x && d.y === y && d.kind === "sign");
+    if (sign?.text) return say(`🪧 ${sign.text}`);
+    if (onPath.has(`${x},${y}`) || map.decor.some((d) => d.x === x && d.y === y) || devices.some((d) => d.x === x && d.y === y)) return setSelected(null);
     setSelected({ x, y });
   };
   const here = selected ? saved.towers.find((t) => t.x === selected.x && t.y === selected.y) : null;
@@ -216,7 +298,9 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
     if (!selected || wallet < TOWERS[kind].cost) return say("Not enough coins. Answer questions to earn more!", false);
     save((cur) => ({ ...cur, spent: cur.spent + TOWERS[kind].cost, towers: [...cur.towers, { ...selected, kind, level: 1 }] }));
     setSelected(null);
+    fire("build", 0);
   };
+  const onBuild = (e: React.MouseEvent<HTMLButtonElement>) => build(e.currentTarget.dataset.kind as Kind);
   const upgrade = () => {
     if (!here) return;
     const cost = upgradeCost(here);
@@ -263,7 +347,8 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
                   <button
                     key={k}
                     type="button"
-                    onClick={() => build(k)}
+                    data-kind={k}
+                    onClick={onBuild}
                     disabled={wallet < TOWERS[k].cost}
                     className="flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 disabled:opacity-40"
                   >
