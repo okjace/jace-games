@@ -3,7 +3,8 @@ import { createHash, randomBytes, randomInt } from "crypto";
 import { liveStore, type LiveGameRow, type LivePlayerRow } from "@/lib/db/live";
 import { broadcast } from "@/lib/realtime/server";
 import type { Session } from "@/lib/session";
-import { MODES, cleanName, forPlayers, isCorrect, isPlayable, type LiveMode, type PlayerQuestion, type Question } from "./types";
+import { HACK_EVERY, TAP_COOLDOWN_MS, cast, hackOptions, mine, passwordChoices, reward, scoreCap, type Catch, type PartyData } from "./party";
+import { DEVICE_MODES, MODES, cleanName, forPlayers, isCorrect, isPlayable, type LiveMode, type PlayerQuestion, type Question } from "./types";
 
 /**
  * Jace Games Live, on the server. The host runs the game from a Jace
@@ -26,7 +27,6 @@ export class LiveError extends Error {
 const MAX_PLAYERS = 200;
 const MAX_GAMES_PER_HOUR = 30;
 const GRACE_MS = 1500; // answers can arrive a little after the timer on slow connections
-const TAP_COOLDOWN_MS = { gold: 1200, rocket: 650 };
 const ROCKET_GOAL = 100;
 
 export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean };
@@ -46,7 +46,7 @@ type State = {
 
 type ClassicAnswer = { a: unknown; correct: boolean; pts: number; at: number };
 type Chest = { kind: "gain" | "double" | "steal" | "swap" | "lose" | "nothing"; amount: number };
-type PlayerData = {
+type PlayerData = PartyData & {
   answers?: Record<string, ClassicAnswer>;
   cur?: { qi: number; issuedAt: number } | null;
   chests?: Chest[] | null;
@@ -241,6 +241,20 @@ export type PlayerView = {
   selfQuestion: PlayerQuestion | null;
   chests: number | null;
   last: Record<string, unknown> | null;
+  /** Party modes: what this player may see of their own mode state. */
+  party: {
+    bank?: number;
+    catches?: Catch[];
+    frenzy?: number;
+    stormed?: boolean;
+    password?: string | null;
+    passwordChoices?: string[];
+    hackReady?: boolean;
+    hackCharge?: number;
+    hackEvery?: number;
+    hack?: { targetName: string; options: string[] } | null;
+    targets?: { id: string; name: string; score: number }[];
+  };
   serverNow: number;
 };
 
@@ -275,8 +289,28 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
     selfQuestion: g.mode !== "classic" && d.cur && qs[d.cur.qi] && g.status === "playing" ? forPlayers(qs[d.cur.qi]) : null,
     chests: d.chests ? d.chests.length : null,
     last: d.last ?? null,
+    party: partyView(g, me, all),
     serverNow: Date.now(),
   };
+}
+
+function partyView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]): PlayerView["party"] {
+  const d = dataOf(me);
+  if (DEVICE_MODES.includes(g.mode)) return { bank: d.bank ?? 0 };
+  if (g.mode === "fishing") return { catches: d.catches ?? [], frenzy: d.frenzy ?? 0, stormed: !!d.stormed };
+  if (g.mode === "hack") {
+    return {
+      password: d.pw ?? null,
+      passwordChoices: d.pw ? undefined : passwordChoices(g.id, me.id),
+      hackReady: !!d.hackReady,
+      hackCharge: d.hackCharge ?? 0,
+      hackEvery: HACK_EVERY,
+      // The real answer stays on the server.
+      hack: d.hack ? { targetName: d.hack.targetName, options: d.hack.options } : null,
+      targets: d.hackReady && !d.hack ? all.filter((p) => p.id !== me.id && dataOf(p).pw).map((p) => ({ id: p.id, name: p.name, score: p.score })) : undefined,
+    };
+  }
+  return {};
 }
 
 // ---------- Host actions ----------
@@ -351,7 +385,17 @@ async function endGame(g: LiveGameRow, winner?: string) {
 
 // ---------- Player actions ----------
 
-type PlayerAction = { action: "answer"; answer: unknown } | { action: "next" } | { action: "pick"; chest: number } | { action: "tap" };
+type PlayerAction =
+  | { action: "answer"; answer: unknown }
+  | { action: "next" }
+  | { action: "pick"; chest: number }
+  | { action: "tap" }
+  // Device modes: the score the mini-game reached.
+  | { action: "report"; score: number }
+  // Code Breakers.
+  | { action: "password"; choice: number }
+  | { action: "hack"; target: string }
+  | { action: "guess"; choice: number };
 
 export async function playerAction(code: string, token: unknown, body: PlayerAction): Promise<PlayerView> {
   const store = liveStore();
@@ -403,6 +447,55 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
   const qs = questionsOf(g);
   const d = dataOf(me);
   let earned = false;
+  let tapped = false;
+
+  // Party-mode actions that aren't about earning.
+  if (body.action === "report") {
+    if (!DEVICE_MODES.includes(g.mode)) throw new LiveError("Unknown action.");
+    const reported = Math.floor(Number(body.score));
+    if (!Number.isFinite(reported) || reported < 0) throw new LiveError("Bad score.");
+    const cap = scoreCap(g.mode, d.bank ?? 0, (now - (s.startedAt ?? now)) / 1000);
+    const score = Math.max(me.score, Math.min(reported, cap));
+    if (score !== me.score) me = (await store.updatePlayer(g.id, me.id, { score }))!;
+    return buildPlayerView(g, me, await store.players(g.id));
+  }
+  if (g.mode === "hack") {
+    if (body.action === "password") {
+      if (d.pw) throw new LiveError("You already picked a password.", 409);
+      const choices = passwordChoices(g.id, me.id);
+      const pw = choices[Number(body.choice)];
+      if (!pw) throw new LiveError("Pick one of the passwords.");
+      me = (await store.updatePlayer(g.id, me.id, { data: { ...d, pw } }))!;
+      return buildPlayerView(g, me, await store.players(g.id));
+    }
+    if (!d.pw) throw new LiveError("Pick a password first.", 409);
+    if (body.action === "hack") {
+      if (!d.hackReady || d.hack) throw new LiveError("You can't hack yet.", 409);
+      const target = typeof body.target === "string" ? await store.player(g.id, body.target) : null;
+      const tpw = target ? dataOf(target).pw : undefined;
+      if (!target || target.id === me.id || !tpw) throw new LiveError("Pick someone to hack.");
+      const { options, answer } = hackOptions(tpw);
+      me = (await store.updatePlayer(g.id, me.id, { data: { ...d, hackReady: false, hack: { target: target.id, targetName: target.name, options, answer } } }))!;
+      return buildPlayerView(g, me, await store.players(g.id));
+    }
+    if (body.action === "guess") {
+      if (!d.hack) throw new LiveError("Start a hack first.", 409);
+      const target = await store.player(g.id, d.hack.target);
+      const right = Number(body.choice) === d.hack.answer;
+      let last: Record<string, unknown> = { kind: "hack", ok: right, target: d.hack.targetName };
+      let score = me.score;
+      if (target && right) {
+        const take = Math.max(1, Math.floor((target.score * (15 + randomInt(11))) / 100));
+        await store.updatePlayer(g.id, target.id, { score: Math.max(0, target.score - take), data: { ...dataOf(target), last: { kind: "hacked", by: me.name, amount: take } } });
+        score += take;
+        last = { ...last, amount: take };
+      } else if (target) {
+        await store.updatePlayer(g.id, target.id, { data: { ...dataOf(target), last: { kind: "defended", by: me.name } } });
+      }
+      me = (await store.updatePlayer(g.id, me.id, { score, data: { ...d, hack: null, last } }))!;
+      return buildPlayerView(g, me, await store.players(g.id));
+    }
+  }
 
   if (body.action === "next") {
     if (settings.noSet || d.chests || d.cur) return buildPlayerView(g, me, await store.players(g.id));
@@ -429,14 +522,50 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
   } else if (body.action === "tap") {
     if (!settings.noSet) throw new LiveError("Answer questions to play.");
     if (d.chests) throw new LiveError("Pick a chest first.", 409);
-    if (now - (d.lastTap ?? 0) < TAP_COOLDOWN_MS[g.mode as "gold" | "rocket"]) throw new LiveError("Too fast!", 429);
+    if (now - (d.lastTap ?? 0) < TAP_COOLDOWN_MS[g.mode]) throw new LiveError("Too fast!", 429);
     me = (await store.updatePlayer(g.id, me.id, { answered: me.answered + 1, data: { ...d, lastTap: now } }))!;
     earned = true;
+    tapped = true;
   } else if (body.action === "pick" && g.mode === "gold") {
     return pickChest(g, me, body.chest);
   } else throw new LiveError("Unknown action.");
 
-  if (earned) {
+  if (earned && DEVICE_MODES.includes(g.mode)) {
+    const fresh = dataOf(me);
+    const amount = reward(g.mode, me.streak, tapped);
+    me = (await store.updatePlayer(g.id, me.id, {
+      data: { ...fresh, bank: (fresh.bank ?? 0) + amount, last: { ...(fresh.last ?? {}), kind: tapped ? "tap" : "answer", correct: true, reward: amount } },
+    }))!;
+  } else if (earned && g.mode === "fishing") {
+    const fresh = dataOf(me);
+    const c = cast(me.streak, fresh.frenzy ?? 0, !!fresh.stormed);
+    let frenzy = Math.max(0, (fresh.frenzy ?? 0) - (c.kind === "fish" ? 1 : 0));
+    if (c.kind === "frenzy") frenzy = 3;
+    if (c.kind === "storm") {
+      // A storm rolls over everyone else: their next catch is halved.
+      const others = (await store.players(g.id)).filter((p) => p.id !== me.id);
+      for (const o of others) await store.updatePlayer(g.id, o.id, { data: { ...dataOf(o), stormed: me.name, last: { kind: "stormed", by: me.name } } });
+    }
+    me = (await store.updatePlayer(g.id, me.id, {
+      score: me.score + c.weight,
+      data: {
+        ...fresh,
+        frenzy,
+        stormed: c.kind === "fish" ? null : (fresh.stormed ?? null),
+        catches: [c, ...(fresh.catches ?? [])].slice(0, 8),
+        last: { kind: "catch", catch: c, stormedBy: c.kind === "fish" && fresh.stormed ? fresh.stormed : undefined },
+      },
+    }))!;
+  } else if (earned && g.mode === "hack") {
+    const fresh = dataOf(me);
+    const bits = mine(me.streak, tapped);
+    const charge = (fresh.hackCharge ?? 0) + 1;
+    const ready = !!fresh.hackReady || charge >= HACK_EVERY;
+    me = (await store.updatePlayer(g.id, me.id, {
+      score: me.score + bits,
+      data: { ...fresh, hackCharge: ready ? 0 : charge, hackReady: ready, last: { kind: "bits", amount: bits, correct: true } },
+    }))!;
+  } else if (earned) {
     const fresh = dataOf(me);
     if (g.mode === "gold") {
       me = (await store.updatePlayer(g.id, me.id, { data: { ...fresh, chests: makeChests(me.streak) } }))!;

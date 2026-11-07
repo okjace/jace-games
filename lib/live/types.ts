@@ -51,15 +51,28 @@ export type LiveSet = {
 
 export type SetSummary = Omit<LiveSet, "questions"> & { questionCount: number };
 
-export type LiveMode = "classic" | "gold" | "rocket";
+export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack";
 
-export const MODES: Record<LiveMode, { name: string; icon: string; blurb: string; needsSet: boolean; selfPaced: boolean }> = {
+export type ModeDef = {
+  name: string;
+  icon: string;
+  blurb: string;
+  needsSet: boolean;
+  selfPaced: boolean;
+  /** How a score reads, e.g. "💰 1,200". */
+  unit: (n: number) => string;
+};
+
+const num = (n: number) => n.toLocaleString("en-US");
+
+export const MODES: Record<LiveMode, ModeDef> = {
   classic: {
     name: "Classic",
     icon: "🏁",
     blurb: "Everyone answers the same question on the big screen. Faster right answers score more.",
     needsSet: true,
     selfPaced: false,
+    unit: num,
   },
   gold: {
     name: "Gold Rush",
@@ -67,6 +80,7 @@ export const MODES: Record<LiveMode, { name: string; icon: string; blurb: string
     blurb: "Answer at your own pace. Every right answer opens a chest: gold, double it, or steal and swap with others.",
     needsSet: false,
     selfPaced: true,
+    unit: (n) => "💰 " + num(n),
   },
   rocket: {
     name: "Rocket Race",
@@ -74,8 +88,52 @@ export const MODES: Record<LiveMode, { name: string; icon: string; blurb: string
     blurb: "Right answers boost your rocket. First to 100% wins.",
     needsSet: false,
     selfPaced: true,
+    unit: (n) => n + "%",
+  },
+  tower: {
+    name: "Tower Siege",
+    icon: "🏰",
+    blurb: "Earn coins, build and upgrade towers, then send the next wave. Hold out the longest to win.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => "🏰 " + num(n),
+  },
+  snack: {
+    name: "Snack Shack",
+    icon: "🍔",
+    blurb: "Answer to restock, serve hungry customers before they walk out, and upgrade your shack. Most cash wins.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => "$" + num(n),
+  },
+  factory: {
+    name: "Gadget Factory",
+    icon: "🏭",
+    blurb: "Earn coins to buy machines that build gadgets for you. Watch for power surges and glitches. Most gadgets wins.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => "⚙️ " + num(n),
+  },
+  fishing: {
+    name: "Lake Frenzy",
+    icon: "🎣",
+    blurb: "Every right answer is a cast. Reel in fish, rare lake monsters, junk and frenzies. Heaviest haul wins.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => num(n) + " lb",
+  },
+  hack: {
+    name: "Code Breakers",
+    icon: "🕵️",
+    blurb: "Pick a secret password, mine bits, and crack rivals' passwords to steal theirs. Most bits wins.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => num(n) + " bits",
   },
 };
+
+/** Modes whose mini-game runs on the player's device; the server caps their score by what they earned. */
+export const DEVICE_MODES: LiveMode[] = ["tower", "snack", "factory"];
 
 export const LIMITS = {
   title: 80,

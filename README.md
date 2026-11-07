@@ -199,9 +199,17 @@ A Kahoot or Gimkit alternative at `/live`. A host puts a game on the big screen;
   - **Classic:** everyone answers the same question on the big screen; up to 1,000 points for a right answer depending on speed, plus a streak bonus.
   - **Gold Rush:** self-paced; every right answer opens one of three chests (gold, double, steal, swap, lose or nothing).
   - **Rocket Race:** self-paced; right answers boost your rocket and the first to 100% wins.
-- **No questions:** the host can turn the set off for Gold Rush and Rocket Race, so players tap a big button instead of answering (rate-limited on the server).
+  - Party modes (all self-paced, all original games, in [`lib/live/party.ts`](lib/live/party.ts) and [`components/live/party`](components/live/party)):
+    - **🏰 Tower Siege:** answer for coins, build and upgrade archer, cannon and frost towers, then send waves. Score = waves cleared × 100 + defeats × 5 (best run).
+    - **🍔 Snack Shack:** answer to restock food, tap customers to serve them before they walk out (quick service tips), and buy upgrades. Score = cash taken in.
+    - **🏭 Gadget Factory:** answer for coins and buy machines that build gadgets every second, with power surges and glitches. Score = gadgets built.
+    - **🎣 Lake Frenzy:** every right answer is a cast. The server rolls the catch: fish from minnows to a legendary whale, junk, frenzies (next 3 catches doubled) and storm clouds (everyone else's next catch halved). Score = weight.
+    - **🕵️ Code Breakers:** pick a secret password, answer to mine bits, and every 3 right answers try to crack a rival's password (one of three guesses) to steal 15–25% of their bits. Score = bits.
+
+    Tower Siege, Snack Shack and Gadget Factory run on the player's device (state saved in the browser so a reload carries on). The server only credits what they earned from answers and caps the score they report to what that could plausibly buy. Lake Frenzy and Code Breakers are decided entirely on the server; passwords never reach other players' devices.
+- **No questions:** the host can turn the set off for every mode except Classic, so players tap a big button instead of answering (smaller rewards, rate-limited on the server).
 - **Fairness:** answers are checked on the server ([`lib/live/engine.ts`](lib/live/engine.ts)). Correct answers aren't sent to players until the reveal, and chest contents are decided when the chests appear. Players are identified by a secret token kept in their browser; the host can remove anyone.
-- **Live updates** use the same Supabase Realtime setup as rooms: the server pushes "the game moved on" (with the question, never the answer) over a secret channel; the host screen and phones also refresh every few seconds as a fallback. Tables are in [`supabase/migrations/004_live.sql`](supabase/migrations/004_live.sql); games expire after 12 hours and the daily cron cleans them up.
+- **Live updates** use the same Supabase Realtime setup as rooms: the server pushes "the game moved on" (with the question, never the answer) over a secret channel; the host screen and phones also refresh every few seconds as a fallback. Tables are in [`supabase/migrations/004_live.sql`](supabase/migrations/004_live.sql) and [`005_live_party_modes.sql`](supabase/migrations/005_live_party_modes.sql); games expire after 12 hours and the daily cron cleans them up.
 
 ## Scripts
 

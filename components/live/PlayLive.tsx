@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
 import type { PlayerView } from "@/lib/live/engine";
-import type { PlayerQuestion } from "@/lib/live/types";
+import { MODES } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
-import { HtmlFrame } from "./HtmlFrame";
-import { ANSWER_COLORS, ANSWER_SHAPES, card, getToken, input, primary, setToken } from "./ui";
+import { Answer } from "./Answer";
+import { PARTY_MODES, PartyPlay } from "./party";
+import { card, getToken, input, primary, setToken } from "./ui";
 
 /** A player's screen for a Live game (usually a phone). */
 export function PlayLive({ code }: { code: string }) {
@@ -127,7 +128,8 @@ export function PlayLive({ code }: { code: string }) {
       )}
 
       {view.status === "playing" && view.mode === "classic" && <ClassicPlay view={view} busy={busy} skew={skew} act={act} />}
-      {view.status === "playing" && view.mode !== "classic" && <SelfPlay view={view} busy={busy} skew={skew} act={act} />}
+      {view.status === "playing" && PARTY_MODES.includes(view.mode) && <PartyPlay view={view} busy={busy} act={act} />}
+      {view.status === "playing" && (view.mode === "gold" || view.mode === "rocket") && <SelfPlay view={view} busy={busy} skew={skew} act={act} />}
 
       {view.status === "ended" && (
         <Centered>
@@ -148,7 +150,7 @@ export function PlayLive({ code }: { code: string }) {
   );
 }
 
-const score = (v: PlayerView, n: number) => (v.mode === "rocket" ? `${n}%` : v.mode === "gold" ? `💰 ${n.toLocaleString()}` : n.toLocaleString());
+const score = (v: PlayerView, n: number) => MODES[v.mode].unit(n);
 
 function Centered({ children }: { children: React.ReactNode }) {
   return <div className="mx-auto flex min-h-[50vh] max-w-xl flex-col items-center justify-center gap-3 text-center">{children}</div>;
@@ -197,51 +199,6 @@ function useSecondsLeft(endsAt: number | null, skew: number) {
     return () => clearInterval(t);
   }, [endsAt, skew]);
   return left;
-}
-
-/** Answer buttons/inputs for a question, used by every mode. */
-function Answer({ q, disabled, onAnswer }: { q: PlayerQuestion; disabled: boolean; onAnswer: (a: number | string) => void }) {
-  const [text, setText] = useState("");
-  return (
-    <div className="flex flex-col gap-3">
-      {q.prompt && <p className="text-center text-xl font-bold">{q.prompt}</p>}
-      {q.html && <HtmlFrame html={q.html} title="Question" height={q.type === "html" ? 340 : 220} locked={disabled} onAnswer={q.type === "html" ? (v) => onAnswer(v) : undefined} />}
-      {(q.type === "choice" || q.type === "truefalse") && (
-        <div className="grid grid-cols-2 gap-3">
-          {(q.choices ?? []).map((c, i) => (
-            <button
-              key={i}
-              type="button"
-              disabled={disabled}
-              onClick={() => onAnswer(i)}
-              className="flex min-h-24 flex-col items-center justify-center gap-1 rounded-2xl p-3 text-lg font-bold text-white transition-transform active:scale-95 disabled:opacity-60"
-              style={{ background: ANSWER_COLORS[i] }}
-            >
-              <span aria-hidden="true" className="text-2xl">
-                {ANSWER_SHAPES[i]}
-              </span>
-              <span className="text-sm sm:text-base">{c}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      {q.type === "type" && (
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (text.trim()) onAnswer(text.trim());
-          }}
-        >
-          <input value={text} onChange={(e) => setText(e.target.value.slice(0, 120))} placeholder="Type your answer" aria-label="Your answer" disabled={disabled} autoFocus className={`${input} h-12 text-lg`} />
-          <button type="submit" disabled={disabled || !text.trim()} className={primary}>
-            Send
-          </button>
-        </form>
-      )}
-      {q.type === "html" && <p className="text-center text-xs text-muted">Answer in the box above.</p>}
-    </div>
-  );
 }
 
 function ClassicPlay({ view, busy, skew, act }: { view: PlayerView; busy: boolean; skew: number; act: (b: Record<string, unknown>) => Promise<PlayerView | null> }) {

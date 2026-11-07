@@ -225,7 +225,9 @@ function SelfPaced({ view, secondsLeft }: { view: HostView; secondsLeft: number 
   return (
     <div className="flex flex-col gap-4">
       <div className={`${card} flex items-center justify-between`}>
-        <p className="text-sm text-muted">{rocket ? "First to 100% wins" : "Most gold wins"}</p>
+        <p className="text-sm text-muted">
+          {rocket ? "First to 100% wins" : `${MODES[view.mode].icon} ${MODES[view.mode].name}: highest score when time's up wins`}
+        </p>
         <p className={`font-mono text-4xl font-black tabular-nums ${secondsLeft <= 10 ? "text-danger" : ""}`}>
           {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}
         </p>
@@ -246,7 +248,7 @@ function SelfPaced({ view, secondsLeft }: { view: HostView; secondsLeft: number 
                 </span>
               )}
             </span>
-            <span className="w-20 text-right font-mono font-semibold tabular-nums">{rocket ? `${p.score}%` : `💰 ${p.score.toLocaleString()}`}</span>
+            <span className="w-28 text-right font-mono font-semibold tabular-nums">{MODES[view.mode].unit(p.score)}</span>
           </li>
         ))}
       </ol>
@@ -275,7 +277,7 @@ function Podium({ view }: { view: HostView }) {
   const order = [top[1], top[0], top[2]];
   const heights = ["h-28", "h-40", "h-20"];
   const medals = ["🥈", "🥇", "🥉"];
-  const fmt = (n: number) => (view.mode === "rocket" ? `${n}%` : view.mode === "gold" ? `💰 ${n.toLocaleString()}` : n.toLocaleString());
+  const fmt = MODES[view.mode].unit;
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-end justify-center gap-3 pt-6">
