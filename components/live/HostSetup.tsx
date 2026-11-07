@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import { MODES, type LiveMode, type SetSummary } from "@/lib/live/types";
+import { MapCard, type MapSummaryView } from "./MapList";
 import { card, primary, secondary } from "./ui";
 
 /**
@@ -20,7 +21,12 @@ export function HostSetup() {
   const [chosen, setChosen] = useState<{ id: string; title: string; cover: string; questionCount: number } | null>(null);
   const [mine, setMine] = useState<SetSummary[]>([]);
   const [noSet, setNoSet] = useState(false);
-  const [pickedMode, setMode] = useState<LiveMode>("classic");
+  const [pickedMode, setMode] = useState<LiveMode>(() => {
+    const m = params.get("mode");
+    return m && m in MODES ? (m as LiveMode) : "classic";
+  });
+  const [mapId, setMapId] = useState<string | null>(params.get("map"));
+  const [maps, setMaps] = useState<MapSummaryView[] | null>(null);
   const [minutes, setMinutes] = useState(5);
   const [shuffle, setShuffle] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -33,6 +39,16 @@ export function HostSetup() {
       .then((d) => setMine(d.sets ?? []))
       .catch(() => {});
   }, [user]);
+
+  // Maps for Tower Siege: yours first, then popular ones (the chosen one included even if it's someone else's).
+  const wantMaps = pickedMode === "tower" && !!user && maps === null;
+  useEffect(() => {
+    if (!wantMaps) return;
+    fetch("/api/live/maps", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { mine: [], public: [] }))
+      .then((d) => setMaps([...(d.mine ?? []).filter((m: MapSummaryView) => m.data.pathLength > 0), ...(d.public ?? [])]))
+      .catch(() => setMaps([]));
+  }, [wantMaps]);
 
   useEffect(() => {
     if (!setId) return;
@@ -62,7 +78,7 @@ export function HostSetup() {
     const res = await fetch("/api/live/games", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ setId: noSet ? null : setId, mode, settings: { minutes, shuffle } }),
+      body: JSON.stringify({ setId: noSet ? null : setId, mode, settings: { minutes, shuffle, mapId: mode === "tower" ? mapId : null } }),
     }).catch(() => null);
     const body = await res?.json().catch(() => null);
     if (res?.ok) router.push(`/live/host/${body.code}`);
@@ -157,6 +173,26 @@ export function HostSetup() {
             );
           })}
         </div>
+        {mode === "tower" && (
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between text-sm">
+              <span className="font-semibold">Map</span>
+              <Link href="/live/maps" className="text-accent hover:underline">
+                Make your own map →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <MapCard
+                m={{ id: "", title: "Classic Meadow", owner_name: "Jace Games", visibility: "public", plays: 0, data: { cols: 12, rows: 8, theme: "meadow", pathLength: 23 } }}
+                selected={!mapId}
+                onClick={() => setMapId(null)}
+              />
+              {(maps ?? []).map((m) => (
+                <MapCard key={m.id} m={m} selected={mapId === m.id} onClick={() => setMapId(m.id)} />
+              ))}
+            </div>
+          </div>
+        )}
         <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
           {MODES[mode].selfPaced ? (
             <label className="flex items-center gap-2">

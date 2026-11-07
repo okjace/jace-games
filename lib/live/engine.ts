@@ -1,6 +1,8 @@
 import "server-only";
 import { createHash, randomBytes, randomInt } from "crypto";
 import { liveStore, type LiveGameRow, type LivePlayerRow } from "@/lib/db/live";
+import { mapStore } from "@/lib/db/liveMaps";
+import { DEFAULT_MAP, cleanMap, type TowerMap } from "./maps";
 import { broadcast } from "@/lib/realtime/server";
 import type { Session } from "@/lib/session";
 import {
@@ -56,7 +58,7 @@ const MAX_GAMES_PER_HOUR = 30;
 const GRACE_MS = 1500; // answers can arrive a little after the timer on slow connections
 const ROCKET_GOAL = 100;
 
-export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean };
+export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean; /** Tower Siege: a copy of the chosen map, taken when the game is made. */ map?: TowerMap; mapTitle?: string };
 
 /**
  * Classic: lobby → question → reveal → question … → ended (q indexes `order`).
@@ -127,7 +129,7 @@ async function bump(g: LiveGameRow, patch: Partial<LiveGameRow>): Promise<LiveGa
 
 export async function createLiveGame(
   session: Session,
-  opts: { setId: string | null; mode: LiveMode; settings: Partial<GameSettings> },
+  opts: { setId: string | null; mode: LiveMode; settings: Partial<GameSettings> & { mapId?: unknown } },
 ): Promise<string> {
   const mode = MODES[opts.mode] ? opts.mode : "classic";
   const store = liveStore();
@@ -152,6 +154,16 @@ export async function createLiveGame(
     minutes: Math.min(30, Math.max(1, Math.round(Number(opts.settings.minutes) || 5))),
     shuffle: !!opts.settings.shuffle,
   };
+  // Tower Siege on a custom map: copy it now, so later edits don't change a game in progress.
+  if (mode === "tower" && typeof opts.settings.mapId === "string" && opts.settings.mapId) {
+    const row = await mapStore().get(opts.settings.mapId);
+    const usable = row && (row.owner_id === session.user.id || (row.visibility === "public" && !row.removed));
+    const cleaned = usable ? cleanMap(row.data) : null;
+    if (!row || !cleaned?.ok) throw new LiveError("That map isn't available.", 404);
+    settings.map = cleaned.map;
+    settings.mapTitle = row.title;
+    await mapStore().addPlay(row.id).catch(() => {});
+  }
   for (let attempt = 0; attempt < 6; attempt++) {
     try {
       const g = await store.createGame({
@@ -271,6 +283,9 @@ export type PlayerView = {
   /** Party modes: what this player may see of their own mode state. */
   party: {
     bank?: number;
+    /** Tower Siege: the map being played. */
+    map?: TowerMap;
+    mapTitle?: string | null;
     catches?: Catch[];
     /** Fishdex: fish id → heaviest caught. */
     caught?: Record<string, number>;
@@ -329,6 +344,10 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
 
 function partyView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]): PlayerView["party"] {
   const d = dataOf(me);
+  if (g.mode === "tower") {
+    const settings = g.settings as GameSettings;
+    return { bank: d.bank ?? 0, map: settings.map ?? DEFAULT_MAP, mapTitle: settings.mapTitle ?? null };
+  }
   if (DEVICE_MODES.includes(g.mode)) return { bank: d.bank ?? 0 };
   const levels = d.shop ?? emptyShop();
   const shop = SHOP_MODES.includes(g.mode)

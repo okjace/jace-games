@@ -62,6 +62,9 @@ export function LiveHome() {
             <Link href="/live/discover" className={secondary}>
               Discover sets
             </Link>
+            <Link href="/live/maps" className={secondary}>
+              Make maps
+            </Link>
           </div>
         </div>
         <form

@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { setupCanvas, themeColors } from "@/components/games/shared";
+import { DEFAULT_MAP, type TowerMap } from "@/lib/live/maps";
 import { Tabs, Toast, useReport, useSaved, type PartyProps } from "./shared";
+import { drawMapBase } from "./towerMap";
 
 /**
  * Tower Siege: answer questions to earn coins, build towers along the path,
@@ -11,17 +13,7 @@ import { Tabs, Toast, useReport, useSaved, type PartyProps } from "./shared";
  * (your best run counts).
  */
 
-const COLS = 12;
-const ROWS = 8;
 const CELL = 40;
-const W = COLS * CELL;
-const H = ROWS * CELL;
-// The road, as grid cells from the gate (left) to the castle (right).
-const PATH: [number, number][] = [
-  [0, 1], [1, 1], [2, 1], [3, 1], [3, 2], [3, 3], [3, 4], [3, 5], [4, 5], [5, 5], [6, 5], [6, 4], [6, 3], [6, 2], [7, 2],
-  [8, 2], [9, 2], [9, 3], [9, 4], [9, 5], [9, 6], [10, 6], [11, 6],
-];
-const onPath = new Set(PATH.map(([x, y]) => `${x},${y}`));
 
 type Kind = "archer" | "cannon" | "frost";
 const TOWERS: Record<Kind, { icon: string; name: string; cost: number; range: number; dmg: number; rate: number; splash?: number; slow?: number }> = {
@@ -39,7 +31,7 @@ const stat = (t: Tower) => {
   return { ...b, dmg: b.dmg * 1.5 ** (t.level - 1), range: b.range + (t.level - 1) * 0.3 };
 };
 
-function pointAt(d: number): [number, number] {
+function pointAt(PATH: [number, number][], d: number): [number, number] {
   const i = Math.min(PATH.length - 2, Math.floor(d));
   const f = Math.min(1, d - i);
   const [x1, y1] = PATH[i];
@@ -48,6 +40,12 @@ function pointAt(d: number): [number, number] {
 }
 
 export function TowerSiege({ view, act, earn }: PartyProps) {
+  const map = view.party.map ?? DEFAULT_MAP;
+  const { cols: COLS, rows: ROWS, path: PATH } = map;
+  const W = COLS * CELL;
+  const H = ROWS * CELL;
+  const onPath = new Set(PATH.map(([x, y]) => `${x},${y}`));
+  const mapRef = useRef(map);
   const [tab, setTab] = useState<"play" | "earn">("earn");
   const [saved, save] = useSaved<Saved>(view.code, "tower", () => ({ towers: [], spent: 0, bonus: 0, wave: 0, best: 0, kills: 0, lives: 10 }));
   const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
@@ -64,7 +62,8 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
   const savedRef = useRef(saved);
   useEffect(() => {
     savedRef.current = saved;
-  }, [saved]);
+    mapRef.current = map;
+  }, [saved, map]);
 
   const wallet = (view.party.bank ?? 0) + saved.bonus - saved.spent;
   const score = saved.best;
@@ -72,7 +71,7 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
 
   useEffect(() => {
     if (canvasRef.current) setupCanvas(canvasRef.current, W, H);
-  }, [tab]);
+  }, [tab, W, H]);
 
   const say = (text: string, good = true) => setToast({ text, good, id: Date.now() });
   useEffect(() => {
@@ -103,6 +102,8 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
     const n = savedRef.current.wave + 1;
     const frame = (now: number, dt: number) => {
       const L = live.current;
+      const M = mapRef.current;
+      const PATH = M.path;
       const s = savedRef.current;
       // Spawn.
       L.nextSpawn -= dt;
@@ -138,7 +139,7 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
         const target = L.enemies
           .filter((e) => e.hp > 0)
           .filter((e) => {
-            const [ex, ey] = pointAt(e.d);
+            const [ex, ey] = pointAt(PATH, e.d);
             return Math.hypot(ex - tx, ey - ty) <= st.range * CELL;
           })
           .sort((a, b) => b.d - a.d)[0];
@@ -147,10 +148,10 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
           continue;
         }
         L.cooldowns.set(key, st.rate);
-        const [ex, ey] = pointAt(target.d);
+        const [ex, ey] = pointAt(PATH, target.d);
         L.shots.push({ x1: tx, y1: ty, x2: ex, y2: ey, until: now + 120 });
         const hit = st.splash
-          ? L.enemies.filter((e) => e.hp > 0 && Math.hypot(pointAt(e.d)[0] - ex, pointAt(e.d)[1] - ey) <= st.splash! * CELL)
+          ? L.enemies.filter((e) => e.hp > 0 && Math.hypot(pointAt(PATH, e.d)[0] - ex, pointAt(PATH, e.d)[1] - ey) <= st.splash! * CELL)
           : [target];
         for (const e of hit) {
           e.hp -= st.dmg;
@@ -167,7 +168,7 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
           return { ...cur, lives, kills, best: Math.max(cur.best, cur.wave * 100 + kills * 5) };
         });
       }
-      draw(canvasRef.current, s, L, now);
+      draw(canvasRef.current, M, s, L, now);
       const sNow = savedRef.current;
       if (sNow.lives - leaked <= 0) {
         stop();
@@ -199,14 +200,14 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
 
   // Redraw when idle.
   useEffect(() => {
-    if (!running) draw(canvasRef.current, saved, live.current, performance.now());
-  }, [saved, running, tab, selected]);
+    if (!running) draw(canvasRef.current, map, saved, live.current, performance.now(), selected);
+  }, [map, saved, running, tab, selected]);
 
   const tile = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const x = Math.floor(((e.clientX - r.left) / r.width) * COLS);
     const y = Math.floor(((e.clientY - r.top) / r.height) * ROWS);
-    if (onPath.has(`${x},${y}`)) return setSelected(null);
+    if (onPath.has(`${x},${y}`) || map.decor.some((d) => d.x === x && d.y === y)) return setSelected(null);
     setSelected({ x, y });
   };
   const here = selected ? saved.towers.find((t) => t.x === selected.x && t.y === selected.y) : null;
@@ -242,7 +243,7 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
         earn
       ) : (
         <>
-          <canvas ref={canvasRef} onPointerDown={tile} className="touch-game aspect-[3/2] w-full rounded-xl border border-line" aria-label="Tower Siege map. Tap an empty square to build." />
+          <canvas ref={canvasRef} onPointerDown={tile} style={{ aspectRatio: `${COLS} / ${ROWS}` }} className="touch-game w-full rounded-xl border border-line" aria-label="Tower Siege map. Tap an empty square to build." />
           {selected && !running && (
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-panel p-3 text-sm">
               {here ? (
@@ -288,18 +289,26 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
   );
 }
 
-function draw(canvas: HTMLCanvasElement | null, s: Saved, L: { enemies: Enemy[]; shots: { x1: number; y1: number; x2: number; y2: number }[] }, now: number) {
+function draw(
+  canvas: HTMLCanvasElement | null,
+  map: TowerMap,
+  s: Saved,
+  L: { enemies: Enemy[]; shots: { x1: number; y1: number; x2: number; y2: number }[] },
+  now: number,
+  selected: { x: number; y: number } | null = null,
+) {
   if (!canvas) return;
   const ctx = canvas.getContext("2d")!;
   const c = themeColors();
-  ctx.fillStyle = "#3d7a3a";
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#c9a66b";
-  for (const [x, y] of PATH) ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+  drawMapBase(ctx, map, CELL);
+  if (selected) {
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(selected.x * CELL + 2, selected.y * CELL + 2, CELL - 4, CELL - 4);
+  }
   ctx.font = `${CELL * 0.7}px sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("🏰", (11 + 0.5) * CELL, (7 + 0.5) * CELL);
   for (const t of s.towers) {
     ctx.fillStyle = "rgba(0,0,0,0.25)";
     ctx.beginPath();
@@ -322,7 +331,7 @@ function draw(canvas: HTMLCanvasElement | null, s: Saved, L: { enemies: Enemy[];
     ctx.stroke();
   }
   for (const e of L.enemies) {
-    const [x, y] = pointAt(e.d);
+    const [x, y] = pointAt(map.path, e.d);
     ctx.font = `${CELL * 0.65}px sans-serif`;
     ctx.fillText(e.icon, x, y);
     ctx.fillStyle = "#000";
