@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
 import type { PlayerView } from "@/lib/live/engine";
 import { MODES } from "@/lib/live/types";
@@ -106,6 +106,16 @@ export function PlayLive({ code }: { code: string }) {
   if (!token) return <JoinForm code={code} defaultName={user?.username ?? ""} note={error} onJoined={(t) => (setToken(code, t), setTok(t))} />;
   if (!view) return <Centered>{error ? <p className="text-muted">{error}</p> : <p className="animate-pulse text-muted">Joining…</p>}</Centered>;
 
+  // Self-paced modes play full screen on their own stage, with their own HUD.
+  if (view.status === "playing" && PARTY_MODES.includes(view.mode)) {
+    return (
+      <>
+        {error && <p className="fixed inset-x-0 top-20 z-[60] mx-auto w-fit rounded-full bg-red-500 px-4 py-1.5 text-sm font-bold text-white shadow-lg">{error}</p>}
+        <PartyPlay view={view} busy={busy} act={act} />
+      </>
+    );
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
       <div className="flex items-center justify-between rounded-2xl border border-line bg-panel px-4 py-3">
@@ -128,8 +138,6 @@ export function PlayLive({ code }: { code: string }) {
       )}
 
       {view.status === "playing" && view.mode === "classic" && <ClassicPlay view={view} busy={busy} skew={skew} act={act} />}
-      {view.status === "playing" && PARTY_MODES.includes(view.mode) && <PartyPlay view={view} busy={busy} act={act} />}
-      {view.status === "playing" && (view.mode === "gold" || view.mode === "rocket") && <SelfPlay view={view} busy={busy} skew={skew} act={act} />}
 
       {view.status === "ended" && (
         <Centered>
@@ -248,134 +256,6 @@ function ClassicPlay({ view, busy, skew, act }: { view: PlayerView; busy: boolea
         <span className={`font-mono text-lg font-bold tabular-nums ${left !== null && left <= 5 ? "text-danger" : "text-foreground"}`}>{left ?? ""}</span>
       </div>
       <Answer q={q} disabled={busy || left === 0} onAnswer={(ans) => void act({ action: "answer", answer: ans })} />
-    </div>
-  );
-}
-
-const CHEST_TEXT: Record<string, (l: Record<string, unknown>) => string> = {
-  gain: (l) => `+${l.amount} gold!`,
-  double: (l) => `Double! +${l.amount} gold`,
-  steal: (l) => `You stole ${l.amount} gold from ${l.target}!`,
-  swap: (l) => `You swapped gold with ${l.target}!`,
-  lose: (l) => `Oh no, you lost ${Math.abs(Number(l.amount))} gold`,
-  nothing: () => "Empty chest!",
-};
-
-function SelfPlay({ view, busy, skew, act }: { view: PlayerView; busy: boolean; skew: number; act: (b: Record<string, unknown>) => Promise<PlayerView | null> }) {
-  const left = useSecondsLeft(view.endsAt, skew);
-  const [feedback, setFeedback] = useState<Record<string, unknown> | null>(null);
-  const gold = view.mode === "gold";
-  const fetching = useRef(false);
-
-  // With questions on, always have the next one ready (unless a chest is waiting).
-  const needsQuestion = !view.noSet && !view.selfQuestion && view.chests === null && !feedback;
-  useEffect(() => {
-    if (!needsQuestion || fetching.current) return;
-    fetching.current = true;
-    void act({ action: "next" }).finally(() => (fetching.current = false));
-  }, [needsQuestion, act]);
-
-  // Someone stole from or swapped with you.
-  const last = view.last;
-  const robbed = last && (last.kind === "robbed" || last.kind === "swapped") ? last : null;
-
-  const after = (v: PlayerView | null) => {
-    if (!v?.last) return;
-    if (v.last.kind === "answer" || (v.mode === "rocket" && view.noSet)) {
-      if (v.chests === null) setFeedback(v.last);
-    } else if (v.last.kind === "chest") setFeedback(v.last);
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between rounded-xl bg-panel px-4 py-2 text-sm">
-        <span className="text-muted">{gold ? "Most gold wins" : "First to 100% wins"}</span>
-        <span className="font-mono font-bold tabular-nums">
-          {left !== null ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : ""}
-        </span>
-      </div>
-
-      {!gold && (
-        <div className="relative h-10 overflow-hidden rounded-full bg-foreground/[.06]">
-          <span className="absolute inset-y-0 left-0 rounded-full bg-accent transition-[width] duration-500" style={{ width: `${view.me.score}%` }} />
-          <span className="absolute top-1 text-2xl transition-[left] duration-500" style={{ left: `calc(${view.me.score}% - 18px)` }}>
-            🚀
-          </span>
-        </div>
-      )}
-
-      {robbed && (
-        <p className="rounded-xl bg-danger/10 px-3 py-2 text-center text-sm text-danger">
-          {robbed.kind === "robbed" ? `${robbed.by} stole ${robbed.amount} of your gold!` : `${robbed.by} swapped gold with you!`}
-        </p>
-      )}
-
-      {view.chests !== null ? (
-        <Centered>
-          <p className="text-xl font-bold">Pick a chest!</p>
-          <div className="flex gap-3">
-            {Array.from({ length: view.chests }, (_, i) => (
-              <button
-                key={i}
-                type="button"
-                disabled={busy}
-                onClick={async () => after(await act({ action: "pick", chest: i }))}
-                className="flex h-24 w-24 items-center justify-center rounded-2xl border-2 border-warn bg-warn/10 text-5xl transition-transform hover:scale-105 active:scale-95"
-                aria-label={`Chest ${i + 1}`}
-              >
-                🎁
-              </button>
-            ))}
-          </div>
-        </Centered>
-      ) : feedback ? (
-        <Centered>
-          {feedback.kind === "chest" ? (
-            <>
-              <p className="text-5xl">{feedback.chest === "lose" ? "💸" : feedback.chest === "nothing" ? "🫥" : feedback.chest === "steal" ? "🦝" : feedback.chest === "swap" ? "🔄" : "💰"}</p>
-              <p className="text-xl font-bold">{(CHEST_TEXT[String(feedback.chest)] ?? CHEST_TEXT.gain)(feedback)}</p>
-              {typeof feedback.note === "string" && <p className="text-sm text-muted">{feedback.note}</p>}
-            </>
-          ) : feedback.correct === false ? (
-            <>
-              <p className="text-5xl">❌</p>
-              <p className="text-xl font-bold">Not quite</p>
-              {Array.isArray(feedback.right) && <p className="text-muted">It was {(feedback.right as string[]).join(" / ")}</p>}
-            </>
-          ) : (
-            <>
-              <p className="text-5xl">✅</p>
-              <p className="text-xl font-bold">{view.mode === "rocket" ? `Boost! +${feedback.boost ?? ""}%` : "Correct!"}</p>
-            </>
-          )}
-          <button type="button" autoFocus onClick={() => setFeedback(null)} className={primary}>
-            Next
-          </button>
-        </Centered>
-      ) : view.noSet ? (
-        <Centered>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={async () => {
-              const v = await act({ action: "tap" });
-              if (v && gold && v.chests !== null) setFeedback(null);
-            }}
-            className="flex h-48 w-48 items-center justify-center rounded-full bg-accent text-3xl font-black text-on-accent shadow-[0_8px_0_rgba(0,0,0,0.25)] transition-transform active:translate-y-1 active:scale-95"
-          >
-            {gold ? "TAP!" : "BOOST!"}
-          </button>
-          <p className="text-sm text-muted">{gold ? "Every tap opens a chest." : "Every tap fires your rocket."}</p>
-        </Centered>
-      ) : view.selfQuestion ? (
-        <Answer key={`${view.me.answered}`} q={view.selfQuestion} disabled={busy} onAnswer={async (ans) => after(await act({ action: "answer", answer: ans }))} />
-      ) : (
-        <Centered>
-          <p className="animate-pulse text-muted">Loading a question…</p>
-        </Centered>
-      )}
-
-      <Top view={view} />
     </div>
   );
 }

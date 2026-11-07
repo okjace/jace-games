@@ -51,7 +51,7 @@ export type LiveSet = {
 
 export type SetSummary = Omit<LiveSet, "questions"> & { questionCount: number };
 
-export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack";
+export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball";
 
 export type ModeDef = {
   name: string;
@@ -129,6 +129,14 @@ export const MODES: Record<LiveMode, ModeDef> = {
     needsSet: false,
     selfPaced: true,
     unit: (n) => num(n) + " bits",
+  },
+  baseball: {
+    name: "Home Run Derby",
+    icon: "⚾",
+    blurb: "Every right answer is an at-bat: time your swing to hit singles, doubles and homers. Wrong answers are outs. Most runs wins.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => num(n) + (n === 1 ? " run" : " runs"),
   },
 };
 

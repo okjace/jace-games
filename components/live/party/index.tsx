@@ -1,80 +1,194 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PlayerView } from "@/lib/live/engine";
 import { MODES, type LiveMode } from "@/lib/live/types";
-import { Answer } from "../Answer";
+import { GameQuestion, type AnswerResult } from "../fx/GameQuestion";
+import { Juice, MuteButton, useCountUp, useJuice } from "../fx/Juice";
+import { sfx } from "../fx/sfx";
+import { Baseball } from "./Baseball";
 import { CodeBreakers } from "./CodeBreakers";
 import { GadgetFactory } from "./GadgetFactory";
+import { GoldRush } from "./GoldRush";
 import { LakeFrenzy } from "./LakeFrenzy";
+import { RocketRace } from "./RocketRace";
+import { Shop } from "./Shop";
 import { SnackShack } from "./SnackShack";
-import { TapButton, Toast, useEarn, type Act } from "./shared";
+import type { Act } from "./shared";
 import { TowerSiege } from "./TowerSiege";
 
-export const PARTY_MODES: LiveMode[] = ["tower", "snack", "factory", "fishing", "hack"];
+/** Every self-paced mode plays on this stage. */
+export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball"];
 
-const TAP_LABEL: Partial<Record<LiveMode, [string, string]>> = {
-  tower: ["⚒️ MINE", "Each tap digs up a few coins."],
-  snack: ["🥕 FORAGE", "Each tap brings in a little food."],
-  factory: ["🪙 CRANK", "Each tap earns a few coins."],
-  fishing: ["🎣 CAST", "Each tap is a cast."],
-  hack: ["💻 MINE", "Each tap mines a few bits."],
+/** Each mode's look: background, accent, and its tap button with questions off. */
+export const THEMES: Record<string, { bg: string; accent: string; tap: [string, string] }> = {
+  gold: { bg: "radial-gradient(circle at 50% 0%, #6d3fd1 0%, #2b1462 55%, #160a36 100%)", accent: "#facc15", tap: ["💰 DIG", "Every dig opens a chest."] },
+  rocket: { bg: "radial-gradient(circle at 50% 120%, #1e3a8a 0%, #0b1026 60%, #05060f 100%)", accent: "#38bdf8", tap: ["🔥 BOOST", "Every boost fires your rocket."] },
+  tower: { bg: "linear-gradient(180deg, #2f6b3a 0%, #1d4527 100%)", accent: "#facc15", tap: ["⛏️ MINE", "Each tap digs up a few coins."] },
+  snack: { bg: "linear-gradient(180deg, #ff9a5a 0%, #e8573c 100%)", accent: "#fff3c4", tap: ["🥕 FORAGE", "Each tap brings in a little food."] },
+  factory: { bg: "linear-gradient(180deg, #3b4252 0%, #1f242e 100%)", accent: "#fbbf24", tap: ["🔩 CRANK", "Each tap earns a few coins."] },
+  fishing: { bg: "linear-gradient(180deg, #38bdf8 0%, #0369a1 60%, #0c4a6e 100%)", accent: "#fde68a", tap: ["🎣 CAST", "Each tap is a cast."] },
+  hack: { bg: "linear-gradient(180deg, #04130b 0%, #000 100%)", accent: "#3ddc84", tap: ["💻 MINE", "Each tap mines a few bits."] },
+  baseball: { bg: "linear-gradient(180deg, #166534 0%, #14532d 70%, #052e16 100%)", accent: "#facc15", tap: ["⚾ PLAY BALL", "Each tap brings a pitch."] },
 };
 
-const EARN_TEXT: Partial<Record<LiveMode, (v: PlayerView) => string>> = {
-  tower: (v) => `+${v.last?.reward ?? ""} coins`,
-  snack: (v) => `+${v.last?.reward ?? ""} food`,
-  factory: (v) => `+${v.last?.reward ?? ""} coins`,
+const REWARD_TEXT: Partial<Record<LiveMode, (v: PlayerView) => string | null>> = {
+  tower: (v) => (v.last?.reward ? `+${v.last.reward} 🪙` : null),
+  snack: (v) => (v.last?.reward ? `+${v.last.reward} 🥫` : null),
+  factory: (v) => (v.last?.reward ? `+${v.last.reward} 🪙` : null),
+  hack: (v) => (v.last?.kind === "bits" ? `+${v.last.amount} bits` : null),
+  rocket: (v) => (typeof v.last?.boost === "number" ? `+${v.last.boost}%` : null),
 };
 
-/** A party mode's screen: the mini-game, with an Earn panel to answer questions (or tap). */
-export function PartyPlay({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act }) {
-  const { question, answer, tap, toast, say } = useEarn(view, act);
+export type StageProps = {
+  view: PlayerView;
+  busy: boolean;
+  act: Act;
+  /** The earn panel: a question, or the tap button with questions off. */
+  earn: React.ReactNode;
+  /** True while this mode wants the earn panel hidden (a chest to pick, a hack to finish…). */
+  setEarnHidden?: (hidden: boolean) => void;
+};
+
+export function PartyPlay(props: { view: PlayerView; busy: boolean; act: Act }) {
+  return (
+    <Juice>
+      <Stage {...props} />
+    </Juice>
+  );
+}
+
+function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act }) {
+  const juice = useJuice();
   const mode = view.mode;
+  const theme = THEMES[mode] ?? THEMES.gold;
+  const def = MODES[mode];
   const left = useSecondsLeft(view.endsAt, view.serverNow);
+  const score = useCountUp(view.me.score);
+  const [shopOpen, setShopOpen] = useState(false);
+  const fetching = useRef(false);
 
-  const afterEarn = (v: PlayerView | null) => {
-    if (v?.last && (v.last.correct === true || v.last.kind === "tap") && EARN_TEXT[mode]) say(EARN_TEXT[mode]!(v), true);
+  // Keep the next question ready (with questions on).
+  const needsQuestion = !view.noSet && !view.selfQuestion && view.status === "playing" && !(mode === "hack" && !view.party.password) && view.chests === null;
+  useEffect(() => {
+    if (!needsQuestion || fetching.current) return;
+    fetching.current = true;
+    void act({ action: "next" }).finally(() => (fetching.current = false));
+  }, [needsQuestion, act]);
+
+  // Someone else did something to you.
+  const lastKind = view.last?.kind;
+  const lastKey = `${lastKind}-${view.last?.by}-${view.last?.amount}`;
+  const seenLast = useRef(lastKey);
+  useEffect(() => {
+    if (lastKey === seenLast.current) return;
+    seenLast.current = lastKey;
+    if (lastKind === "robbed" || lastKind === "hacked") {
+      sfx.alarm();
+      juice.flash("rgba(229,72,77,0.45)");
+      juice.shake();
+    } else if (lastKind === "swapped" || lastKind === "stormed") {
+      sfx.whoosh();
+      juice.shake();
+    }
+  }, [lastKey, lastKind, juice]);
+
+  const celebrate = (v: PlayerView | null) => {
+    if (!v) return;
+    const text = REWARD_TEXT[mode]?.(v);
+    if (text) {
+      sfx.coin();
+      juice.pop(text, theme.accent);
+    }
   };
 
-  const [label, sub] = TAP_LABEL[mode] ?? ["TAP!", ""];
+  const answer = async (a: number | string): Promise<AnswerResult> => {
+    const v = await act({ action: "answer", answer: a });
+    if (!v) return null;
+    const last = v.last ?? {};
+    const correct = last.correct !== false;
+    if (correct) setTimeout(() => celebrate(v), 250);
+    else if (last.shielded) juice.pop("🛡️ Streak saved!", "#facc15");
+    return { correct, right: Array.isArray(last.right) ? (last.right as string[]) : undefined };
+  };
+
+  const [tapLabel, tapSub] = theme.tap;
   const earn = view.noSet ? (
-    <TapButton label={label} sub={sub} disabled={busy} onTap={async () => afterEarn(await tap())} />
-  ) : question ? (
-    <div className="rounded-2xl border border-line bg-panel p-4">
-      <Answer key={`${view.me.answered}`} q={question} disabled={busy} onAnswer={async (a) => afterEarn(await answer(a))} />
+    <div className="flex flex-col items-center gap-2 py-6">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          sfx.tap();
+          celebrate(await act({ action: "tap" }));
+        }}
+        className="flex h-40 w-40 items-center justify-center rounded-full text-2xl font-black text-black shadow-[0_10px_0_rgba(0,0,0,0.35)] transition-transform active:translate-y-2 active:shadow-[0_2px_0_rgba(0,0,0,0.35)] disabled:opacity-70"
+        style={{ background: theme.accent, animation: "jg-bob 2s ease-in-out infinite" }}
+      >
+        {tapLabel}
+      </button>
+      <p className="text-sm font-semibold text-white/80">{tapSub}</p>
     </div>
+  ) : view.selfQuestion ? (
+    <GameQuestion key={`${view.me.answered}`} q={view.selfQuestion} streak={view.me.streak} onAnswer={answer} accent={theme.accent} />
   ) : (
-    <p className="animate-pulse py-6 text-center text-muted">Loading a question…</p>
+    <p className="animate-pulse py-10 text-center font-semibold text-white/80">Loading a question…</p>
   );
 
-  const props = { view, busy, act, earn };
+  const stageProps: StageProps = { view, busy, act, earn };
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between rounded-xl bg-panel px-4 py-2 text-sm">
-        <span className="font-semibold">
-          {MODES[mode].icon} {MODES[mode].name}
-        </span>
-        <span className="font-mono font-bold tabular-nums">{left !== null ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : ""}</span>
+    <div className="relative -mx-4 -mt-6 min-h-[calc(100vh-4rem)] px-4 pb-10 pt-4 text-white sm:-mx-6 sm:-mt-8 sm:px-6" style={{ background: theme.bg }}>
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
+        {/* HUD */}
+        <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-black/25 py-1.5 pl-2 pr-4 backdrop-blur">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-xl">{def.icon}</span>
+            <span className="truncate font-mono text-xl font-black tabular-nums">{def.unit(score)}</span>
+          </div>
+          {view.me.streak >= 2 && <span className="rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-3 py-2 text-sm font-black">🔥{view.me.streak}</span>}
+          <span className="rounded-full bg-black/25 px-3 py-2 text-sm font-bold backdrop-blur">#{view.me.rank}</span>
+          <span className={`rounded-full bg-black/25 px-3 py-2 font-mono text-sm font-bold tabular-nums backdrop-blur ${left !== null && left <= 10 ? "text-red-300" : ""}`}>
+            {left !== null ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : ""}
+          </span>
+          {view.party.shop && (
+            <button type="button" onClick={() => setShopOpen(true)} className="rounded-full px-3 py-2 text-sm font-black text-black shadow-[0_3px_0_rgba(0,0,0,0.3)]" style={{ background: theme.accent }}>
+              🛒
+            </button>
+          )}
+          <MuteButton />
+        </div>
+
+        {view.last?.kind === "robbed" && <Alert>🦝 {String(view.last.by)} stole {String(view.last.amount)} of your gold!</Alert>}
+        {view.last?.kind === "swapped" && <Alert>🔄 {String(view.last.by)} swapped gold with you!</Alert>}
+        {view.last?.kind === "stormed" && <Alert>⛈️ {String(view.last.by)} sent a storm your way: your next catch is halved.</Alert>}
+
+        {mode === "gold" && <GoldRush {...stageProps} />}
+        {mode === "rocket" && <RocketRace {...stageProps} />}
+        {mode === "tower" && <TowerSiege {...stageProps} />}
+        {mode === "snack" && <SnackShack {...stageProps} />}
+        {mode === "factory" && <GadgetFactory {...stageProps} />}
+        {mode === "fishing" && <LakeFrenzy {...stageProps} />}
+        {mode === "hack" && <CodeBreakers {...stageProps} />}
+        {mode === "baseball" && <Baseball {...stageProps} />}
+
+        <ol className="flex flex-col gap-1.5 rounded-3xl bg-black/25 p-3 text-sm backdrop-blur">
+          {view.top.map((p, i) => (
+            <li key={p.name} className={`flex items-center gap-2 rounded-xl px-3 py-1.5 transition-colors ${p.you ? "bg-white/20 font-bold" : ""}`}>
+              <span className="w-6 text-center">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</span>
+              <span className="flex-1 truncate">{p.name}</span>
+              <span className="font-mono tabular-nums">{def.unit(p.score)}</span>
+            </li>
+          ))}
+        </ol>
       </div>
-      {view.last?.kind === "stormed" && <p className="rounded-xl bg-neutral-800 px-3 py-2 text-center text-sm text-white">⛈️ {String(view.last.by)} sent a storm your way!</p>}
-      {mode === "tower" && <TowerSiege {...props} />}
-      {mode === "snack" && <SnackShack {...props} />}
-      {mode === "factory" && <GadgetFactory {...props} />}
-      {mode === "fishing" && <LakeFrenzy {...props} />}
-      {mode === "hack" && <CodeBreakers {...props} />}
-      <Toast toast={toast} />
-      <ol className="flex flex-col gap-1 text-sm">
-        {view.top.map((p, i) => (
-          <li key={i} className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${p.you ? "bg-accent/10 ring-1 ring-accent/30" : "bg-foreground/[.03]"}`}>
-            <span className="w-5 font-mono text-muted">{i + 1}</span>
-            <span className="flex-1 truncate">{p.name}</span>
-            <span className="font-mono tabular-nums">{MODES[mode].unit(p.score)}</span>
-          </li>
-        ))}
-      </ol>
+      {shopOpen && <Shop view={view} act={act} unit={def.unit} onClose={() => setShopOpen(false)} />}
     </div>
   );
+}
+
+function Alert({ children }: { children: React.ReactNode }) {
+  return <p className="rounded-2xl bg-red-500/90 px-4 py-2 text-center text-sm font-bold shadow-lg" style={{ animation: "jg-rise 0.25s ease-out" }}>{children}</p>;
 }
 
 function useSecondsLeft(endsAt: number | null, serverNow: number) {
@@ -82,7 +196,15 @@ function useSecondsLeft(endsAt: number | null, serverNow: number) {
   useEffect(() => {
     if (!endsAt) return;
     const skew = serverNow - Date.now();
-    const tick = () => setLeft(Math.max(0, Math.ceil((endsAt - (Date.now() + skew)) / 1000)));
+    let warned = false;
+    const tick = () => {
+      const s = Math.max(0, Math.ceil((endsAt - (Date.now() + skew)) / 1000));
+      setLeft(s);
+      if (s <= 10 && s > 0 && !warned) {
+        warned = true;
+        sfx.countdown();
+      }
+    };
     tick();
     const t = setInterval(tick, 250);
     return () => clearInterval(t);

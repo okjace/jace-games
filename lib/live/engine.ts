@@ -3,7 +3,34 @@ import { createHash, randomBytes, randomInt } from "crypto";
 import { liveStore, type LiveGameRow, type LivePlayerRow } from "@/lib/db/live";
 import { broadcast } from "@/lib/realtime/server";
 import type { Session } from "@/lib/session";
-import { HACK_EVERY, TAP_COOLDOWN_MS, cast, hackOptions, mine, passwordChoices, reward, scoreCap, type Catch, type PartyData } from "./party";
+import {
+  HACK_EVERY,
+  SHOP,
+  TAP_COOLDOWN_MS,
+  boosted,
+  cast,
+  emptyShop,
+  hackOptions,
+  mine,
+  passwordChoices,
+  reward,
+  scoreCap,
+  makePitch,
+  newBall,
+  runPlay,
+  swingResult,
+  type BallState,
+  type Pitch,
+  type Play,
+  shopPrice,
+  type Catch,
+  type PartyData,
+  type ShopItem,
+  type ShopLevels,
+} from "./party";
+
+/** Modes with the upgrade shop (score is also the currency). */
+const SHOP_MODES: LiveMode[] = ["gold", "hack"];
 import { DEVICE_MODES, MODES, cleanName, forPlayers, isCorrect, isPlayable, type LiveMode, type PlayerQuestion, type Question } from "./types";
 
 /**
@@ -245,6 +272,8 @@ export type PlayerView = {
   party: {
     bank?: number;
     catches?: Catch[];
+    /** Fishdex: fish id → heaviest caught. */
+    caught?: Record<string, number>;
     frenzy?: number;
     stormed?: boolean;
     password?: string | null;
@@ -252,6 +281,10 @@ export type PlayerView = {
     hackReady?: boolean;
     hackCharge?: number;
     hackEvery?: number;
+    /** Baseball: the field, and the pitch waiting for a swing (speed only, no outcome). */
+    ball?: Omit<BallState, "pitch"> & { pitch: Pitch | null };
+    /** Gold Rush and Code Breakers: the upgrade shop, with what each next level costs. */
+    shop?: { levels: ShopLevels; prices: Record<ShopItem, number | null> };
     hack?: { targetName: string; options: string[] } | null;
     targets?: { id: string; name: string; score: number }[];
   };
@@ -297,7 +330,16 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
 function partyView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]): PlayerView["party"] {
   const d = dataOf(me);
   if (DEVICE_MODES.includes(g.mode)) return { bank: d.bank ?? 0 };
-  if (g.mode === "fishing") return { catches: d.catches ?? [], frenzy: d.frenzy ?? 0, stormed: !!d.stormed };
+  const levels = d.shop ?? emptyShop();
+  const shop = SHOP_MODES.includes(g.mode)
+    ? { levels, prices: Object.fromEntries((Object.keys(SHOP) as ShopItem[]).map((k) => [k, shopPrice(k, levels)])) as Record<ShopItem, number | null> }
+    : undefined;
+  if (g.mode === "gold") return { shop };
+  if (g.mode === "baseball") {
+    const b = d.ball ?? newBall();
+    return { ball: { ...b, pitch: b.pitch ? { type: b.pitch.type, ms: b.pitch.ms, curve: b.pitch.curve } : null } };
+  }
+  if (g.mode === "fishing") return { catches: d.catches ?? [], caught: d.caught ?? {}, frenzy: d.frenzy ?? 0, stormed: !!d.stormed };
   if (g.mode === "hack") {
     return {
       password: d.pw ?? null,
@@ -308,6 +350,7 @@ function partyView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]): Pla
       // The real answer stays on the server.
       hack: d.hack ? { targetName: d.hack.targetName, options: d.hack.options } : null,
       targets: d.hackReady && !d.hack ? all.filter((p) => p.id !== me.id && dataOf(p).pw).map((p) => ({ id: p.id, name: p.name, score: p.score })) : undefined,
+      shop,
     };
   }
   return {};
@@ -395,7 +438,11 @@ type PlayerAction =
   // Code Breakers.
   | { action: "password"; choice: number }
   | { action: "hack"; target: string }
-  | { action: "guess"; choice: number };
+  | { action: "guess"; choice: number }
+  // Gold Rush and Code Breakers.
+  | { action: "buy"; item: ShopItem }
+  // Baseball: how many ms off perfect the swing was (negative = early), or null to take the pitch.
+  | { action: "swing"; offset: number | null };
 
 export async function playerAction(code: string, token: unknown, body: PlayerAction): Promise<PlayerView> {
   const store = liveStore();
@@ -448,6 +495,37 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
   const d = dataOf(me);
   let earned = false;
   let tapped = false;
+
+  // The upgrade shop: pay with your score.
+  if (body.action === "buy") {
+    if (!SHOP_MODES.includes(g.mode)) throw new LiveError("There's no shop in this mode.");
+    const item = (Object.keys(SHOP) as ShopItem[]).find((k) => k === body.item);
+    if (!item) throw new LiveError("Pick something from the shop.");
+    const levels = d.shop ?? emptyShop();
+    const price = shopPrice(item, levels);
+    if (price === null) throw new LiveError("That's maxed out!", 409);
+    if (me.score < price) throw new LiveError("Not enough to buy that yet.", 409);
+    const next: ShopLevels =
+      item === "shield" ? { ...levels, shields: levels.shields + 1, shieldsBought: levels.shieldsBought + 1 } : { ...levels, [item]: levels[item] + 1 };
+    me = (await store.updatePlayer(g.id, me.id, { score: me.score - price, data: { ...d, shop: next, last: { kind: "bought", item, price } } }))!;
+    return buildPlayerView(g, me, await store.players(g.id));
+  }
+
+  // Baseball: swing at (or take) the pitch you earned.
+  if (body.action === "swing") {
+    if (g.mode !== "baseball") throw new LiveError("Unknown action.");
+    const ball = d.ball ?? newBall();
+    if (!ball.pitch) throw new LiveError("Answer a question to get a pitch.", 409);
+    if (now - ball.pitch.issuedAt > 20_000) throw new LiveError("That pitch got away. Answer another!", 409);
+    const offset = body.offset === null ? null : Number(body.offset);
+    const play: Play = swingResult(offset === null || !Number.isFinite(offset) ? null : Math.max(-2000, Math.min(2000, offset)));
+    const { state, runs, inningOver } = runPlay(ball, play);
+    me = (await store.updatePlayer(g.id, me.id, {
+      score: me.score + runs,
+      data: { ...d, ball: state, last: { kind: "play", play, runs, inningOver, inning: state.inning } },
+    }))!;
+    return buildPlayerView(g, me, await store.players(g.id));
+  }
 
   // Party-mode actions that aren't about earning.
   if (body.action === "report") {
@@ -511,14 +589,22 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
     if (settings.noSet || !d.cur || d.chests) throw new LiveError("Get a question first.", 409);
     const q = qs[d.cur.qi];
     const correct = isCorrect(q, body.answer);
+    const shielded = !correct && me.streak > 0 && (d.shop?.shields ?? 0) > 0;
     const last = { kind: "answer", correct, ...(correct ? {} : { right: q.type === "choice" || q.type === "truefalse" ? (q.correct ?? []).map((i) => q.choices![i]) : q.accepted }) };
     me = (await store.updatePlayer(g.id, me.id, {
-      streak: correct ? me.streak + 1 : 0,
+      // A shield from the shop saves the streak once.
+      streak: correct ? me.streak + 1 : shielded ? me.streak : 0,
       correct: me.correct + (correct ? 1 : 0),
       answered: me.answered + 1,
-      data: { ...d, cur: null, last },
+      data: { ...d, cur: null, last: shielded ? { ...last, shielded: true } : last, ...(shielded ? { shop: { ...d.shop!, shields: d.shop!.shields - 1 } } : {}) },
     }))!;
     earned = correct;
+    // Home Run Derby: a wrong answer is a strikeout.
+    if (!correct && g.mode === "baseball") {
+      const fresh = dataOf(me);
+      const { state, inningOver } = runPlay(fresh.ball ?? newBall(), "strikeout");
+      me = (await store.updatePlayer(g.id, me.id, { data: { ...fresh, ball: state, last: { ...(fresh.last ?? {}), play: "strikeout", inningOver, inning: state.inning } } }))!;
+    }
   } else if (body.action === "tap") {
     if (!settings.noSet) throw new LiveError("Answer questions to play.");
     if (d.chests) throw new LiveError("Pick a chest first.", 409);
@@ -553,12 +639,26 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
         frenzy,
         stormed: c.kind === "fish" ? null : (fresh.stormed ?? null),
         catches: [c, ...(fresh.catches ?? [])].slice(0, 8),
-        last: { kind: "catch", catch: c, stormedBy: c.kind === "fish" && fresh.stormed ? fresh.stormed : undefined },
+        // The Fishdex keeps your heaviest of each kind.
+        caught: c.kind === "fish" ? { ...(fresh.caught ?? {}), [c.id]: Math.max(fresh.caught?.[c.id] ?? 0, c.weight) } : (fresh.caught ?? {}),
+        last: {
+          kind: "catch",
+          catch: c,
+          stormedBy: c.kind === "fish" && fresh.stormed ? fresh.stormed : undefined,
+          firstCatch: c.kind === "fish" && !fresh.caught?.[c.id],
+        },
       },
+    }))!;
+  } else if (earned && g.mode === "baseball") {
+    // A right answer (or a tap) brings a pitch to swing at.
+    const fresh = dataOf(me);
+    const ball = fresh.ball ?? newBall();
+    me = (await store.updatePlayer(g.id, me.id, {
+      data: { ...fresh, ball: { ...ball, pitch: { ...makePitch(), issuedAt: now } }, last: { kind: tapped ? "tap" : "answer", correct: true, pitch: true } },
     }))!;
   } else if (earned && g.mode === "hack") {
     const fresh = dataOf(me);
-    const bits = mine(me.streak, tapped);
+    const bits = boosted(mine(me.streak, tapped), me.streak, fresh.shop);
     const charge = (fresh.hackCharge ?? 0) + 1;
     const ready = !!fresh.hackReady || charge >= HACK_EVERY;
     me = (await store.updatePlayer(g.id, me.id, {
@@ -568,7 +668,7 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
   } else if (earned) {
     const fresh = dataOf(me);
     if (g.mode === "gold") {
-      me = (await store.updatePlayer(g.id, me.id, { data: { ...fresh, chests: makeChests(me.streak) } }))!;
+      me = (await store.updatePlayer(g.id, me.id, { data: { ...fresh, chests: makeChests(me.streak, fresh.shop) } }))!;
     } else {
       const boost = settings.noSet ? randomInt(2, 8) : 8 + Math.min(me.streak, 4) * 2;
       const score = Math.min(ROCKET_GOAL, me.score + boost);
@@ -587,8 +687,9 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
 }
 
 /** Three hidden chests for Gold Rush; what's inside is decided now, so peeking at the network can't help. */
-function makeChests(streak: number): Chest[] {
-  const base = 10 + Math.min(streak, 10) * 8;
+function makeChests(streak: number, shop?: ShopLevels): Chest[] {
+  // Shop upgrades make every gold chest bigger.
+  const base = boosted(10 + Math.min(streak, 10) * 8, streak, shop);
   const roll = (): Chest => {
     const r = randomInt(100);
     if (r < 46) return { kind: "gain", amount: base + randomInt(base) };

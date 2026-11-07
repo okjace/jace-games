@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash, randomInt } from "crypto";
+import { FISH, SPECIALS, type FishDef, type Rarity } from "./fish";
 import type { LiveMode } from "./types";
 
 /**
@@ -14,13 +15,22 @@ import type { LiveMode } from "./types";
  *   how many bits you mine, and whether a hack works.
  */
 
-export type Catch = { icon: string; name: string; weight: number; kind: "fish" | "junk" | "frenzy" | "storm" };
+export type Catch = {
+  id: string;
+  icon: string;
+  name: string;
+  weight: number;
+  kind: "fish" | "junk" | "frenzy" | "storm" | "treasure";
+  rarity: Rarity | null;
+};
 
 export type PartyData = {
   /** Device modes: everything earned so far (coins or food units). */
   bank?: number;
   /** Lake Frenzy: the last few catches, frenzy casts left, and a storm hanging over you. */
   catches?: Catch[];
+  /** Fishdex: every fish id this player has ever caught, with their heaviest. */
+  caught?: Record<string, number>;
   frenzy?: number;
   stormed?: string | null;
   /** Code Breakers. */
@@ -28,6 +38,10 @@ export type PartyData = {
   hackCharge?: number;
   hackReady?: boolean;
   hack?: { target: string; targetName: string; options: string[]; answer: number } | null;
+  /** Gold Rush and Code Breakers: upgrades bought in the shop. */
+  shop?: ShopLevels;
+  /** Baseball: bases, outs, inning and the pitch on its way. */
+  ball?: BallState;
 };
 
 export const TAP_COOLDOWN_MS: Record<LiveMode, number> = {
@@ -39,6 +53,7 @@ export const TAP_COOLDOWN_MS: Record<LiveMode, number> = {
   factory: 900,
   fishing: 1500,
   hack: 1200,
+  baseball: 1500,
 };
 
 // ---------- Device modes ----------
@@ -64,39 +79,38 @@ export function scoreCap(mode: LiveMode, bank: number, elapsedSec: number): numb
 
 // ---------- Lake Frenzy ----------
 
-const LAKE: { w: number; c: () => Catch }[] = [
-  { w: 300, c: () => ({ icon: "🐟", name: "Minnow", weight: randomInt(1, 4), kind: "fish" }) },
-  { w: 250, c: () => ({ icon: "🐠", name: "Sunfish", weight: randomInt(3, 9), kind: "fish" }) },
-  { w: 120, c: () => ({ icon: "🐡", name: "Puffer", weight: randomInt(5, 13), kind: "fish" }) },
-  { w: 80, c: () => ({ icon: "🦑", name: "Squid", weight: randomInt(10, 26), kind: "fish" }) },
-  { w: 50, c: () => ({ icon: "🐢", name: "Old Turtle", weight: randomInt(20, 46), kind: "fish" }) },
-  { w: 20, c: () => ({ icon: "🦈", name: "Lake Shark", weight: randomInt(60, 121), kind: "fish" }) },
-  { w: 5, c: () => ({ icon: "🐋", name: "Legendary Whale", weight: randomInt(150, 301), kind: "fish" }) },
-  { w: 80, c: () => ({ icon: "🥾", name: "Soggy Boot", weight: 0, kind: "junk" }) },
-  { w: 50, c: () => ({ icon: "🫧", name: "Frenzy!", weight: 0, kind: "frenzy" }) },
-  { w: 45, c: () => ({ icon: "⛈️", name: "Storm Cloud", weight: 0, kind: "storm" }) },
-];
-const LAKE_TOTAL = LAKE.reduce((a, b) => a + b.w, 0);
-
-/** One cast. A streak is a better lure; frenzy doubles the next 3 catches; being stormed halves one. */
+/**
+ * One cast, rolled from the catalog in lib/live/fish.ts. A streak is a
+ * better lure (up to +50% weight and slightly better odds on rare fish);
+ * a frenzy doubles the next 3 catches; being stormed halves one.
+ */
 export function cast(streak: number, frenzy: number, stormed: boolean): Catch {
-  let r = randomInt(LAKE_TOTAL);
-  let pick = LAKE[0];
-  for (const entry of LAKE) {
-    if (r < entry.w) {
-      pick = entry;
+  // A long streak nudges the odds toward the rarer end of the table.
+  const luck = 1 + Math.min(streak, 10) * 0.08;
+  const table = [
+    ...FISH.map((f) => ({ f, w: f.rarity === "Common" || f.rarity === "Uncommon" ? f.weight : f.weight * luck })),
+    ...SPECIALS.map((s) => ({ s, w: s.weight })),
+  ];
+  const total = table.reduce((a, e) => a + e.w, 0);
+  let r = Math.random() * total;
+  let pick = table[0];
+  for (const e of table) {
+    if (r < e.w) {
+      pick = e;
       break;
     }
-    r -= entry.w;
+    r -= e.w;
   }
-  const c = pick.c();
-  if (c.kind === "fish") {
-    let w = c.weight * (1 + Math.min(streak, 5) * 0.1);
-    if (frenzy > 0) w *= 2;
-    if (stormed) w /= 2;
-    c.weight = Math.max(1, Math.round(w));
+  if ("s" in pick && pick.s) {
+    const s = pick.s;
+    const weight = s.kind === "treasure" ? randomInt(50, 151) : 0;
+    return { id: s.id, icon: s.icon, name: s.name, weight, kind: s.kind, rarity: null };
   }
-  return c;
+  const f = (pick as { f: FishDef }).f;
+  let w = randomInt(f.min, f.max + 1) * (1 + Math.min(streak, 5) * 0.1);
+  if (frenzy > 0) w *= 2;
+  if (stormed) w /= 2;
+  return { id: f.id, icon: f.icon, name: f.name, weight: Math.max(1, Math.round(w)), kind: "fish", rarity: f.rarity };
 }
 
 // ---------- Code Breakers ----------
@@ -140,3 +154,100 @@ export function hackOptions(real: string): { options: string[]; answer: number }
 
 /** Right answers needed before you can try a hack. */
 export const HACK_EVERY = 3;
+
+// ---------- Baseball ----------
+
+export type Pitch = { type: "fastball" | "curveball" | "changeup"; ms: number; curve: number };
+export type Play = "single" | "double" | "triple" | "homer" | "groundout" | "flyout" | "strikeout" | "looking";
+export type BallState = {
+  bases: [boolean, boolean, boolean];
+  outs: number;
+  inning: number;
+  /** The pitch waiting for a swing (one per right answer). */
+  pitch: (Pitch & { issuedAt: number }) | null;
+};
+
+export const newBall = (): BallState => ({ bases: [false, false, false], outs: 0, inning: 1, pitch: null });
+
+/** The next pitch: speed is how long the ball takes from the mound to the plate. */
+export function makePitch(): Pitch {
+  const r = randomInt(100);
+  if (r < 50) return { type: "fastball", ms: randomInt(620, 820), curve: 0 };
+  if (r < 80) return { type: "curveball", ms: randomInt(850, 1050), curve: randomInt(-40, 41) };
+  return { type: "changeup", ms: randomInt(1050, 1300), curve: randomInt(-10, 11) };
+}
+
+/**
+ * What a swing does, from how far off perfect it was (ms, early is
+ * negative, null = no swing). Better timing means better odds; there's
+ * always a little luck.
+ */
+export function swingResult(offsetMs: number | null): Play {
+  if (offsetMs === null || !Number.isFinite(offsetMs)) return "looking";
+  const q = Math.max(0, 1 - Math.abs(offsetMs) / 240);
+  const r = randomInt(100);
+  if (q > 0.88) return r < 42 ? "homer" : r < 55 ? "triple" : r < 82 ? "double" : "single";
+  if (q > 0.68) return r < 10 ? "homer" : r < 18 ? "triple" : r < 45 ? "double" : r < 85 ? "single" : "flyout";
+  if (q > 0.42) return r < 8 ? "double" : r < 50 ? "single" : r < 75 ? "groundout" : "flyout";
+  if (q > 0.18) return r < 22 ? "single" : r < 60 ? "groundout" : "flyout";
+  return "strikeout";
+}
+
+const BASES_FOR: Partial<Record<Play, number>> = { single: 1, double: 2, triple: 3, homer: 4 };
+
+/** Moves the runners for a play. Returns the new state and the runs that scored. */
+export function runPlay(s: BallState, play: Play): { state: BallState; runs: number; inningOver: boolean } {
+  const hit = BASES_FOR[play];
+  if (!hit) {
+    const outs = s.outs + 1;
+    if (outs >= 3) return { state: { ...s, bases: [false, false, false], outs: 0, inning: s.inning + 1, pitch: null }, runs: 0, inningOver: true };
+    return { state: { ...s, outs, pitch: null }, runs: 0, inningOver: false };
+  }
+  let runs = 0;
+  const bases: [boolean, boolean, boolean] = [false, false, false];
+  // Runners move up as many bases as the hit (everyone scores on a homer).
+  s.bases.forEach((on, i) => {
+    if (!on) return;
+    const to = i + hit;
+    if (to >= 3) runs++;
+    else bases[to] = true;
+  });
+  if (hit >= 4) runs++;
+  else bases[hit - 1] = true;
+  return { state: { ...s, bases, pitch: null }, runs, inningOver: false };
+}
+
+// ---------- Upgrade shop (Gold Rush and Code Breakers) ----------
+
+/**
+ * Spend your score to earn faster, like any good economy game: bigger base
+ * rewards, a bonus that grows with your streak, a multiplier, and shields
+ * that save your streak from one wrong answer. Prices and effects live here
+ * on the server, so they can't be changed from a player's device.
+ */
+export type ShopItem = "earn" | "streak" | "multi" | "shield";
+export type ShopLevels = { earn: number; streak: number; multi: number; shields: number; shieldsBought: number };
+
+export const SHOP: Record<ShopItem, { name: string; icon: string; desc: string; prices: number[] }> = {
+  earn: { name: "Earnings", icon: "💵", desc: "+25% on every reward", prices: [40, 120, 320, 800, 2000] },
+  streak: { name: "Streak Bonus", icon: "🔥", desc: "Extra for every answer in a row", prices: [30, 100, 260, 650, 1600] },
+  multi: { name: "Multiplier", icon: "✖️", desc: "×1.5 on everything you earn", prices: [250, 1000, 3500] },
+  shield: { name: "Shield", icon: "🛡️", desc: "A wrong answer won't break your streak (one use)", prices: [60] },
+};
+
+export const emptyShop = (): ShopLevels => ({ earn: 0, streak: 0, multi: 0, shields: 0, shieldsBought: 0 });
+
+/** What the next level of an item costs, or null when it's maxed. */
+export function shopPrice(item: ShopItem, s: ShopLevels): number | null {
+  if (item === "shield") return Math.round(SHOP.shield.prices[0] * 1.5 ** Math.min(s.shieldsBought, 8));
+  const level = s[item];
+  return SHOP[item].prices[level] ?? null;
+}
+
+/** Applies the shop to a base reward. */
+export function boosted(base: number, streak: number, s: ShopLevels | undefined): number {
+  if (!s) return base;
+  const withEarn = base * (1 + 0.25 * s.earn);
+  const withStreak = withEarn + Math.min(streak, 15) * s.streak * 2;
+  return Math.round(withStreak * (1 + 0.5 * s.multi));
+}
