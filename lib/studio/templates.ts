@@ -7,7 +7,7 @@ import type { Multiplayer } from "@/lib/db/studio";
  * lib/studio/blockTemplates.ts.
  */
 
-export type TemplateId = "arcade" | "puzzle" | "clicker" | "duel" | "blank";
+export type TemplateId = "arcade" | "puzzle" | "clicker" | "duel" | "live" | "blank";
 
 export type Template = {
   id: TemplateId;
@@ -15,6 +15,8 @@ export type Template = {
   icon: string;
   description: string;
   multiplayer: Multiplayer | null;
+  /** Starts with "Let hosts use this as a Jace Games Live mode" ticked. */
+  liveMode?: boolean;
 };
 
 export const TEMPLATES: Template[] = [
@@ -22,6 +24,7 @@ export const TEMPLATES: Template[] = [
   { id: "puzzle", name: "Lights Out", icon: "💡", description: "Puzzle: turn every light off. Each tap flips a light and its neighbours.", multiplayer: null },
   { id: "clicker", name: "Cookie Rush", icon: "🍪", description: "Clicker: tap the cookie, buy helpers, bake as much as you can in 60 seconds.", multiplayer: null },
   { id: "duel", name: "Paddle Duel", icon: "🏓", description: "2 players: first to 5 points wins. Uses jace.room to play online.", multiplayer: { mode: "live", min: 2, max: 2 } },
+  { id: "live", name: "Star Garden", icon: "🌟", description: "Live mode: spend coins from right answers on flowers that grow stars. Uses jace.live.", multiplayer: null, liveMode: true },
   { id: "blank", name: "Blank", icon: "🎮", description: "An empty canvas and a game loop.", multiplayer: null },
 ];
 
@@ -553,7 +556,96 @@ frame();
 </script>
 `;
 
-const HTML: Record<TemplateId, string> = { arcade: ARCADE, puzzle: PUZZLE, clicker: CLICKER, duel: DUEL, blank: BLANK };
+const LIVE = `<style>
+  html, body { margin: 0; height: 100%; background: #10162b; color: #fff; font-family: system-ui, sans-serif; overflow: hidden; user-select: none; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+</style>
+<canvas id="c" width="480" height="360"></canvas>
+<script>
+// Star Garden: a Jace Games Live mode.
+// Players earn coins by answering questions. jace.live.coins is the total
+// they've earned (it only goes up), so the game keeps track of what it spent.
+// Plant flowers with coins; flowers grow stars; stars are the score.
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const live = jace.live; // null when you test it outside of Live
+let earned = live ? live.coins : 50;
+let spent = 0;
+let stars = 0;
+const plots = []; // { x, y, level, t }
+for (let i = 0; i < 8; i++) plots.push({ x: 60 + (i % 4) * 120, y: 150 + Math.floor(i / 4) * 110, level: 0, t: 0 });
+const cost = (p) => 10 * Math.pow(2, p.level);
+const coins = () => earned - spent;
+let flash = null;
+
+if (live) live.onCoins((total, gained) => { earned = total; flash = { text: "+" + gained + " coins", t: 1.2 }; });
+
+canvas.addEventListener("pointerdown", (e) => {
+  const r = canvas.getBoundingClientRect();
+  const x = ((e.clientX - r.left) / r.width) * 480;
+  const y = ((e.clientY - r.top) / r.height) * 360;
+  if (y < 50 && x > 330) { if (live) live.earn(); return; } // the "Earn coins" button
+  for (const p of plots) {
+    if (Math.abs(x - p.x) < 50 && Math.abs(y - p.y) < 45) {
+      if (p.level >= 4) return;
+      if (coins() < cost(p)) { flash = { text: "Answer questions for coins!", t: 1.5 }; return; }
+      spent += cost(p);
+      p.level++;
+    }
+  }
+});
+
+let last = performance.now();
+let reported = 0;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  for (const p of plots) {
+    if (!p.level) continue;
+    p.t += dt;
+    const every = 3 / p.level;
+    while (p.t >= every) { p.t -= every; stars += p.level; }
+  }
+  if (Math.floor(stars) !== reported) { reported = Math.floor(stars); jace.submitScore(reported); }
+
+  ctx.fillStyle = "#10162b";
+  ctx.fillRect(0, 0, 480, 360);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 18px system-ui";
+  ctx.textAlign = "left";
+  ctx.fillText("🌟 " + Math.floor(stars) + "   🪙 " + coins(), 14, 30);
+  ctx.fillStyle = "#facc15";
+  ctx.beginPath(); ctx.roundRect(340, 10, 128, 32, 16); ctx.fill();
+  ctx.fillStyle = "#000";
+  ctx.font = "bold 14px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("Earn coins ❓", 404, 31);
+  for (const p of plots) {
+    ctx.fillStyle = "#2b3a1f";
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + 30, 44, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.font = (24 + p.level * 8) + "px system-ui";
+    ctx.fillText(["🌱", "🌷", "🌻", "🌺", "🌟"][p.level], p.x, p.y + 10 + Math.sin(now / 400 + p.x) * 2);
+    ctx.font = "12px system-ui";
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillText(p.level >= 4 ? "max" : "🪙 " + cost(p), p.x, p.y + 52);
+    ctx.fillStyle = "#000";
+  }
+  if (flash) {
+    flash.t -= dt;
+    ctx.globalAlpha = Math.max(0, Math.min(1, flash.t));
+    ctx.fillStyle = "#facc15";
+    ctx.font = "bold 20px system-ui";
+    ctx.fillText(flash.text, 240, 90);
+    ctx.globalAlpha = 1;
+    if (flash.t <= 0) flash = null;
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+`;
+
+const HTML: Record<TemplateId, string> = { arcade: ARCADE, puzzle: PUZZLE, clicker: CLICKER, duel: DUEL, live: LIVE, blank: BLANK };
 
 export function templateHtml(id: TemplateId): string {
   return HTML[id] ?? BLANK;

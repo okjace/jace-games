@@ -26,6 +26,8 @@ export type SandboxInit = {
   player: { name: string };
   seed: number;
   room: { mode: "race" | "live"; isHost: boolean; mySeat: number; players: SandboxPlayer[] } | null;
+  /** Set when the game runs as a Jace Games Live mode. Coins arrive by message after it loads. */
+  live?: { coins: number } | null;
 };
 
 /** Limits the page enforces on messages from a game. */
@@ -72,9 +74,26 @@ if (init.room) {
     }
   });
 }
+var live = null, coins = 0, coinHandlers = [];
+if (init.live) {
+  coins = init.live.coins | 0;
+  live = Object.freeze({
+    get coins(){ return coins; },
+    onCoins: function(cb){
+      coinHandlers.push(cb);
+      return function(){ coinHandlers = coinHandlers.filter(function(f){ return f !== cb; }); };
+    },
+    earn: function(){ post({ type: "earn" }); }
+  });
+}
 window.addEventListener("message", function(e){
   if (e.source !== P || !e.data || e.data.__jace !== 1) return;
   var m = e.data;
+  if (m.type === "coins" && typeof m.coins === "number") {
+    var before = coins; coins = m.coins;
+    if (coins !== before) coinHandlers.slice().forEach(function(cb){ try { cb(coins, coins - before); } catch (err) { log("error", [String(err)]); } });
+    return;
+  }
   if (m.type === "msg") (handlers[m.event] || []).slice().forEach(function(cb){ try { cb(m.data, m.from); } catch (err) { log("error", [String(err)]); } });
 });
 var jace = {
@@ -90,7 +109,8 @@ var jace = {
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function(){ cb(jace); });
     else setTimeout(function(){ cb(jace); }, 0);
   },
-  room: room
+  room: room,
+  live: live
 };
 Object.defineProperty(window, "jace", { value: Object.freeze(jace), writable: false, configurable: false });
 })();`;

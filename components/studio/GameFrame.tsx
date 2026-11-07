@@ -34,6 +34,10 @@ type Props = {
   onScore?: (score: number) => void;
   onGameOver?: (winners: number[] | null) => void;
   onLog?: (entry: LogEntry) => void;
+  /** Jace Games Live: the player's coins (earned from answers). Turns on jace.live in the game. */
+  liveCoins?: number | null;
+  /** Jace Games Live: the game asked to go answer questions (jace.live.earn()). */
+  onEarn?: () => void;
   /** Bump to restart the game. */
   runKey?: number | string;
   title: string;
@@ -41,23 +45,48 @@ type Props = {
   autoFocus?: boolean;
 };
 
-export function GameFrame({ html, playerName, seed = 1, room = null, onScore, onGameOver, onLog, runKey = 0, title, className = "", autoFocus = false }: Props) {
+export function GameFrame({
+  html,
+  playerName,
+  seed = 1,
+  room = null,
+  onScore,
+  onGameOver,
+  onLog,
+  liveCoins = null,
+  onEarn,
+  runKey = 0,
+  title,
+  className = "",
+  autoFocus = false,
+}: Props) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [left, setLeft] = useState<string | null>(null);
   const loads = useRef(0);
 
   // Keep the latest callbacks without rebuilding the game when they change.
-  const cb = useRef({ onScore, onGameOver, onLog, room });
+  const cb = useRef({ onScore, onGameOver, onLog, room, onEarn });
   useEffect(() => {
-    cb.current = { onScore, onGameOver, onLog, room };
+    cb.current = { onScore, onGameOver, onLog, room, onEarn };
   });
+
+  // Live coins: told to the game after it loads and whenever they change (never restarts it).
+  const isLive = liveCoins !== null;
+  const coinsRef = useRef(liveCoins);
+  const sendCoins = () => {
+    if (coinsRef.current !== null) frameRef.current?.contentWindow?.postMessage({ __jace: 1, type: "coins", coins: coinsRef.current }, "*");
+  };
+  useEffect(() => {
+    coinsRef.current = liveCoins;
+    if (liveCoins !== null) frameRef.current?.contentWindow?.postMessage({ __jace: 1, type: "coins", coins: liveCoins }, "*");
+  }, [liveCoins]);
 
   // The game only restarts when what it was told at the start changes.
   const roomKey = room ? JSON.stringify({ mode: room.mode, isHost: room.isHost, mySeat: room.mySeat, players: room.players }) : "";
   const srcdoc = useMemo(() => {
-    const init: SandboxInit = { player: { name: playerName }, seed, room: roomKey ? JSON.parse(roomKey) : null };
+    const init: SandboxInit = { player: { name: playerName }, seed, room: roomKey ? JSON.parse(roomKey) : null, live: isLive ? { coins: 0 } : null };
     return buildSrcdoc(html, init);
-  }, [html, playerName, seed, roomKey]);
+  }, [html, playerName, seed, roomKey, isLive]);
 
   const frameKey = useMemo(() => `${runKey}:${hash(srcdoc)}`, [runKey, srcdoc]);
 
@@ -84,8 +113,11 @@ export function GameFrame({ html, playerName, seed = 1, room = null, onScore, on
       if (!win || e.source !== win) return; // only our own game
       const m = e.data as Record<string, unknown> | null;
       if (!m || typeof m !== "object" || m.__jace !== 1 || typeof m.type !== "string") return;
-      const { onScore, onGameOver, onLog, room } = cb.current;
+      const { onScore, onGameOver, onLog, room, onEarn } = cb.current;
       switch (m.type) {
+        case "earn":
+          onEarn?.();
+          return;
         case "score": {
           if (typeof m.score !== "number" || !Number.isFinite(m.score)) return;
           const now = Date.now();
@@ -162,7 +194,10 @@ export function GameFrame({ html, playerName, seed = 1, room = null, onScore, on
             loads.current++;
             // A game that navigates its frame somewhere else loses its CSP, so stop it.
             if (loads.current > 1) setLeft("This game tried to open another page, so it was stopped.");
-            else if (autoFocus) frameRef.current?.focus();
+            else {
+              sendCoins();
+              if (autoFocus) frameRef.current?.focus();
+            }
           }}
         />
       )}

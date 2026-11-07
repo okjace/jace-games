@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomBytes, randomInt } from "crypto";
 import { liveStore, type LiveGameRow, type LivePlayerRow } from "@/lib/db/live";
 import { mapStore } from "@/lib/db/liveMaps";
+import { studioStore } from "@/lib/db/studio";
 import { DEFAULT_MAP, cleanMap, type TowerMap } from "./maps";
 import { broadcast } from "@/lib/realtime/server";
 import type { Session } from "@/lib/session";
@@ -58,7 +59,10 @@ const MAX_GAMES_PER_HOUR = 30;
 const GRACE_MS = 1500; // answers can arrive a little after the timer on slow connections
 const ROCKET_GOAL = 100;
 
-export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean; /** Tower Siege: a copy of the chosen map, taken when the game is made. */ map?: TowerMap; mapTitle?: string };
+export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean; /** Tower Siege: a copy of the chosen map, taken when the game is made. */ map?: TowerMap; mapTitle?: string;
+  /** Studio-game mode: a copy of the game, taken when the Live game is made. */
+  custom?: { gameId: string; title: string; icon: string; owner: string; html: string };
+};
 
 /**
  * Classic: lobby → question → reveal → question … → ended (q indexes `order`).
@@ -129,7 +133,7 @@ async function bump(g: LiveGameRow, patch: Partial<LiveGameRow>): Promise<LiveGa
 
 export async function createLiveGame(
   session: Session,
-  opts: { setId: string | null; mode: LiveMode; settings: Partial<GameSettings> & { mapId?: unknown } },
+  opts: { setId: string | null; mode: LiveMode; settings: Partial<GameSettings> & { mapId?: unknown; gameId?: unknown } },
 ): Promise<string> {
   const mode = MODES[opts.mode] ? opts.mode : "classic";
   const store = liveStore();
@@ -163,6 +167,16 @@ export async function createLiveGame(
     settings.map = cleaned.map;
     settings.mapTitle = row.title;
     await mapStore().addPlay(row.id).catch(() => {});
+  }
+  if (mode === "custom") {
+    const id = typeof opts.settings.gameId === "string" ? opts.settings.gameId : "";
+    const row = /^[0-9a-f-]{36}$/i.test(id) ? await studioStore().getGame(id) : null;
+    if (!row || row.removed || !row.live_mode) throw new LiveError("That Studio game isn't available as a Live mode.", 404);
+    // Your own game plays its latest draft (so you can test it); anyone else's plays what's published.
+    const html = row.owner_id === session.user.id ? row.html : row.published ? row.published_html : null;
+    if (!html?.trim()) throw new LiveError("That Studio game isn't published yet.", 404);
+    settings.custom = { gameId: row.id, title: row.title, icon: row.icon, owner: row.owner_name, html };
+    await studioStore().addPlay(row.id).catch(() => {});
   }
   for (let attempt = 0; attempt < 6; attempt++) {
     try {
@@ -227,6 +241,13 @@ export type HostView = {
   serverNow: number;
 };
 
+/** Settings for the host screen, without the (large) copies of a map or game. */
+function hostSettings(st: GameSettings): GameSettings {
+  const { map: _map, custom, ...rest } = st;
+  void _map;
+  return { ...rest, ...(custom ? { custom: { ...custom, html: "" } } : {}) };
+}
+
 export async function hostView(code: string, session: Session): Promise<HostView> {
   const g = await getGame(code);
   if (g.host_id !== session.user.id) throw new LiveError("Only the host can see this.", 403);
@@ -249,7 +270,7 @@ export async function hostView(code: string, session: Session): Promise<HostView
     mode: g.mode,
     status: g.status,
     setTitle: g.set_title,
-    settings: g.settings as GameSettings,
+    settings: hostSettings(g.settings as GameSettings),
     state: s,
     topic: topicOf(g),
     questionCount: s.order?.length ?? qs.length,
@@ -286,6 +307,8 @@ export type PlayerView = {
     /** Tower Siege: the map being played. */
     map?: TowerMap;
     mapTitle?: string | null;
+    /** Studio-game mode: which game (its code comes from customGameHtml). */
+    custom?: { title: string; icon: string; owner: string } | null;
     catches?: Catch[];
     /** Fishdex: fish id → heaviest caught. */
     caught?: Record<string, number>;
@@ -310,6 +333,15 @@ export async function playerView(code: string, token: unknown): Promise<PlayerVi
   const g = await getGame(code);
   const me = await playerFor(g, token);
   return buildPlayerView(g, me, await liveStore().players(g.id));
+}
+
+/** The Studio game a custom-mode Live game plays, for its players only. */
+export async function customGameHtml(code: string, token: unknown): Promise<string> {
+  const g = await getGame(code);
+  await playerFor(g, token);
+  const c = (g.settings as GameSettings).custom;
+  if (g.mode !== "custom" || !c) throw new LiveError("This game doesn't use a Studio game.", 404);
+  return c.html;
 }
 
 function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]): PlayerView {
@@ -347,6 +379,10 @@ function partyView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]): Pla
   if (g.mode === "tower") {
     const settings = g.settings as GameSettings;
     return { bank: d.bank ?? 0, map: settings.map ?? DEFAULT_MAP, mapTitle: settings.mapTitle ?? null };
+  }
+  if (g.mode === "custom") {
+    const c = (g.settings as GameSettings).custom;
+    return { bank: d.bank ?? 0, custom: c ? { title: c.title, icon: c.icon, owner: c.owner } : null };
   }
   if (DEVICE_MODES.includes(g.mode)) return { bank: d.bank ?? 0 };
   const levels = d.shop ?? emptyShop();

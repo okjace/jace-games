@@ -20,7 +20,7 @@ function EditorLoading() {
 }
 
 type Multiplayer = { mode: "race" | "live"; min: number; max: number } | null;
-type Meta = { title: string; description: string; icon: string; multiplayer: Multiplayer };
+type Meta = { title: string; description: string; icon: string; multiplayer: Multiplayer; live_mode: boolean };
 type GameResponse = {
   meta: Meta & { id: string; kind: "code" | "blocks"; published: boolean; removed: boolean; owner_id: string };
   game: { html: string } | null;
@@ -37,7 +37,7 @@ export function Editor({ id }: { id: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [kind, setKind] = useState<"code" | "blocks">("code");
-  const [meta, setMeta] = useState<Meta>({ title: "", description: "", icon: "🎮", multiplayer: null });
+  const [meta, setMeta] = useState<Meta>({ title: "", description: "", icon: "🎮", multiplayer: null, live_mode: false });
   const [html, setHtml] = useState("");
   const [blocks, setBlocks] = useState<object | null>(null);
   const [blocksKey, setBlocksKey] = useState(0);
@@ -67,7 +67,7 @@ export function Editor({ id }: { id: string }) {
           setLoadError("You can only edit your own games.");
           return;
         }
-        const m: Meta = { title: d.meta.title, description: d.meta.description, icon: d.meta.icon, multiplayer: d.meta.multiplayer };
+        const m: Meta = { title: d.meta.title, description: d.meta.description, icon: d.meta.icon, multiplayer: d.meta.multiplayer, live_mode: !!d.meta.live_mode };
         setKind(d.meta.kind);
         setMeta(m);
         setHtml(d.draft.html);
@@ -508,6 +508,18 @@ function Settings({
           </div>
         )}
       </fieldset>
+      <label className="flex items-start gap-2 text-sm sm:col-span-2">
+        <input type="checkbox" className="mt-1" checked={meta.live_mode} onChange={(e) => setMeta({ ...meta, live_mode: e.target.checked })} />
+        <span>
+          <span className="font-medium">Let hosts use this as a Jace Games Live mode</span>
+          <span className="block text-muted">
+            Players earn coins by answering questions. <code>jace.live.coins</code> is the total they&apos;ve earned (your game keeps track
+            of what it spends), <code>jace.live.onCoins(fn)</code> tells you when it goes up, and <code>jace.live.earn()</code> sends them to
+            answer questions. Report progress with <code>jace.submitScore(n)</code>; a score counts up to 20× the coins earned. Others can only
+            host it once it&apos;s published.
+          </span>
+        </span>
+      </label>
       <div className="flex flex-wrap gap-2 sm:col-span-2">
         {published && (
           <button type="button" className={small} onClick={onUnpublish}>

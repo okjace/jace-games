@@ -15,10 +15,11 @@ import { RocketRace } from "./RocketRace";
 import { Shop } from "./Shop";
 import { SnackShack } from "./SnackShack";
 import type { Act } from "./shared";
+import { StudioMode } from "./StudioMode";
 import { TowerSiege } from "./TowerSiege";
 
 /** Every self-paced mode plays on this stage. */
-export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball"];
+export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom"];
 
 /** Each mode's look: background, accent, and its tap button with questions off. */
 export const THEMES: Record<string, { bg: string; accent: string; tap: [string, string] }> = {
@@ -30,12 +31,14 @@ export const THEMES: Record<string, { bg: string; accent: string; tap: [string, 
   fishing: { bg: "linear-gradient(180deg, #38bdf8 0%, #0369a1 60%, #0c4a6e 100%)", accent: "#fde68a", tap: ["🎣 CAST", "Each tap is a cast."] },
   hack: { bg: "linear-gradient(180deg, #04130b 0%, #000 100%)", accent: "#3ddc84", tap: ["💻 MINE", "Each tap mines a few bits."] },
   baseball: { bg: "linear-gradient(180deg, #166534 0%, #14532d 70%, #052e16 100%)", accent: "#facc15", tap: ["⚾ PLAY BALL", "Each tap brings a pitch."] },
+  custom: { bg: "linear-gradient(180deg, #4338ca 0%, #1e1b4b 100%)", accent: "#a5f3fc", tap: ["🪙 EARN", "Each tap earns a few coins."] },
 };
 
 const REWARD_TEXT: Partial<Record<LiveMode, (v: PlayerView) => string | null>> = {
   tower: (v) => (v.last?.reward ? `+${v.last.reward} 🪙` : null),
   snack: (v) => (v.last?.reward ? `+${v.last.reward} 🥫` : null),
   factory: (v) => (v.last?.reward ? `+${v.last.reward} 🪙` : null),
+  custom: (v) => (v.last?.reward ? `+${v.last.reward} 🪙` : null),
   hack: (v) => (v.last?.kind === "bits" ? `+${v.last.amount} bits` : null),
   rocket: (v) => (typeof v.last?.boost === "number" ? `+${v.last.boost}%` : null),
 };
@@ -171,6 +174,7 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
         {mode === "fishing" && <LakeFrenzy {...stageProps} />}
         {mode === "hack" && <CodeBreakers {...stageProps} />}
         {mode === "baseball" && <Baseball {...stageProps} />}
+        {mode === "custom" && <StudioMode {...stageProps} />}
 
         <ol className="flex flex-col gap-1.5 rounded-3xl bg-black/25 p-3 text-sm backdrop-blur">
           {view.top.map((p, i) => (

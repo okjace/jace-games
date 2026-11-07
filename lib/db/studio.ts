@@ -24,6 +24,8 @@ export type CommunityGameRow = {
   published: boolean;
   removed: boolean;
   multiplayer: Multiplayer | null;
+  /** Hosts can pick this game as a Jace Games Live mode. */
+  live_mode: boolean;
   plays: number;
   created_at: string;
   updated_at: string;
@@ -37,7 +39,7 @@ export type VersionRow = { game_id: string; version: number; html: string; block
 export type ScoreRow = { game_id: string; user_id: string; username: string; score: number; created_at: string };
 export type ReportRow = { id: string; game_id: string; reporter_id: string; reason: string; created_at: string };
 
-export type NewGame = Pick<CommunityGameRow, "owner_id" | "owner_name" | "title" | "description" | "icon" | "kind" | "html" | "blocks_json" | "multiplayer">;
+export type NewGame = Pick<CommunityGameRow, "owner_id" | "owner_name" | "title" | "description" | "icon" | "kind" | "html" | "blocks_json" | "multiplayer" | "live_mode">;
 
 /** Saved versions kept per game; older ones are dropped. */
 export const MAX_VERSIONS = 30;
@@ -63,7 +65,7 @@ export interface StudioStore {
 }
 
 const SUMMARY =
-  "id, owner_id, owner_name, title, description, icon, kind, published, removed, multiplayer, plays, created_at, updated_at, published_at";
+  "id, owner_id, owner_name, title, description, icon, kind, published, removed, multiplayer, live_mode, plays, created_at, updated_at, published_at";
 
 // ---------- Supabase ----------
 

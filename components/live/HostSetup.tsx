@@ -13,6 +13,8 @@ import { card, primary, secondary } from "./ui";
  * Choose what to host: a set (or none: players just tap a button) and a game
  * mode, then make the game and go to the host screen.
  */
+type StudioPick = { id: string; title: string; icon: string; owner_name: string; plays: number; published: boolean; mine?: boolean };
+
 export function HostSetup() {
   const { user } = useScores();
   const router = useRouter();
@@ -27,6 +29,8 @@ export function HostSetup() {
   });
   const [mapId, setMapId] = useState<string | null>(params.get("map"));
   const [maps, setMaps] = useState<MapSummaryView[] | null>(null);
+  const [gameId, setGameId] = useState<string | null>(params.get("game"));
+  const [studioGames, setStudioGames] = useState<StudioPick[] | null>(null);
   const [minutes, setMinutes] = useState(5);
   const [shuffle, setShuffle] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -49,6 +53,15 @@ export function HostSetup() {
       .then((d) => setMaps([...(d.mine ?? []).filter((m: MapSummaryView) => m.data.pathLength > 0), ...(d.public ?? [])]))
       .catch(() => setMaps([]));
   }, [wantMaps]);
+
+  const wantGames = pickedMode === "custom" && !!user && studioGames === null;
+  useEffect(() => {
+    if (!wantGames) return;
+    fetch("/api/live/modes", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { mine: [], public: [] }))
+      .then((d) => setStudioGames([...(d.mine ?? []).map((g: StudioPick) => ({ ...g, mine: true })), ...(d.public ?? [])]))
+      .catch(() => setStudioGames([]));
+  }, [wantGames]);
 
   useEffect(() => {
     if (!setId) return;
@@ -78,7 +91,7 @@ export function HostSetup() {
     const res = await fetch("/api/live/games", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ setId: noSet ? null : setId, mode, settings: { minutes, shuffle, mapId: mode === "tower" ? mapId : null } }),
+      body: JSON.stringify({ setId: noSet ? null : setId, mode, settings: { minutes, shuffle, mapId: mode === "tower" ? mapId : null, gameId: mode === "custom" ? gameId : null } }),
     }).catch(() => null);
     const body = await res?.json().catch(() => null);
     if (res?.ok) router.push(`/live/host/${body.code}`);
@@ -88,7 +101,7 @@ export function HostSetup() {
     }
   };
 
-  const ready = noSet || !!setId;
+  const ready = (noSet || !!setId) && (mode !== "custom" || !!gameId);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5">
@@ -173,6 +186,42 @@ export function HostSetup() {
             );
           })}
         </div>
+        {mode === "custom" && (
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between text-sm">
+              <span className="font-semibold">Studio game</span>
+              <Link href="/studio" className="text-accent hover:underline">
+                Make one in Game Studio →
+              </Link>
+            </div>
+            {studioGames === null ? (
+              <p className="text-sm text-muted">Loading…</p>
+            ) : studioGames.length === 0 ? (
+              <p className="text-sm text-muted">
+                No Studio games are Live modes yet. In Game Studio, open a game&apos;s settings and tick &ldquo;Let hosts use this as a Jace Games
+                Live mode&rdquo;.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {studioGames.map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    aria-pressed={gameId === g.id}
+                    onClick={() => setGameId(g.id)}
+                    className={`rounded-xl border p-3 text-left transition-colors ${gameId === g.id ? "border-accent bg-accent/10" : "border-line hover:border-accent/50"}`}
+                  >
+                    <span className="text-2xl">{g.icon}</span>
+                    <span className="mt-1 block truncate text-sm font-semibold">{g.title}</span>
+                    <span className="block text-xs text-muted">
+                      {g.mine ? (g.published ? "yours" : "yours · draft") : `by ${g.owner_name} · ${g.plays} plays`}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {mode === "tower" && (
           <div className="mt-4">
             <div className="mb-2 flex items-center justify-between text-sm">

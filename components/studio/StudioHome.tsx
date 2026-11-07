@@ -72,7 +72,7 @@ export function StudioHome() {
       const shown = label(t, kind);
       const { game } = await api<{ game: { id: string } }>("/api/studio/games", {
         method: "POST",
-        body: { title: t.id === "blank" ? "My game" : shown.name, icon: shown.icon, description: shown.description, kind, html, blocks_json: blocks, multiplayer: t.multiplayer },
+        body: { title: t.id === "blank" ? "My game" : shown.name, icon: shown.icon, description: shown.description, kind, html, blocks_json: blocks, multiplayer: t.multiplayer, live_mode: !!t.liveMode },
       });
       router.push(`/studio/${game.id}`);
     } catch (e) {

@@ -51,7 +51,7 @@ export type LiveSet = {
 
 export type SetSummary = Omit<LiveSet, "questions"> & { questionCount: number };
 
-export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball";
+export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom";
 
 export type ModeDef = {
   name: string;
@@ -138,10 +138,18 @@ export const MODES: Record<LiveMode, ModeDef> = {
     selfPaced: true,
     unit: (n) => num(n) + (n === 1 ? " run" : " runs"),
   },
+  custom: {
+    name: "Studio game",
+    icon: "🧩",
+    blurb: "Play a game someone made in Game Studio. Right answers earn coins to spend in it.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => num(n) + " pts",
+  },
 };
 
 /** Modes whose mini-game runs on the player's device; the server caps their score by what they earned. */
-export const DEVICE_MODES: LiveMode[] = ["tower", "snack", "factory"];
+export const DEVICE_MODES: LiveMode[] = ["tower", "snack", "factory", "custom"];
 
 export const LIMITS = {
   title: 80,

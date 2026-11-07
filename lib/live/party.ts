@@ -54,6 +54,7 @@ export const TAP_COOLDOWN_MS: Record<LiveMode, number> = {
   fishing: 1500,
   hack: 1200,
   baseball: 1500,
+  custom: 900,
 };
 
 // ---------- Device modes ----------
@@ -63,6 +64,7 @@ export function reward(mode: LiveMode, streak: number, tap: boolean): number {
   if (mode === "tower") return tap ? 4 : 10 + Math.min(streak, 10) * 2;
   if (mode === "snack") return tap ? 2 : 4 + Math.floor(Math.min(streak, 9) / 3);
   if (mode === "factory") return tap ? 5 : 15 + Math.min(streak, 10) * 3;
+  if (mode === "custom") return tap ? 4 : 10 + Math.min(streak, 10) * 2;
   return 0;
 }
 
@@ -70,10 +72,14 @@ export function reward(mode: LiveMode, streak: number, tap: boolean): number {
  * The most a device-mode score can be. Generous on purpose (the games have
  * upgrades), but it stops a tampered page from posting a huge number.
  */
+/** Studio-game Live modes: a score counts up to this many points per coin earned. */
+export const CUSTOM_SCORE_PER_COIN = 20;
+
 export function scoreCap(mode: LiveMode, bank: number, elapsedSec: number): number {
   if (mode === "tower") return Math.round(bank * 15 + 300); // waves and kills cost coins to reach
   if (mode === "snack") return Math.round(bank * 40); // the best upgraded price per item
   if (mode === "factory") return Math.round(bank * 0.3 * elapsedSec + bank * 20); // machines turn coins into gadgets per second
+  if (mode === "custom") return Math.round(bank * CUSTOM_SCORE_PER_COIN); // Studio games: what's written in the Studio editor
   return 0;
 }
 

@@ -56,6 +56,7 @@ function publicGame(row: CommunityGameRow): PublicGame | null {
     icon: row.icon,
     kind: row.kind,
     multiplayer: row.multiplayer,
+    live_mode: row.live_mode,
     plays: row.plays,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -101,6 +102,7 @@ export type GameInput = {
   html?: unknown;
   blocks_json?: unknown;
   multiplayer?: unknown;
+  live_mode?: unknown;
 };
 
 function cleanTitle(v: unknown): string {
@@ -176,6 +178,7 @@ export async function createGame(session: Session, input: GameInput): Promise<Co
     kind,
     ...code,
     multiplayer: cleanMultiplayer(input.multiplayer),
+    live_mode: input.live_mode === true,
   });
   await store.addVersion(row.id, row.html, row.blocks_json);
   return row;
@@ -190,6 +193,7 @@ export async function saveGame(session: Session, id: string, input: GameInput): 
   if (input.description !== undefined) patch.description = cleanDescription(input.description);
   if (input.icon !== undefined) patch.icon = cleanIcon(input.icon);
   if (input.multiplayer !== undefined) patch.multiplayer = cleanMultiplayer(input.multiplayer);
+  if (input.live_mode !== undefined) patch.live_mode = input.live_mode === true;
   if (input.kind === "code" && row.kind === "blocks") patch.kind = "code"; // "Convert to code" is one-way
   const kind = patch.kind ?? row.kind;
   let codeChanged = false;
