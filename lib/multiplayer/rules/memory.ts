@@ -20,6 +20,7 @@ export type MemoryMove = { card: number };
 export type MemoryView = Omit<MemoryState, "cards"> & { cards: (string | null)[] };
 
 export const memory: Rules<MemoryState, MemoryMove, MemoryView> = {
+  openness: "public",
   init: (seats, ctx) => ({
     cards: shuffle([...SYMBOLS, ...SYMBOLS], ctx.rng),
     owner: Array(16).fill(-1),

@@ -66,6 +66,7 @@ export function legalMoves(state: CheckersState, seat: number): CheckersMove[] {
 }
 
 export const checkers: Rules<CheckersState, CheckersMove, CheckersState> = {
+  openness: "full",
   init: () => {
     const board: Piece[] = Array(64).fill(null);
     for (let r = 0; r < N; r++)

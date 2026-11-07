@@ -9,6 +9,8 @@ import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import { CommunityRoomPlay } from "@/components/studio/CommunityRoom";
 import { getGame } from "@/lib/games";
+import { RULES } from "@/lib/multiplayer/registry";
+import { isError } from "@/lib/multiplayer/types";
 import { Lobby } from "./Lobby";
 import { RaceView } from "./RaceView";
 import { Results } from "./Results";
@@ -23,7 +25,7 @@ const secondary =
 export function RoomView({ code }: { code: string }) {
   const { user } = useScores();
   const me = user ? { userId: user.id, username: user.username } : null;
-  const { data, error, gone, channel, online, act } = useRoom(code, me);
+  const { data, error, gone, channel, online, act, optimistic, refresh } = useRoom(code, me);
   const [notice, setNotice] = useState<string | null>(null);
   const triedJoin = useRef(false);
   const playing = data?.me && data.room.status === "playing" ? data.room.gameName : null;
@@ -120,7 +122,7 @@ export function RoomView({ code }: { code: string }) {
       ) : data.room.status === "lobby" ? (
         <Lobby data={data} online={online} act={act} onError={setNotice} />
       ) : data.room.status === "playing" ? (
-        <Playing data={data} channel={channel} online={online} act={act} onError={setNotice} />
+        <Playing data={data} channel={channel} online={online} act={act} optimistic={optimistic} refresh={refresh} onError={setNotice} />
       ) : (
         <Results data={data} act={act} onError={setNotice} />
       )}
@@ -133,12 +135,16 @@ function Playing({
   channel,
   online,
   act,
+  optimistic,
+  refresh,
   onError,
 }: {
   data: RoomPayload;
   channel: ReturnType<typeof useRoom>["channel"];
   online: ReturnType<typeof useRoom>["online"];
   act: ReturnType<typeof useRoom>["act"];
+  optimistic: ReturnType<typeof useRoom>["optimistic"];
+  refresh: ReturnType<typeof useRoom>["refresh"];
   onError: (e: string | null) => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -173,9 +179,22 @@ function Playing({
             clockSkew={data.clockSkew}
             onMove={async (move) => {
               const tick = !!(move as { tick?: boolean } | null)?.tick;
-              if (!tick) setBusy(true);
+              // Where the board is the whole game, show your own move at once
+              // with the same rules the server uses; the server's answer follows.
+              const rules = RULES[data.room.game];
+              let shown = false;
+              if (!tick && rules?.openness === "full" && data.view) {
+                const next = rules.apply(data.view, seat, move, { now: Date.now() + data.clockSkew, rng: Math.random });
+                if (!isError(next)) {
+                  const status = rules.status(next);
+                  optimistic((cur) => ({ ...cur, view: next, turn: status.over ? [] : status.turn }));
+                  shown = true;
+                }
+              }
+              if (!tick && !shown) setBusy(true);
               const r = await act("move", { move, version: data.room.version });
               setBusy(false);
+              if (!r.ok && shown) void refresh(); // undo the early move
               // Timer ticks race between players; losing that race is fine.
               if (!tick) onError(r.ok ? null : (r.error ?? null));
             }}

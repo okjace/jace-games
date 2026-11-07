@@ -130,7 +130,10 @@ export default function SnakeArena({ seat, seed, isHost, players, channel, onEnd
       channel?.send("state", s);
     };
     const t = setInterval(tick, TICK_MS);
-    const announce = setInterval(() => channel?.send("state", s), 500);
+    // During the countdown nothing ticks, so share the starting board a few times.
+    const announce = setInterval(() => {
+      if (Date.now() < s.startAt + 500) channel?.send("state", s);
+    }, 500);
     return () => {
       clearInterval(t);
       clearInterval(announce);

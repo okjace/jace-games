@@ -34,6 +34,7 @@ function findLine(board: number[][], r: number, c: number): [number, number][] |
 }
 
 export const connect4: Rules<C4State, C4Move, C4State> = {
+  openness: "full",
   init: () => ({
     board: Array.from({ length: ROWS }, () => Array(COLS).fill(-1)),
     turn: 0,

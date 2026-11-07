@@ -11,7 +11,9 @@ const PADDLE_H = 90;
 const PADDLE_W = 14;
 const BALL = 12;
 const WIN = 7;
-const SEND_MS = 33;
+// 20 updates a second is plenty: guests predict the ball in between, and
+// fewer messages keeps the shared Supabase project under its rate limit.
+const SEND_MS = 50;
 
 type PongState = { ball: { x: number; y: number; vx: number; vy: number }; paddles: [number, number]; score: [number, number]; serveIn: number; over: boolean };
 
@@ -27,6 +29,9 @@ export default function Pong({ seat, isHost, players, channel, online, onEnd }: 
   const [score, setScore] = useState<[number, number]>([0, 0]);
   const [waiting, setWaiting] = useState(!isHost);
   const ended = useRef(false);
+  const receivedAt = useRef(0);
+  const shownOpponent = useRef(H / 2);
+  const lastInput = useRef(-1);
   const name = (s: number) => players.find((p) => p.seat === s)?.name ?? `Player ${s + 1}`;
   const side = seat === 0 ? 0 : 1;
 
@@ -42,9 +47,12 @@ export default function Pong({ seat, isHost, players, channel, online, onEnd }: 
       if (Number.isFinite(y)) state.current.paddles[1] = Math.max(PADDLE_H / 2, Math.min(H - PADDLE_H / 2, y));
     });
     return channel.on("state", (p) => {
-      state.current = p as PongState;
+      const next = p as PongState;
+      // Keep my own paddle where I put it; everything else comes from the host.
+      state.current = { ...next, paddles: [next.paddles[0], next.paddles[1]] };
+      receivedAt.current = performance.now();
       setWaiting(false);
-      setScore([...(p as PongState).score] as [number, number]);
+      setScore((cur) => (cur[0] !== next.score[0] || cur[1] !== next.score[1] ? [next.score[0], next.score[1]] : cur));
     });
   }, [channel, isHost]);
 
@@ -63,15 +71,17 @@ export default function Pong({ seat, isHost, players, channel, online, onEnd }: 
     return () => window.removeEventListener("keyup", up);
   }, []);
 
-  // Main loop: move my paddle, simulate (host), send, draw.
+  // Main loop: move my paddle, simulate (host), send, draw. It runs on a
+  // timer rather than animation frames, which stop when a tab is hidden, so
+  // the game keeps going for the guest if the host switches tabs.
   useEffect(() => {
-    let raf = 0;
     let last = performance.now();
     let sent = 0;
     const opponent = players.find((p) => p.seat !== seat);
     let goneSince: number | null = null;
     const frame = (now: number) => {
-      const dt = Math.min(0.033, (now - last) / 1000);
+      const elapsed = Math.min(1, (now - last) / 1000);
+      const dt = Math.min(0.033, elapsed);
       last = now;
       const s = state.current;
       const dir = (keys.current.down ? 1 : 0) - (keys.current.up ? 1 : 0);
@@ -88,30 +98,50 @@ export default function Pong({ seat, isHost, players, channel, online, onEnd }: 
           s.over = true;
           onEnd([seat], { 0: s.score[0], 1: s.score[1] });
         }
-        step(s, dt);
+        // Small fixed steps, so a throttled background tab doesn't tunnel the ball.
+        for (let t = elapsed; t > 0; t -= 1 / 120) step(s, Math.min(1 / 120, t));
         if (s.score[0] >= WIN || s.score[1] >= WIN) {
           s.over = true;
           if (!ended.current) {
             ended.current = true;
             const winner = s.score[0] > s.score[1] ? 0 : 1;
-            channel?.send("state", s);
+            channel?.send("state", compact(s));
             onEnd([winner], { 0: s.score[0], 1: s.score[1] });
           }
         }
         if (now - sent > SEND_MS) {
           sent = now;
-          channel?.send("state", s);
+          channel?.send("state", compact(s));
           setScore((cur) => (cur[0] !== s.score[0] || cur[1] !== s.score[1] ? [s.score[0], s.score[1]] : cur));
         }
-      } else if (!isHost && now - sent > SEND_MS) {
-        sent = now;
-        channel?.send("input", { y: myY.current });
+        draw(canvasRef.current, s, seat);
+      } else {
+        // Only send my paddle when it actually moved.
+        const y = Math.round(myY.current);
+        if (!isHost && y !== lastInput.current && now - sent > SEND_MS) {
+          sent = now;
+          lastInput.current = y;
+          channel?.send("input", { y });
+        }
+        // Between host updates, carry the ball along its path and ease the
+        // other paddle toward where the host last saw it.
+        const ahead = Math.min(0.12, (now - receivedAt.current) / 1000);
+        const b = s.ball;
+        let y2 = b.y + (s.serveIn > 0 ? 0 : b.vy * ahead);
+        if (y2 < BALL / 2) y2 = BALL - y2;
+        if (y2 > H - BALL / 2) y2 = 2 * (H - BALL / 2) - y2;
+        const other = 1 - side;
+        shownOpponent.current += (s.paddles[other] - shownOpponent.current) * Math.min(1, dt * 18);
+        const shown: PongState = {
+          ...s,
+          ball: { ...b, x: b.x + (s.serveIn > 0 ? 0 : b.vx * ahead), y: y2 },
+          paddles: other === 0 ? [shownOpponent.current, myY.current] : [myY.current, shownOpponent.current],
+        };
+        draw(canvasRef.current, shown, seat);
       }
-      draw(canvasRef.current, s, seat);
-      raf = requestAnimationFrame(frame);
     };
-    raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    const timer = setInterval(() => frame(performance.now()), 16);
+    return () => clearInterval(timer);
   }, [isHost, channel, side, seat, players, online, onEnd]);
 
   const movePointer = (e: React.PointerEvent) => {
@@ -153,6 +183,18 @@ export default function Pong({ seat, isHost, players, channel, online, onEnd }: 
       <p className="text-xs text-muted">↑/↓ or W/S, or drag on the court. First to {WIN}.</p>
     </div>
   );
+}
+
+/** The state with numbers rounded, to keep messages small. */
+function compact(s: PongState): PongState {
+  const r = (n: number) => Math.round(n * 10) / 10;
+  return {
+    ball: { x: r(s.ball.x), y: r(s.ball.y), vx: r(s.ball.vx), vy: r(s.ball.vy) },
+    paddles: [r(s.paddles[0]), r(s.paddles[1])],
+    score: s.score,
+    serveIn: r(s.serveIn),
+    over: s.over,
+  };
 }
 
 function step(s: PongState, dt: number) {

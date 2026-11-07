@@ -21,6 +21,16 @@ export type Rules<S = unknown, M = unknown, V = unknown> = {
   /** What `seat` (null = a spectator) is allowed to see. */
   view: (state: S, seat: number | null) => V;
   status: (state: S) => Status;
+  /**
+   * How much players may see, which decides what can travel over the room's
+   * live channel (everyone in the room can read it):
+   * - "full": view() is the whole state for everyone, so the new state can be
+   *   pushed to all players and a mover's own browser can apply moves at once.
+   * - "public": view() is the same for every seat (but hides things), so it
+   *   can be pushed to everyone.
+   * - unset: views differ per seat; players fetch their own after a change.
+   */
+  openness?: "full" | "public";
   /** Optional: someone left a game with 3+ players. Default: the game ends. */
   forfeit?: (state: S, seat: number, ctx: Ctx) => S;
 };

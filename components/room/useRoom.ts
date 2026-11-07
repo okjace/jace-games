@@ -9,9 +9,11 @@ export type RoomData = RoomPayload & { clockSkew: number };
 export type { RoomData as RoomPayload };
 
 /**
- * Loads a room and keeps it fresh: re-fetches whenever the server
- * broadcasts a change on the room's channel, and every few seconds as a
- * fallback. Exposes the channel so games can talk to each other directly.
+ * Loads a room and keeps it fresh. The server pushes every change over the
+ * room's channel, usually with the room (and the board) inside, so it's
+ * applied straight away; games with hidden information fetch the player's
+ * own view instead. A slow poll is the fallback if a push is missed. Also
+ * exposes the channel so games can talk to each other directly.
  */
 export function useRoom(code: string, me: { userId: string; username: string } | null) {
   const [data, setData] = useState<RoomData | null>(null);
@@ -41,7 +43,7 @@ export function useRoom(code: string, me: { userId: string; username: string } |
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
-    const t = setInterval(() => document.visibilityState === "visible" && void refresh(), 5000);
+    const t = setInterval(() => document.visibilityState === "visible" && void refresh(), 15_000);
     return () => clearInterval(t);
   }, [refresh]);
 
@@ -51,9 +53,22 @@ export function useRoom(code: string, me: { userId: string; username: string } |
     if (!topic) return;
     const [userId, username] = meKey ? meKey.split("|") : [];
     const ch = openRoomChannel(topic, userId ? { userId, username } : null);
-    const offRoom = ch.on("room", (p) => {
-      if ((p as { deleted?: boolean })?.deleted) setGone(true);
-      else void refresh();
+    const offRoom = ch.on("room", (raw) => {
+      const p = raw as { deleted?: boolean; version?: number; room?: RoomPayload; complete?: boolean };
+      if (p?.deleted) return setGone(true);
+      if (typeof p.version === "number" && p.version <= versionRef.current) return; // already have it
+      if (!p.room || !p.complete) return void refresh();
+      const pushed = p.room;
+      const mine = pushed.players.find((pl) => pl.userId === userId && !pl.left) ?? null;
+      versionRef.current = pushed.room.version;
+      setData((cur) => ({
+        ...pushed,
+        me: mine ? { userId: mine.userId, seat: mine.seat } : null,
+        topic: mine ? (cur?.topic ?? null) : null,
+        // Your own race result isn't in the public copy.
+        players: pushed.players.map((pl) => (pl.userId === userId ? { ...pl, result: cur?.players.find((c) => c.userId === userId)?.result ?? pl.result } : pl)),
+        clockSkew: pushed.serverNow - Date.now(),
+      }));
     });
     const offPresence = ch.onPresence(setOnline);
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -92,5 +107,8 @@ export function useRoom(code: string, me: { userId: string; username: string } |
     [code, refresh],
   );
 
-  return { data, error, gone, channel, online, act, refresh };
+  /** Shows a change right away (e.g. your own move) until the server's answer replaces it. */
+  const optimistic = useCallback((fn: (cur: RoomData) => RoomData) => setData((cur) => (cur ? fn(cur) : cur)), []);
+
+  return { data, error, gone, channel, online, act, refresh, optimistic };
 }

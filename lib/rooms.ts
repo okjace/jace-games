@@ -70,8 +70,18 @@ function rulesFor(room: RoomRow): Rules | null {
   return room.mode === "turns" ? (RULES[room.game] ?? null) : null;
 }
 
-async function touch(room: RoomRow) {
-  await broadcast(topicOf(room), "room", { version: room.version });
+/**
+ * Tells everyone in the room it changed. The room itself rides along (as a
+ * spectator would see it, so no race results or private views leak), and
+ * for games where every seat sees the same board the board does too, so
+ * players can update straight from the channel instead of fetching.
+ */
+async function touch(room: RoomRow, players: PlayerRow[]) {
+  const pub = payload(room, players, null);
+  const rules = rulesFor(room);
+  if (rules?.openness && room.state && room.status === "playing") pub.view = rules.view(room.state, null);
+  const shared = !rules || !!rules.openness;
+  await broadcast(topicOf(room), "room", { version: room.version, room: pub, complete: shared });
 }
 
 // ---------- Reading ----------
@@ -366,9 +376,9 @@ export async function roomAction(code: string, session: Session, body: Action): 
       throw new RoomError("Unknown action.");
   }
 
-  if (changed) await touch(changed);
-  const fresh = await store.roomByCode(room.code);
-  return payload(fresh ?? room, await store.players(room.id), session.user.id);
+  const [fresh, freshPlayers] = await Promise.all([store.roomByCode(room.code), store.players(room.id)]);
+  if (changed) await touch(fresh ?? changed, freshPlayers);
+  return payload(fresh ?? room, freshPlayers, session.user.id);
 }
 
 function requireMember(me: PlayerRow | null) {

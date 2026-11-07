@@ -30,6 +30,7 @@ const boxDone = (s: Pick<DotsState, "h" | "v">, r: number, c: number) =>
   s.h[r][c] !== -1 && s.h[r + 1][c] !== -1 && s.v[r][c] !== -1 && s.v[r][c + 1] !== -1;
 
 export const dots: Rules<DotsState, DotsMove, DotsState> = {
+  openness: "full",
   init: (seats) => ({
     h: Array.from({ length: BOXES + 1 }, () => Array(BOXES).fill(-1)),
     v: Array.from({ length: BOXES }, () => Array(BOXES + 1).fill(-1)),

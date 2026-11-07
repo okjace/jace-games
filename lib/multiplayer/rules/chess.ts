@@ -221,6 +221,7 @@ export function initialChess(board: (string | null)[] = START, turn = 0): ChessS
 }
 
 export const chess: Rules<ChessState, ChessMove, ChessState> = {
+  openness: "full",
   init: () => initialChess(),
   apply(s, seat, move) {
     if (s.result) return { error: "The game is over." };
