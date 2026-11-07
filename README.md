@@ -183,6 +183,26 @@ Community games are untrusted code, so they run in `<iframe sandbox="allow-scrip
 - Plays are counted once per person per game every 30 minutes.
 - Rooms for community games: 2 to 8 players.
 
+## Jace Games Live
+
+A Kahoot or Gimkit alternative at `/live`. A host puts a game on the big screen; everyone joins on their phone at `/live` with a 6-digit code and a nickname. Players don't need an account. Hosting and making sets need Jace sign-in.
+
+- **Sets** are made at `/live` → New set. Question types:
+  - multiple choice (2–4 answers, any number right)
+  - true or false
+  - type the answer (case, extra spaces and end punctuation are ignored)
+  - **custom HTML**
+
+  Every question has a time limit and normal, double or no points. Sets are private, unlisted (link only) or public. Public sets show up in **Discover** (`/live/discover`), with search, tags and popular or new. Banned or muted Jace accounts can't make sets public.
+- **Custom HTML** runs like a Studio game: `<iframe sandbox="allow-scripts">` with the no-network CSP from [`lib/studio/sandbox.ts`](lib/studio/sandbox.ts) ([`components/live/HtmlFrame.tsx`](components/live/HtmlFrame.tsx)). Any question can add HTML to its prompt (pictures, diagrams). A "Custom HTML" question is entirely the creator's HTML: it answers with `jace.answer(value)`, `jace.onLock(fn)` runs when time's up, and the value is checked against the set's accepted answers on the server.
+- **Game modes** (the host picks one):
+  - **Classic:** everyone answers the same question on the big screen; up to 1,000 points for a right answer depending on speed, plus a streak bonus.
+  - **Gold Rush:** self-paced; every right answer opens one of three chests (gold, double, steal, swap, lose or nothing).
+  - **Rocket Race:** self-paced; right answers boost your rocket and the first to 100% wins.
+- **No questions:** the host can turn the set off for Gold Rush and Rocket Race, so players tap a big button instead of answering (rate-limited on the server).
+- **Fairness:** answers are checked on the server ([`lib/live/engine.ts`](lib/live/engine.ts)). Correct answers aren't sent to players until the reveal, and chest contents are decided when the chests appear. Players are identified by a secret token kept in their browser; the host can remove anyone.
+- **Live updates** use the same Supabase Realtime setup as rooms: the server pushes "the game moved on" (with the question, never the answer) over a secret channel; the host screen and phones also refresh every few seconds as a fallback. Tables are in [`supabase/migrations/004_live.sql`](supabase/migrations/004_live.sql); games expire after 12 hours and the daily cron cleans them up.
+
 ## Scripts
 
 - `npm run dev`: development server
