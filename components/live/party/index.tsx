@@ -45,6 +45,43 @@ const REWARD_TEXT: Partial<Record<LiveMode, (v: PlayerView) => string | null>> =
   rocket: (v) => (typeof v.last?.boost === "number" ? `+${v.last.boost}%` : null),
 };
 
+type Feedback = { id: number; correct: boolean; prompt: string; yours: string; right: string[]; shielded: boolean };
+
+/** Right or wrong, big and clear. Wrong answers show the right one and wait for a tap (or a few seconds). */
+function FeedbackCard({ f, onDone, accent }: { f: Feedback; onDone: () => void; accent: string }) {
+  if (f.correct) {
+    return (
+      <button type="button" onClick={onDone} className="flex flex-col items-center gap-1 rounded-3xl bg-green-500/90 px-6 py-8 text-center shadow-[0_6px_0_rgba(0,0,0,0.25)]" style={{ animation: "jg-rise 0.2s ease-out" }}>
+        <span className="text-6xl" style={{ animation: "jg-zoom 0.5s ease-out" }}>
+          ✅
+        </span>
+        <span className="text-3xl font-black">Correct!</span>
+      </button>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-3 rounded-3xl bg-red-500/90 p-5 text-center shadow-[0_6px_0_rgba(0,0,0,0.25)]" role="alert" style={{ animation: "jg-rise 0.2s ease-out" }}>
+      <span className="text-5xl">❌</span>
+      <p className="text-3xl font-black">Not quite!</p>
+      {f.shielded && <p className="font-bold">🛡️ Your shield saved your streak.</p>}
+      <div className="rounded-2xl bg-black/25 p-3 text-left">
+        <p className="text-sm font-semibold text-white/80">{f.prompt}</p>
+        <p className="mt-2 text-sm">
+          You said: <b className="line-through decoration-2">{f.yours}</b>
+        </p>
+        {f.right.length > 0 && (
+          <p className="text-lg">
+            Right answer: <b className="rounded bg-white px-1.5 text-green-700">{f.right.join(" / ")}</b>
+          </p>
+        )}
+      </div>
+      <button type="button" autoFocus onClick={onDone} className="h-12 rounded-full font-black text-black shadow-[0_4px_0_rgba(0,0,0,0.3)] active:translate-y-1" style={{ background: accent }}>
+        Got it, next question →
+      </button>
+    </div>
+  );
+}
+
 export type StageProps = {
   view: PlayerView;
   busy: boolean;
@@ -109,18 +146,33 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
     }
   };
 
+  // What happened with the last answer, shown before the next question.
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  useEffect(() => {
+    if (!feedback) return;
+    const t = setTimeout(() => setFeedback(null), feedback.correct ? 1100 : 6000);
+    return () => clearTimeout(t);
+  }, [feedback]);
+
   const answer = async (a: number | string): Promise<AnswerResult> => {
+    const q = view.selfQuestion;
     const v = await act({ action: "answer", answer: a });
     if (!v) return null;
     const last = v.last ?? {};
     const correct = last.correct !== false;
+    if (q) {
+      const yours = typeof a === "number" && q.choices ? (q.choices[a] ?? "?") : String(a);
+      setFeedback({ id: Date.now(), correct, prompt: q.prompt, yours, right: Array.isArray(last.right) ? (last.right as string[]) : [], shielded: !!last.shielded });
+    }
     if (correct) setTimeout(() => celebrate(v), 250);
     else if (last.shielded) juice.pop("🛡️ Streak saved!", "#facc15");
     return { correct, right: Array.isArray(last.right) ? (last.right as string[]) : undefined };
   };
 
   const [tapLabel, tapSub] = theme.tap;
-  const earn = view.noSet ? (
+  const earn = feedback ? (
+    <FeedbackCard f={feedback} onDone={() => setFeedback(null)} accent={theme.accent} />
+  ) : view.noSet ? (
     <div className="flex flex-col items-center gap-2 py-6">
       <button
         type="button"

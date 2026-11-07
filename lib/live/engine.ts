@@ -99,7 +99,44 @@ type PlayerData = PartyData & {
   avatar?: Avatar;
   /** Locker XP this game gave them (set when it ends). */
   xp?: number;
+  /** Self-paced modes: every answer, for the review at the end. */
+  log?: { qi: number; a: unknown; correct: boolean }[];
 };
+
+/** One line of the end-of-game review: the question, what you said, and the right answer. */
+export type ReviewItem = { prompt: string; yours: string; right: string; correct: boolean };
+
+const MAX_LOG = 200;
+
+/** An answer as words: the choice's text, or what was typed. */
+function answerText(q: Question, a: unknown): string {
+  if ((q.type === "choice" || q.type === "truefalse") && typeof a === "number") return q.choices?.[a] ?? "?";
+  if (a === null || a === undefined || a === "") return "(no answer)";
+  return String(a).slice(0, 120);
+}
+function rightText(q: Question): string {
+  if (q.type === "choice" || q.type === "truefalse") return (q.correct ?? []).map((i) => q.choices?.[i]).filter(Boolean).join(" / ");
+  return (q.accepted ?? []).join(" / ");
+}
+
+/** Every question this player answered, in order (only once the game is over). */
+function reviewFor(g: LiveGameRow, me: LivePlayerRow): ReviewItem[] {
+  const qs = questionsOf(g);
+  const d = dataOf(me);
+  const item = (q: Question | undefined, a: unknown, correct: boolean): ReviewItem | null =>
+    q ? { prompt: q.prompt || "(picture question)", yours: answerText(q, a), right: rightText(q), correct } : null;
+  if (g.mode === "classic") {
+    const order = stateOf(g).order ?? [];
+    return order
+      .map((qi, i) => {
+        const ans = d.answers?.[String(i)];
+        return item(qs[qi], ans?.a ?? null, !!ans?.correct);
+      })
+      .filter((x): x is ReviewItem => !!x)
+      .slice(0, (stateOf(g).q ?? order.length - 1) + 1);
+  }
+  return (d.log ?? []).map((l) => item(qs[l.qi], l.a, l.correct)).filter((x): x is ReviewItem => !!x);
+}
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 const topicOf = (g: LiveGameRow) => `jg-live:${g.channel}`;
@@ -334,6 +371,8 @@ export type PlayerView = {
   selfQuestion: PlayerQuestion | null;
   chests: number | null;
   last: Record<string, unknown> | null;
+  /** Once the game is over: each question, what you answered, and the right answer. */
+  review: ReviewItem[] | null;
   /** Party modes: what this player may see of their own mode state. */
   party: {
     bank?: number;
@@ -405,6 +444,7 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
     selfQuestion: g.mode !== "classic" && d.cur && qs[d.cur.qi] && g.status === "playing" ? forPlayers(qs[d.cur.qi]) : null,
     chests: d.chests ? d.chests.length : null,
     last: d.last ?? null,
+    review: g.status === "ended" && !settings.noSet ? reviewFor(g, me) : null,
     party: partyView(g, me, all),
     serverNow: Date.now(),
   };
@@ -738,7 +778,13 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
       streak: correct ? me.streak + 1 : shielded ? me.streak : 0,
       correct: me.correct + (correct ? 1 : 0),
       answered: me.answered + 1,
-      data: { ...d, cur: null, last: shielded ? { ...last, shielded: true } : last, ...(shielded ? { shop: { ...d.shop!, shields: d.shop!.shields - 1 } } : {}) },
+      data: {
+        ...d,
+        cur: null,
+        last: shielded ? { ...last, shielded: true } : last,
+        log: [...(d.log ?? []), { qi: d.cur.qi, a: typeof body.answer === "string" ? body.answer.slice(0, 120) : body.answer, correct }].slice(-MAX_LOG),
+        ...(shielded ? { shop: { ...d.shop!, shields: d.shop!.shields - 1 } } : {}),
+      },
     }))!;
     earned = correct;
     // Home Run Derby: a wrong answer is a strike; strike three is an out.

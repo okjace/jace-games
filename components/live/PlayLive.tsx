@@ -183,6 +183,7 @@ export function PlayLive({ code }: { code: string }) {
             {score(view, view.me.score)} · {view.me.correct}/{view.me.answered} right
           </p>
           <XpGained view={view} />
+          <Review view={view} />
           <Top view={view} />
           <Link href="/live" className={primary}>
             Done
@@ -347,6 +348,7 @@ function SoloResults({ view }: { view: PlayerView }) {
         {view.me.answered > 0 && !view.noSet ? ` · ${view.me.correct}/${view.me.answered} right` : ""}
       </p>
       <XpGained view={view} />
+      <Review view={view} />
       {error && <p className="text-sm text-danger">{error}</p>}
       <div className="flex flex-wrap justify-center gap-2">
         <button type="button" onClick={again} disabled={busy} className={primary}>
@@ -360,6 +362,56 @@ function SoloResults({ view }: { view: PlayerView }) {
         </Link>
       </div>
     </Centered>
+  );
+}
+
+/** After a game: every question you answered, what you said, and (for the ones you missed) the right answer. */
+function Review({ view }: { view: PlayerView }) {
+  const items = view.review ?? [];
+  const wrong = items.filter((r) => !r.correct).length;
+  const [onlyWrong, setOnlyWrong] = useState(wrong > 0);
+  if (items.length === 0) return null;
+  const shown = onlyWrong ? items.map((r, i) => ({ r, i })).filter(({ r }) => !r.correct) : items.map((r, i) => ({ r, i }));
+  return (
+    <details className="w-full rounded-2xl border border-line bg-panel text-left" open={wrong > 0 && wrong <= 10}>
+      <summary className="cursor-pointer select-none px-4 py-3 font-semibold">
+        Your answers: {items.length - wrong} right, {wrong} wrong
+      </summary>
+      <div className="flex flex-col gap-2 px-4 pb-4">
+        {wrong > 0 && (
+          <div className="flex gap-1 text-xs">
+            {[true, false].map((only) => (
+              <button
+                key={String(only)}
+                type="button"
+                aria-pressed={onlyWrong === only}
+                onClick={() => setOnlyWrong(only)}
+                className={`rounded-full px-3 py-1 font-semibold ${onlyWrong === only ? "bg-accent text-on-accent" : "bg-foreground/[.06] text-muted"}`}
+              >
+                {only ? `Missed (${wrong})` : `All (${items.length})`}
+              </button>
+            ))}
+          </div>
+        )}
+        <ol className="flex flex-col gap-2">
+          {shown.map(({ r, i }) => (
+            <li key={i} className={`rounded-xl border-l-4 p-3 text-sm ${r.correct ? "border-green-500 bg-green-500/[.07]" : "border-red-500 bg-red-500/[.07]"}`}>
+              <p className="font-semibold">
+                {r.correct ? "✅" : "❌"} {r.prompt}
+              </p>
+              <p className="mt-1 text-muted">
+                You said: <span className={r.correct ? "font-semibold text-foreground" : "line-through"}>{r.yours}</span>
+              </p>
+              {!r.correct && r.right && (
+                <p>
+                  Right answer: <b className="text-green-600 dark:text-green-400">{r.right}</b>
+                </p>
+              )}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </details>
   );
 }
 
