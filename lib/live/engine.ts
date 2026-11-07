@@ -22,9 +22,9 @@ import {
   scoreCap,
   makePitch,
   newBall,
-  addStrike,
+  easyHit,
   runPlay,
-  swingResult,
+  wrongAnswerStrike,
   type BallState,
   type Pitch,
   type Play,
@@ -576,7 +576,7 @@ type PlayerAction =
   // Gold Rush and Code Breakers.
   | { action: "buy"; item: ShopItem }
   // Baseball: how many ms off perfect the swing was (negative = early), or null to take the pitch.
-  | { action: "swing"; offset: number | null };
+  | { action: "swing" };
 
 export async function playerAction(code: string, token: unknown, body: PlayerAction): Promise<PlayerView> {
   const store = liveStore();
@@ -658,21 +658,10 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
     if (g.mode !== "baseball") throw new LiveError("Unknown action.");
     const ball = d.ball ?? newBall();
     if (!ball.pitch) throw new LiveError("Answer a question to get a pitch.", 409);
-    // A pitch left too long (a locked phone, a slow network) counts as taken: a strike, never a stuck at-bat.
-    const stale = now - ball.pitch.issuedAt > 20_000;
-    const offset = body.offset === null || stale ? null : Number(body.offset);
-    const play: Play = swingResult(offset === null || !Number.isFinite(offset) ? null : Math.max(-2000, Math.min(2000, offset)));
-    // A miss, foul or pitch taken is a strike; strike three is an out. Otherwise the ball's in play.
-    let result: { state: BallState; runs: number; inningOver: boolean };
-    let shown: string = play;
-    if (play === "miss" || play === "foul" || play === "looking") {
-      const k = addStrike(ball, play);
-      if (k.out) {
-        result = runPlay(k.state, "strikeout");
-        shown = play === "looking" ? "looking" : "strikeout";
-      } else result = { state: k.state, runs: 0, inningOver: false };
-    } else result = runPlay(ball, play);
-    const { state, runs, inningOver } = result;
+    // The HIT button always connects; the server picks how far it goes.
+    const play: Play = easyHit(me.streak);
+    const { state, runs, inningOver } = runPlay(ball, play);
+    const shown: string = play;
     me = (await store.updatePlayer(g.id, me.id, {
       score: me.score + runs,
       data: { ...d, ball: state, last: { kind: "play", play: shown, contact: play, runs, inningOver, inning: state.inning, strikes: state.strikes ?? 0, atBatOver: !state.pitch } },
@@ -752,11 +741,14 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
       data: { ...d, cur: null, last: shielded ? { ...last, shielded: true } : last, ...(shielded ? { shop: { ...d.shop!, shields: d.shop!.shields - 1 } } : {}) },
     }))!;
     earned = correct;
-    // Home Run Derby: a wrong answer is a strikeout.
+    // Home Run Derby: a wrong answer is a strike; strike three is an out.
     if (!correct && g.mode === "baseball") {
       const fresh = dataOf(me);
-      const { state, inningOver } = runPlay(fresh.ball ?? newBall(), "strikeout");
-      me = (await store.updatePlayer(g.id, me.id, { data: { ...fresh, ball: state, last: { ...(fresh.last ?? {}), play: "strikeout", inningOver, inning: state.inning } } }))!;
+      const k = wrongAnswerStrike(fresh.ball ?? newBall());
+      const { state, inningOver } = k.out ? runPlay(k.state, "strikeout") : { state: k.state, inningOver: false };
+      me = (await store.updatePlayer(g.id, me.id, {
+        data: { ...fresh, ball: state, last: { ...(fresh.last ?? {}), play: k.out ? "strikeout" : "strike", strikes: k.state.strikes ?? 0, inningOver, inning: state.inning } },
+      }))!;
     }
   } else if (body.action === "tap") {
     if (!settings.noSet) throw new LiveError("Answer questions to play.");

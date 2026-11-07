@@ -32,7 +32,7 @@ export const THEMES: Record<string, { bg: string; accent: string; tap: [string, 
   factory: { bg: "linear-gradient(180deg, #3b4252 0%, #1f242e 100%)", accent: "#fbbf24", tap: ["🔩 CRANK", "Each tap earns a few coins."] },
   fishing: { bg: "linear-gradient(180deg, #38bdf8 0%, #0369a1 60%, #0c4a6e 100%)", accent: "#fde68a", tap: ["🎣 CAST", "Each tap is a cast."] },
   hack: { bg: "linear-gradient(180deg, #04130b 0%, #000 100%)", accent: "#3ddc84", tap: ["💻 MINE", "Each tap mines a few bits."] },
-  baseball: { bg: "linear-gradient(180deg, #166534 0%, #14532d 70%, #052e16 100%)", accent: "#facc15", tap: ["⚾ PLAY BALL", "Each tap brings a pitch."] },
+  baseball: { bg: "linear-gradient(180deg, #166534 0%, #14532d 70%, #052e16 100%)", accent: "#facc15", tap: ["⚾ PLAY BALL", "Each tap puts you up to bat."] },
   custom: { bg: "linear-gradient(180deg, #4338ca 0%, #1e1b4b 100%)", accent: "#a5f3fc", tap: ["🪙 EARN", "Each tap earns a few coins."] },
 };
 

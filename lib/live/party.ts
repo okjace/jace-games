@@ -164,12 +164,12 @@ export const HACK_EVERY = 3;
 // ---------- Baseball ----------
 
 export type Pitch = { type: "fastball" | "curveball" | "changeup"; ms: number; curve: number };
-export type Play = "single" | "double" | "triple" | "homer" | "groundout" | "flyout" | "strikeout" | "looking" | "foul" | "miss";
+export type Play = "single" | "double" | "triple" | "homer" | "groundout" | "flyout" | "strikeout";
 export type BallState = {
   bases: [boolean, boolean, boolean];
   outs: number;
   inning: number;
-  /** Strikes in this at-bat: a miss or a foul is a strike (a foul can't be strike three). */
+  /** Strikes: each wrong answer is one; the third is an out. */
   strikes?: number;
   /** The pitch waiting for a swing (one per right answer). */
   pitch: (Pitch & { issuedAt: number }) | null;
@@ -185,34 +185,26 @@ export function makePitch(): Pitch {
   return { type: "changeup", ms: randomInt(1050, 1300), curve: randomInt(-10, 11) };
 }
 
-/** How a swing's timing is described, from how far off perfect it was (ms, early is negative). */
-export const SWING_WINDOWS = { perfect: 45, great: 95, good: 155, foul: 230 };
-
 /**
- * What a swing does, from how far off perfect it was (ms, early is
- * negative, null = no swing). Better timing means better odds; there's
- * always a little luck. Way off is a miss, nearly there is a foul.
+ * The HIT button: every swing connects. About 4 in 5 are hits, and an
+ * answer streak makes the big ones likelier (up to +10% home runs).
  */
-export function swingResult(offsetMs: number | null): Play {
-  if (offsetMs === null || !Number.isFinite(offsetMs)) return "looking";
-  const off = Math.abs(offsetMs);
+export function easyHit(streak: number): Play {
+  const bonus = Math.min(Math.max(0, streak), 5) * 2;
   const r = randomInt(100);
-  if (off <= SWING_WINDOWS.perfect) return r < 45 ? "homer" : r < 60 ? "triple" : r < 88 ? "double" : "single";
-  if (off <= SWING_WINDOWS.great) return r < 12 ? "homer" : r < 20 ? "triple" : r < 48 ? "double" : r < 88 ? "single" : "flyout";
-  if (off <= SWING_WINDOWS.good) return r < 10 ? "double" : r < 52 ? "single" : r < 76 ? "groundout" : "flyout";
-  if (off <= SWING_WINDOWS.foul) return r < 70 ? "foul" : r < 85 ? "groundout" : "flyout";
-  return "miss";
+  if (r < 15 + bonus) return "homer";
+  if (r < 22 + bonus) return "triple";
+  if (r < 42 + bonus) return "double";
+  if (r < 80) return "single";
+  if (r < 91) return "flyout";
+  return "groundout";
 }
 
-/**
- * Strikes: a miss, a foul or a pitch taken. Strike three is an out;
- * otherwise the at-bat goes on with another pitch.
- */
-export function addStrike(s: BallState, play: Play): { state: BallState; out: boolean } {
-  const strikes = s.strikes ?? 0;
-  const next = play === "foul" && strikes >= 2 ? strikes : strikes + 1;
-  if (next >= 3) return { state: { ...s, strikes: 0, pitch: null }, out: true };
-  return { state: { ...s, strikes: next, pitch: { ...makePitch(), issuedAt: Date.now() } }, out: false };
+/** A wrong answer is a strike; the third one is an out. */
+export function wrongAnswerStrike(s: BallState): { state: BallState; out: boolean } {
+  const strikes = (s.strikes ?? 0) + 1;
+  if (strikes >= 3) return { state: { ...s, strikes: 0, pitch: null }, out: true };
+  return { state: { ...s, strikes, pitch: null }, out: false };
 }
 
 const BASES_FOR: Partial<Record<Play, number>> = { single: 1, double: 2, triple: 3, homer: 4 };

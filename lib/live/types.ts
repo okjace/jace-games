@@ -133,7 +133,7 @@ export const MODES: Record<LiveMode, ModeDef> = {
   baseball: {
     name: "Home Run Derby",
     icon: "⚾",
-    blurb: "Every right answer is an at-bat: time your swing to hit singles, doubles and homers. Wrong answers are outs. Most runs wins.",
+    blurb: "Every right answer puts you up to bat: press HIT for singles, doubles and homers. Wrong answers are strikes. Most runs wins.",
     needsSet: false,
     selfPaced: true,
     unit: (n) => num(n) + (n === 1 ? " run" : " runs"),
