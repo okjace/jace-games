@@ -8,6 +8,7 @@ import type { PlayerView } from "@/lib/live/engine";
 import { MODES } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
 import { Answer } from "./Answer";
+import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { PARTY_MODES, PartyPlay } from "./party";
 import { card, getToken, input, primary, secondary, setToken } from "./ui";
 
@@ -21,6 +22,8 @@ export function PlayLive({ code }: { code: string }) {
   const [kicked, setKicked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [skew, setSkew] = useState(0);
+  const playRef = useRef<HTMLDivElement>(null);
+  const full = useStageFullscreen(playRef);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -139,10 +142,12 @@ export function PlayLive({ code }: { code: string }) {
   }
 
   return (
+    <div ref={playRef} className={full.on ? `${FULLSCREEN_CLASS} bg-background p-4` : ""}>
     <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
       <div className="flex items-center justify-between rounded-2xl border border-line bg-panel px-4 py-3">
         <span className="truncate font-semibold">{view.me.name}</span>
         <span className="flex items-center gap-3 text-sm">
+          <FullscreenButton on={full.on} toggle={full.toggle} className="-my-2 text-muted hover:text-foreground" />
           {view.me.streak >= 2 && <span title="Streak">🔥 {view.me.streak}</span>}
           <span className="font-mono font-bold tabular-nums">{score(view, view.me.score)}</span>
           {view.status !== "lobby" && <span className="text-muted">#{view.me.rank}</span>}
@@ -178,6 +183,7 @@ export function PlayLive({ code }: { code: string }) {
           </Link>
         </Centered>
       )}
+    </div>
     </div>
   );
 }

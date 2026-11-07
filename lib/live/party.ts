@@ -164,16 +164,18 @@ export const HACK_EVERY = 3;
 // ---------- Baseball ----------
 
 export type Pitch = { type: "fastball" | "curveball" | "changeup"; ms: number; curve: number };
-export type Play = "single" | "double" | "triple" | "homer" | "groundout" | "flyout" | "strikeout" | "looking";
+export type Play = "single" | "double" | "triple" | "homer" | "groundout" | "flyout" | "strikeout" | "looking" | "foul" | "miss";
 export type BallState = {
   bases: [boolean, boolean, boolean];
   outs: number;
   inning: number;
+  /** Strikes in this at-bat: a miss or a foul is a strike (a foul can't be strike three). */
+  strikes?: number;
   /** The pitch waiting for a swing (one per right answer). */
   pitch: (Pitch & { issuedAt: number }) | null;
 };
 
-export const newBall = (): BallState => ({ bases: [false, false, false], outs: 0, inning: 1, pitch: null });
+export const newBall = (): BallState => ({ bases: [false, false, false], outs: 0, inning: 1, strikes: 0, pitch: null });
 
 /** The next pitch: speed is how long the ball takes from the mound to the plate. */
 export function makePitch(): Pitch {
@@ -183,20 +185,34 @@ export function makePitch(): Pitch {
   return { type: "changeup", ms: randomInt(1050, 1300), curve: randomInt(-10, 11) };
 }
 
+/** How a swing's timing is described, from how far off perfect it was (ms, early is negative). */
+export const SWING_WINDOWS = { perfect: 45, great: 95, good: 155, foul: 230 };
+
 /**
  * What a swing does, from how far off perfect it was (ms, early is
  * negative, null = no swing). Better timing means better odds; there's
- * always a little luck.
+ * always a little luck. Way off is a miss, nearly there is a foul.
  */
 export function swingResult(offsetMs: number | null): Play {
   if (offsetMs === null || !Number.isFinite(offsetMs)) return "looking";
-  const q = Math.max(0, 1 - Math.abs(offsetMs) / 240);
+  const off = Math.abs(offsetMs);
   const r = randomInt(100);
-  if (q > 0.88) return r < 42 ? "homer" : r < 55 ? "triple" : r < 82 ? "double" : "single";
-  if (q > 0.68) return r < 10 ? "homer" : r < 18 ? "triple" : r < 45 ? "double" : r < 85 ? "single" : "flyout";
-  if (q > 0.42) return r < 8 ? "double" : r < 50 ? "single" : r < 75 ? "groundout" : "flyout";
-  if (q > 0.18) return r < 22 ? "single" : r < 60 ? "groundout" : "flyout";
-  return "strikeout";
+  if (off <= SWING_WINDOWS.perfect) return r < 45 ? "homer" : r < 60 ? "triple" : r < 88 ? "double" : "single";
+  if (off <= SWING_WINDOWS.great) return r < 12 ? "homer" : r < 20 ? "triple" : r < 48 ? "double" : r < 88 ? "single" : "flyout";
+  if (off <= SWING_WINDOWS.good) return r < 10 ? "double" : r < 52 ? "single" : r < 76 ? "groundout" : "flyout";
+  if (off <= SWING_WINDOWS.foul) return r < 70 ? "foul" : r < 85 ? "groundout" : "flyout";
+  return "miss";
+}
+
+/**
+ * Strikes: a miss, a foul or a pitch taken. Strike three is an out;
+ * otherwise the at-bat goes on with another pitch.
+ */
+export function addStrike(s: BallState, play: Play): { state: BallState; out: boolean } {
+  const strikes = s.strikes ?? 0;
+  const next = play === "foul" && strikes >= 2 ? strikes : strikes + 1;
+  if (next >= 3) return { state: { ...s, strikes: 0, pitch: null }, out: true };
+  return { state: { ...s, strikes: next, pitch: { ...makePitch(), issuedAt: Date.now() } }, out: false };
 }
 
 const BASES_FOR: Partial<Record<Play, number>> = { single: 1, double: 2, triple: 3, homer: 4 };
@@ -206,8 +222,8 @@ export function runPlay(s: BallState, play: Play): { state: BallState; runs: num
   const hit = BASES_FOR[play];
   if (!hit) {
     const outs = s.outs + 1;
-    if (outs >= 3) return { state: { ...s, bases: [false, false, false], outs: 0, inning: s.inning + 1, pitch: null }, runs: 0, inningOver: true };
-    return { state: { ...s, outs, pitch: null }, runs: 0, inningOver: false };
+    if (outs >= 3) return { state: { ...s, bases: [false, false, false], outs: 0, inning: s.inning + 1, strikes: 0, pitch: null }, runs: 0, inningOver: true };
+    return { state: { ...s, outs, strikes: 0, pitch: null }, runs: 0, inningOver: false };
   }
   let runs = 0;
   const bases: [boolean, boolean, boolean] = [false, false, false];
@@ -220,7 +236,7 @@ export function runPlay(s: BallState, play: Play): { state: BallState; runs: num
   });
   if (hit >= 4) runs++;
   else bases[hit - 1] = true;
-  return { state: { ...s, bases, pitch: null }, runs, inningOver: false };
+  return { state: { ...s, bases, strikes: 0, pitch: null }, runs, inningOver: false };
 }
 
 // ---------- Upgrade shop (Gold Rush and Code Breakers) ----------

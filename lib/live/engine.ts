@@ -20,6 +20,7 @@ import {
   scoreCap,
   makePitch,
   newBall,
+  addStrike,
   runPlay,
   swingResult,
   type BallState,
@@ -337,7 +338,7 @@ export type PlayerView = {
     hackCharge?: number;
     hackEvery?: number;
     /** Baseball: the field, and the pitch waiting for a swing (speed only, no outcome). */
-    ball?: Omit<BallState, "pitch"> & { pitch: Pitch | null };
+    ball?: Omit<BallState, "pitch"> & { pitch: (Pitch & { id: number }) | null };
     /** Gold Rush and Code Breakers: the upgrade shop, with what each next level costs. */
     shop?: { levels: ShopLevels; prices: Record<ShopItem, number | null> };
     hack?: { targetName: string; options: string[] } | null;
@@ -412,7 +413,7 @@ function partyView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]): Pla
   if (g.mode === "gold") return { shop };
   if (g.mode === "baseball") {
     const b = d.ball ?? newBall();
-    return { ball: { ...b, pitch: b.pitch ? { type: b.pitch.type, ms: b.pitch.ms, curve: b.pitch.curve } : null } };
+    return { ball: { ...b, strikes: b.strikes ?? 0, pitch: b.pitch ? { id: b.pitch.issuedAt, type: b.pitch.type, ms: b.pitch.ms, curve: b.pitch.curve } : null } };
   }
   if (g.mode === "fishing") return { catches: d.catches ?? [], caught: d.caught ?? {}, frenzy: d.frenzy ?? 0, stormed: !!d.stormed };
   if (g.mode === "hack") {
@@ -621,13 +622,24 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
     if (g.mode !== "baseball") throw new LiveError("Unknown action.");
     const ball = d.ball ?? newBall();
     if (!ball.pitch) throw new LiveError("Answer a question to get a pitch.", 409);
-    if (now - ball.pitch.issuedAt > 20_000) throw new LiveError("That pitch got away. Answer another!", 409);
-    const offset = body.offset === null ? null : Number(body.offset);
+    // A pitch left too long (a locked phone, a slow network) counts as taken: a strike, never a stuck at-bat.
+    const stale = now - ball.pitch.issuedAt > 20_000;
+    const offset = body.offset === null || stale ? null : Number(body.offset);
     const play: Play = swingResult(offset === null || !Number.isFinite(offset) ? null : Math.max(-2000, Math.min(2000, offset)));
-    const { state, runs, inningOver } = runPlay(ball, play);
+    // A miss, foul or pitch taken is a strike; strike three is an out. Otherwise the ball's in play.
+    let result: { state: BallState; runs: number; inningOver: boolean };
+    let shown: string = play;
+    if (play === "miss" || play === "foul" || play === "looking") {
+      const k = addStrike(ball, play);
+      if (k.out) {
+        result = runPlay(k.state, "strikeout");
+        shown = play === "looking" ? "looking" : "strikeout";
+      } else result = { state: k.state, runs: 0, inningOver: false };
+    } else result = runPlay(ball, play);
+    const { state, runs, inningOver } = result;
     me = (await store.updatePlayer(g.id, me.id, {
       score: me.score + runs,
-      data: { ...d, ball: state, last: { kind: "play", play, runs, inningOver, inning: state.inning } },
+      data: { ...d, ball: state, last: { kind: "play", play: shown, contact: play, runs, inningOver, inning: state.inning, strikes: state.strikes ?? 0, atBatOver: !state.pitch } },
     }))!;
     return buildPlayerView(g, me, await store.players(g.id));
   }

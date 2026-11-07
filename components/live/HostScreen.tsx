@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Fullscreen } from "@/components/Fullscreen";
 import type { HostView } from "@/lib/live/engine";
 import { MODES } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
+import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { HtmlFrame } from "./HtmlFrame";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
 
@@ -20,6 +20,8 @@ export function HostScreen({ code }: { code: string }) {
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(0);
   const skew = useRef(0);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const full = useStageFullscreen(hostRef);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/live/games/${code}/host`, { cache: "no-store" }).catch(() => null);
@@ -88,8 +90,8 @@ export function HostScreen({ code }: { code: string }) {
   const joinUrl = typeof window !== "undefined" ? `${window.location.host}/live` : "/live";
 
   return (
-    <Fullscreen label="Live game" shortcut={false}>
-      <div className="flex flex-col gap-4">
+    <div ref={hostRef} className={`bg-background ${full.on ? `${FULLSCREEN_CLASS} p-6` : ""}`}>
+      <div className="mx-auto flex max-w-6xl flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="text-3xl">{mode.icon}</span>
@@ -103,11 +105,14 @@ export function HostScreen({ code }: { code: string }) {
               </p>
             </div>
           </div>
-          {view.status !== "ended" && (
-            <button type="button" onClick={() => confirm("End the game for everyone?") && act("end")} className={secondary}>
-              End game
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <FullscreenButton on={full.on} toggle={full.toggle} className="border border-line bg-panel" />
+            {view.status !== "ended" && (
+              <button type="button" onClick={() => confirm("End the game for everyone?") && act("end")} className={secondary}>
+                End game
+              </button>
+            )}
+          </div>
         </div>
         {error && <p className="text-sm text-danger">{error}</p>}
 
@@ -121,7 +126,7 @@ export function HostScreen({ code }: { code: string }) {
 
         {view.status === "ended" && <Podium view={view} />}
       </div>
-    </Fullscreen>
+    </div>
   );
 }
 

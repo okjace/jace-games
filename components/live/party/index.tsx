@@ -15,6 +15,7 @@ import { RocketRace } from "./RocketRace";
 import { Shop } from "./Shop";
 import { SnackShack } from "./SnackShack";
 import type { Act } from "./shared";
+import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "../fx/useStageFullscreen";
 import { StudioMode } from "./StudioMode";
 import { TowerSiege } from "./TowerSiege";
 
@@ -70,6 +71,8 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
   const score = useCountUp(view.me.score);
   const [shopOpen, setShopOpen] = useState(false);
   const fetching = useRef(false);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const full = useStageFullscreen(stageRef);
 
   // Keep the next question ready (with questions on).
   const needsQuestion = !view.noSet && !view.selfQuestion && view.status === "playing" && !(mode === "hack" && !view.party.password) && view.chests === null;
@@ -141,7 +144,11 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
   const stageProps: StageProps = { view, busy, act, earn };
 
   return (
-    <div className="relative -mx-4 -mt-6 min-h-[calc(100vh-4rem)] px-4 pb-10 pt-4 text-white sm:-mx-6 sm:-mt-8 sm:px-6" style={{ background: theme.bg }}>
+    <div
+      ref={stageRef}
+      className={`relative -mx-4 -mt-6 min-h-[calc(100vh-4rem)] px-4 pb-10 pt-4 text-white sm:-mx-6 sm:-mt-8 sm:px-6 ${full.on ? FULLSCREEN_CLASS : ""}`}
+      style={{ background: theme.bg }}
+    >
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         {/* HUD */}
         <div className="flex items-center gap-2">
@@ -160,6 +167,7 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
             </button>
           )}
           <MuteButton />
+          <FullscreenButton on={full.on} toggle={full.toggle} className="bg-black/25 backdrop-blur" />
         </div>
 
         {view.last?.kind === "robbed" && <Alert>🦝 {String(view.last.by)} stole {String(view.last.amount)} of your gold!</Alert>}
