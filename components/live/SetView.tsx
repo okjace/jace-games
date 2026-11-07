@@ -54,6 +54,9 @@ export function SetView({ id }: { id: string }) {
               Edit
             </Link>
           )}
+          <Link href={`/live/host/new?set=${id}&solo=1`} className={secondary}>
+            🎮 Play solo
+          </Link>
           <Link href={`/live/host/new?set=${id}`} className={primary}>
             Host this set
           </Link>

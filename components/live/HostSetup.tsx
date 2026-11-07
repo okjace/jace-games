@@ -7,7 +7,7 @@ import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import { MODES, type LiveMode, type SetSummary } from "@/lib/live/types";
 import { MapCard, type MapSummaryView } from "./MapList";
-import { card, primary, secondary } from "./ui";
+import { card, primary, secondary, setToken } from "./ui";
 
 /**
  * Choose what to host: a set (or none: players just tap a button) and a game
@@ -28,6 +28,7 @@ export function HostSetup() {
     return m && m in MODES ? (m as LiveMode) : "classic";
   });
   const [mapId, setMapId] = useState<string | null>(params.get("map"));
+  const soloFirst = params.get("solo") === "1";
   const [maps, setMaps] = useState<MapSummaryView[] | null>(null);
   const [gameId, setGameId] = useState<string | null>(params.get("game"));
   const [studioGames, setStudioGames] = useState<StudioPick[] | null>(null);
@@ -45,7 +46,7 @@ export function HostSetup() {
   }, [user]);
 
   // Maps for Tower Siege: yours first, then popular ones (the chosen one included even if it's someone else's).
-  const wantMaps = pickedMode === "tower" && !!user && maps === null;
+  const wantMaps = pickedMode === "tower" && maps === null;
   useEffect(() => {
     if (!wantMaps) return;
     fetch("/api/live/maps", { cache: "no-store" })
@@ -54,7 +55,7 @@ export function HostSetup() {
       .catch(() => setMaps([]));
   }, [wantMaps]);
 
-  const wantGames = pickedMode === "custom" && !!user && studioGames === null;
+  const wantGames = pickedMode === "custom" && studioGames === null;
   useEffect(() => {
     if (!wantGames) return;
     fetch("/api/live/modes", { cache: "no-store" })
@@ -74,16 +75,21 @@ export function HostSetup() {
   // Classic needs questions, so with them off it becomes Gold Rush.
   const mode = noSet && MODES[pickedMode].needsSet ? "gold" : pickedMode;
 
-  if (!user) {
-    return (
-      <div className={`${card} mx-auto max-w-md text-center`}>
-        <p className="font-semibold">Sign in with Jace to host a game.</p>
-        <a href={signInHref("/live/host/new")} className={`${primary} mt-4`}>
-          Sign in with Jace
-        </a>
-      </div>
-    );
-  }
+  const picks = () => ({ setId: noSet ? null : setId, mode, settings: { minutes, shuffle, mapId: mode === "tower" ? mapId : null, gameId: mode === "custom" ? gameId : null } });
+
+  const playSolo = async () => {
+    setBusy(true);
+    setError(null);
+    const res = await fetch("/api/live/solo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(picks()) }).catch(() => null);
+    const body = await res?.json().catch(() => null);
+    if (res?.ok) {
+      setToken(body.code, body.token);
+      router.push(`/live/play/${body.code}`);
+    } else {
+      setError(body?.error ?? "Couldn't start the game.");
+      setBusy(false);
+    }
+  };
 
   const host = async () => {
     setBusy(true);
@@ -91,7 +97,7 @@ export function HostSetup() {
     const res = await fetch("/api/live/games", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ setId: noSet ? null : setId, mode, settings: { minutes, shuffle, mapId: mode === "tower" ? mapId : null, gameId: mode === "custom" ? gameId : null } }),
+      body: JSON.stringify(picks()),
     }).catch(() => null);
     const body = await res?.json().catch(() => null);
     if (res?.ok) router.push(`/live/host/${body.code}`);
@@ -105,7 +111,8 @@ export function HostSetup() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5">
-      <h1 className="text-3xl font-bold tracking-tight">Host a game</h1>
+      <h1 className="text-3xl font-bold tracking-tight">{soloFirst ? "Play solo" : "Host a game"}</h1>
+      {soloFirst && <p className="-mt-3 text-muted">Pick a set and a mode and play on your own, no host or room needed.</p>}
 
       <section className={card}>
         <h2 className="text-sm font-semibold">1. Questions</h2>
@@ -264,10 +271,32 @@ export function HostSetup() {
       </section>
 
       {error && <p className="text-sm text-danger">{error}</p>}
-      <div className="flex gap-2">
-        <button type="button" onClick={host} disabled={!ready || busy} className={primary}>
-          {busy ? "Starting…" : "Create game"}
-        </button>
+      <div className="flex flex-wrap gap-2">
+        {soloFirst || !user ? (
+          <>
+            <button type="button" onClick={playSolo} disabled={!ready || busy} className={primary}>
+              {busy ? "Starting…" : "🎮 Play solo"}
+            </button>
+            {user ? (
+              <button type="button" onClick={host} disabled={!ready || busy} className={secondary}>
+                Host for a room instead
+              </button>
+            ) : (
+              <a href={signInHref("/live/host/new")} className={secondary}>
+                Sign in to host for a room
+              </a>
+            )}
+          </>
+        ) : (
+          <>
+            <button type="button" onClick={host} disabled={!ready || busy} className={primary}>
+              {busy ? "Starting…" : "Create game"}
+            </button>
+            <button type="button" onClick={playSolo} disabled={!ready || busy} className={secondary}>
+              🎮 Play solo
+            </button>
+          </>
+        )}
         <Link href="/live" className={secondary}>
           Cancel
         </Link>

@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
 import type { PlayerView } from "@/lib/live/engine";
 import { MODES } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
 import { Answer } from "./Answer";
 import { PARTY_MODES, PartyPlay } from "./party";
-import { card, getToken, input, primary, setToken } from "./ui";
+import { card, getToken, input, primary, secondary, setToken } from "./ui";
 
 /** A player's screen for a Live game (usually a phone). */
 export function PlayLive({ code }: { code: string }) {
@@ -69,6 +70,27 @@ export function PlayLive({ code }: { code: string }) {
       ch.close();
     };
   }, [topic, myId, load, code]);
+
+  // Solo games have no host screen to notice a timer running out, so this screen does.
+  const soloEnds = view?.solo && view.status === "playing" && (view.phase === "question" || view.phase === "running") ? view.endsAt : null;
+  const soloTick = useRef<number | null>(null);
+  useEffect(() => {
+    if (!soloEnds || !token) return;
+    const wait = Math.max(0, soloEnds - (Date.now() + skew)) + 400;
+    const t = setTimeout(() => {
+      if (soloTick.current === soloEnds) return;
+      soloTick.current = soloEnds;
+      void fetch(`/api/live/games/${code}/play`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Live-Token": token },
+        body: JSON.stringify({ action: "solo", op: "tick" }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((v) => v && setView(v))
+        .catch(() => {});
+    }, wait);
+    return () => clearTimeout(t);
+  }, [soloEnds, token, skew, code]);
 
   const act = async (body: Record<string, unknown>) => {
     if (!token) return null;
@@ -139,7 +161,9 @@ export function PlayLive({ code }: { code: string }) {
 
       {view.status === "playing" && view.mode === "classic" && <ClassicPlay view={view} busy={busy} skew={skew} act={act} />}
 
-      {view.status === "ended" && (
+      {view.status === "ended" && view.solo && <SoloResults view={view} />}
+
+      {view.status === "ended" && !view.solo && (
         <Centered>
           <p className="text-5xl">{view.me.rank === 1 ? "🥇" : view.me.rank === 2 ? "🥈" : view.me.rank === 3 ? "🥉" : "🎮"}</p>
           <p className="text-2xl font-bold">
@@ -230,9 +254,15 @@ function ClassicPlay({ view, busy, skew, act }: { view: PlayerView; busy: boolea
             </b>
           </p>
         )}
-        <p className="text-sm text-muted">
-          You&apos;re #{view.me.rank} of {view.playerCount}
-        </p>
+        {view.solo ? (
+          <button type="button" autoFocus disabled={busy} onClick={() => void act({ action: "solo", op: "next" })} className={primary}>
+            {q.index + 1 >= q.total ? "See results" : "Next question →"}
+          </button>
+        ) : (
+          <p className="text-sm text-muted">
+            You&apos;re #{view.me.rank} of {view.playerCount}
+          </p>
+        )}
       </Centered>
     );
   }
@@ -257,6 +287,54 @@ function ClassicPlay({ view, busy, skew, act }: { view: PlayerView; busy: boolea
       </div>
       <Answer q={q} disabled={busy || left === 0} onAnswer={(ans) => void act({ action: "answer", answer: ans })} />
     </div>
+  );
+}
+
+/** The end of a solo game: how you did, and the same game again in one tap. */
+function SoloResults({ view }: { view: PlayerView }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const again = async () => {
+    const p = view.solo!;
+    setBusy(true);
+    const res = await fetch("/api/live/solo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ setId: p.setId, mode: view.mode, settings: { minutes: p.minutes, shuffle: p.shuffle, mapId: p.mapId, gameId: p.gameId } }),
+    }).catch(() => null);
+    const body = await res?.json().catch(() => null);
+    if (res?.ok) {
+      setToken(body.code, body.token);
+      router.push(`/live/play/${body.code}`);
+    } else {
+      setError(body?.error ?? "Couldn't start another game.");
+      setBusy(false);
+    }
+  };
+  const def = MODES[view.mode];
+  return (
+    <Centered>
+      <p className="text-5xl">{def.icon}</p>
+      <p className="text-2xl font-bold">Nice run!</p>
+      <p className="text-4xl font-black tabular-nums">{score(view, view.me.score)}</p>
+      <p className="text-muted">
+        {def.name}
+        {view.me.answered > 0 && !view.noSet ? ` · ${view.me.correct}/${view.me.answered} right` : ""}
+      </p>
+      {error && <p className="text-sm text-danger">{error}</p>}
+      <div className="flex flex-wrap justify-center gap-2">
+        <button type="button" onClick={again} disabled={busy} className={primary}>
+          {busy ? "Starting…" : "🔁 Play again"}
+        </button>
+        <Link href="/live/host/new?solo=1" className={secondary}>
+          Change game
+        </Link>
+        <Link href="/live" className={secondary}>
+          Done
+        </Link>
+      </div>
+    </Centered>
   );
 }
 

@@ -62,6 +62,12 @@ const ROCKET_GOAL = 100;
 export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean; /** Tower Siege: a copy of the chosen map, taken when the game is made. */ map?: TowerMap; mapTitle?: string;
   /** Studio-game mode: a copy of the game, taken when the Live game is made. */
   custom?: { gameId: string; title: string; icon: string; owner: string; html: string };
+  /** Solo: one player, no host screen. The player moves the game along. */
+  solo?: boolean;
+  /** Solo: what was picked, so "Play again" can make the same game. */
+  setId?: string | null;
+  mapId?: string | null;
+  gameId?: string | null;
 };
 
 /**
@@ -138,7 +144,8 @@ export async function createLiveGame(
   const mode = MODES[opts.mode] ? opts.mode : "classic";
   const store = liveStore();
   const since = new Date(Date.now() - 3_600_000).toISOString();
-  if ((await store.countGamesByHostSince(session.user.id, since)) >= MAX_GAMES_PER_HOUR) {
+  const solo = opts.settings.solo === true;
+  if (!solo && (await store.countGamesByHostSince(session.user.id, since)) >= MAX_GAMES_PER_HOUR) {
     throw new LiveError("You've hosted a lot of games this hour. Try again in a bit.", 429);
   }
   const noSet = !opts.setId;
@@ -157,6 +164,14 @@ export async function createLiveGame(
     noSet,
     minutes: Math.min(30, Math.max(1, Math.round(Number(opts.settings.minutes) || 5))),
     shuffle: !!opts.settings.shuffle,
+    ...(solo
+      ? {
+          solo: true,
+          setId: opts.setId,
+          mapId: typeof opts.settings.mapId === "string" ? opts.settings.mapId : null,
+          gameId: typeof opts.settings.gameId === "string" ? opts.settings.gameId : null,
+        }
+      : {}),
   };
   // Tower Siege on a custom map: copy it now, so later edits don't change a game in progress.
   if (mode === "tower" && typeof opts.settings.mapId === "string" && opts.settings.mapId) {
@@ -287,6 +302,8 @@ export type PlayerView = {
   mode: LiveMode;
   status: LiveGameRow["status"];
   noSet: boolean;
+  /** Solo games: what was picked, for "Play again". */
+  solo: { setId: string | null; minutes: number; shuffle: boolean; mapId: string | null; gameId: string | null } | null;
   phase: string;
   topic: string;
   me: { id: string; name: string; score: number; rank: number; streak: number; correct: number; answered: number };
@@ -357,6 +374,9 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
     mode: g.mode,
     status: g.status,
     noSet: !!settings.noSet,
+    solo: settings.solo
+      ? { setId: settings.setId ?? null, minutes: settings.minutes, shuffle: settings.shuffle, mapId: settings.mapId ?? null, gameId: settings.gameId ?? null }
+      : null,
     phase: s.phase,
     topic: topicOf(g),
     me: { id: me.id, name: me.name, score: me.score, rank, streak: me.streak, correct: me.correct, answered: me.answered },
@@ -418,12 +438,23 @@ type HostAction = { action: "start" } | { action: "next" } | { action: "reveal" 
 export async function hostAction(code: string, session: Session, body: HostAction): Promise<void> {
   const g = await getGame(code);
   if (g.host_id !== session.user.id) throw new LiveError("Only the host can do that.", 403);
+  if (body.action === "kick") {
+    if (typeof body.playerId !== "string") return;
+    await liveStore().removePlayer(g.id, body.playerId);
+    await push(g, "kicked", { playerId: body.playerId });
+    return;
+  }
+  await step(g, body.action);
+}
+
+/** Moves a game along: from the host's screen, or from the player's in a solo game. */
+async function step(g: LiveGameRow, action: string): Promise<void> {
   const s = stateOf(g);
   const now = Date.now();
   const qs = questionsOf(g);
   const settings = g.settings as GameSettings;
 
-  switch (body.action) {
+  switch (action) {
     case "start": {
       if (g.status !== "lobby") return;
       if ((await liveStore().players(g.id)).length === 0) throw new LiveError("Wait for someone to join.");
@@ -466,14 +497,25 @@ export async function hostAction(code: string, session: Session, body: HostActio
       await endGame(g);
       return;
     }
-    case "kick": {
-      if (typeof body.playerId !== "string") return;
-      await liveStore().removePlayer(g.id, body.playerId);
-      await push(g, "kicked", { playerId: body.playerId });
-      return;
-    }
   }
   throw new LiveError("Unknown action.");
+}
+
+// ---------- Solo ----------
+
+/**
+ * A solo game: made, joined and started in one go. Signed-out players get
+ * a throwaway host id (they never see a host screen).
+ */
+export async function startSoloGame(
+  session: Session | null,
+  opts: { setId: string | null; mode: LiveMode; settings: Record<string, unknown> },
+): Promise<{ code: string; token: string }> {
+  const host: Session = session ?? { token: "", iat: Date.now(), user: { id: `solo:${randomBytes(9).toString("base64url")}`, username: "Solo", picture: null } };
+  const code = await createLiveGame(host, { ...opts, settings: { ...opts.settings, solo: true } });
+  const { token } = await joinLiveGame(code, session?.user.username ?? "You", session);
+  await step(await getGame(code), "start");
+  return { code, token };
 }
 
 async function endGame(g: LiveGameRow, winner?: string) {
@@ -490,6 +532,8 @@ type PlayerAction =
   | { action: "tap" }
   // Device modes: the score the mini-game reached.
   | { action: "report"; score: number }
+  // Solo games: the player moves the game along.
+  | { action: "solo"; op: string }
   // Code Breakers.
   | { action: "password"; choice: number }
   | { action: "hack"; target: string }
@@ -503,6 +547,12 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
   const store = liveStore();
   const g = await getGame(code);
   let me = await playerFor(g, token);
+  if (body.action === "solo") {
+    if (!(g.settings as GameSettings).solo) throw new LiveError("Only solo games can do that.", 403);
+    if (!["reveal", "next", "tick", "end"].includes(String(body.op))) throw new LiveError("Unknown action.");
+    await step(g, String(body.op));
+    return buildPlayerView(await getGame(code), me, await liveStore().players(g.id));
+  }
   const s = stateOf(g);
   const now = Date.now();
   if (g.status !== "playing") throw new LiveError(g.status === "lobby" ? "The game hasn't started yet." : "The game is over.", 409);
