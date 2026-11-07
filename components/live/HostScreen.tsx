@@ -6,6 +6,7 @@ import type { HostView } from "@/lib/live/engine";
 import { MODES } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
+import { HostReport } from "./HostReport";
 import { HtmlFrame } from "./HtmlFrame";
 import { LiveAvatar } from "./LiveAvatar";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
@@ -23,6 +24,7 @@ export function HostScreen({ code }: { code: string }) {
   const skew = useRef(0);
   const hostRef = useRef<HTMLDivElement>(null);
   const full = useStageFullscreen(hostRef);
+  const [showAnswers, setShowAnswers] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/live/games/${code}/host`, { cache: "no-store" }).catch(() => null);
@@ -87,6 +89,7 @@ export function HostScreen({ code }: { code: string }) {
   if (!view) return <div className="h-80 animate-pulse rounded-2xl bg-foreground/[.04]" />;
 
   const mode = MODES[view.mode];
+  const hasQuestions = !view.settings.noSet && view.questionCount > 0;
   const secondsLeft = view.state.endsAt ? Math.max(0, Math.ceil((view.state.endsAt - now) / 1000)) : null;
   const joinUrl = typeof window !== "undefined" ? `${window.location.host}/live` : "/live";
 
@@ -107,6 +110,11 @@ export function HostScreen({ code }: { code: string }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {hasQuestions && view.status === "playing" && (
+              <button type="button" aria-pressed={showAnswers} onClick={() => setShowAnswers((v) => !v)} className={secondary}>
+                📋 {showAnswers ? "Hide answers" : "Answers"}
+              </button>
+            )}
             <FullscreenButton on={full.on} toggle={full.toggle} className="border border-line bg-panel" />
             {view.status !== "ended" && (
               <button type="button" onClick={() => confirm("End the game for everyone?") && act("end")} className={secondary}>
@@ -126,6 +134,8 @@ export function HostScreen({ code }: { code: string }) {
         {view.status === "playing" && view.mode !== "classic" && <SelfPaced view={view} secondsLeft={secondsLeft ?? 0} />}
 
         {view.status === "ended" && <Podium view={view} />}
+
+        {hasQuestions && (view.status === "ended" || (view.status === "playing" && showAnswers)) && <HostReport code={view.code} live={view.status === "playing"} />}
       </div>
     </div>
   );

@@ -3,9 +3,11 @@ import { createHash, randomBytes, randomInt } from "crypto";
 import { liveStore, type LiveGameRow, type LivePlayerRow } from "@/lib/db/live";
 import { lockerStore } from "@/lib/db/liveLocker";
 import { mapStore } from "@/lib/db/liveMaps";
+import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
 import { cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar } from "./locker";
 import { DEFAULT_MAP, cleanMap, type TowerMap } from "./maps";
+import type { GameReport, ReportAttempt, ReportQuestion } from "./report";
 import { broadcast } from "@/lib/realtime/server";
 import type { Session } from "@/lib/session";
 import {
@@ -117,6 +119,52 @@ function answerText(q: Question, a: unknown): string {
 function rightText(q: Question): string {
   if (q.type === "choice" || q.type === "truefalse") return (q.correct ?? []).map((i) => q.choices?.[i]).filter(Boolean).join(" / ");
   return (q.accepted ?? []).join(" / ");
+}
+
+/** The host's report: every question and exactly what each player chose. */
+function buildReport(g: LiveGameRow, players: LivePlayerRow[]): GameReport {
+  const qs = questionsOf(g);
+  const s = stateOf(g);
+  // Classic plays the set in its (maybe shuffled) order; self-paced modes use the set's order.
+  const order = g.mode === "classic" ? (s.order ?? qs.map((_, i) => i)) : qs.map((_, i) => i);
+  const questions: ReportQuestion[] = order.map((qi) => {
+    const q = qs[qi];
+    return { prompt: q.prompt || "(picture question)", type: q.type, choices: q.type === "choice" || q.type === "truefalse" ? (q.choices ?? []) : null, right: rightText(q) };
+  });
+  const posOf = new Map(order.map((qi, i) => [qi, i]));
+  return {
+    code: g.code,
+    mode: g.mode,
+    modeName: MODES[g.mode].name,
+    setTitle: g.set_title,
+    status: g.status,
+    startedAt: g.started_at,
+    endedAt: g.ended_at,
+    questions,
+    players: ranked(players).map((p) => {
+      const d = dataOf(p);
+      const answers: ReportAttempt[][] = questions.map(() => []);
+      if (g.mode === "classic") {
+        for (const [key, ans] of Object.entries(d.answers ?? {})) {
+          const i = Number(key);
+          if (answers[i]) answers[i].push({ yours: answerText(qs[order[i]], ans.a), correct: ans.correct });
+        }
+      } else {
+        for (const l of d.log ?? []) {
+          const i = posOf.get(l.qi);
+          if (i !== undefined) answers[i].push({ yours: answerText(qs[l.qi], l.a), correct: l.correct });
+        }
+      }
+      return { name: p.name, avatar: avatarOf(p), score: p.score, correct: p.correct, answered: p.answered, answers };
+    }),
+  };
+}
+
+/** The report for the host's own game, while it exists. */
+export async function hostReport(code: string, session: Session): Promise<GameReport> {
+  const g = await getGame(code);
+  if (g.host_id !== session.user.id) throw new LiveError("Only the host can see this.", 403);
+  return buildReport(g, await liveStore().players(g.id));
 }
 
 /** Every question this player answered, in order (only once the game is over). */
@@ -579,7 +627,19 @@ async function endGame(g: LiveGameRow, winner?: string) {
   const s = stateOf(g);
   const ended = await bump(g, { status: "ended", ended_at: new Date().toISOString(), state: { ...s, phase: "ended", ...(winner ? { winner } : {}) } });
   await giveXp(ended);
+  await saveReport(ended);
   await push(ended);
+}
+
+/** A copy of the report for the host to see later (games themselves are deleted after 12 hours). Solo games and games without questions skip it. */
+async function saveReport(g: LiveGameRow) {
+  const settings = g.settings as GameSettings;
+  if (settings.solo || settings.noSet || questionsOf(g).length === 0) return;
+  const players = await liveStore().players(g.id);
+  if (players.length === 0) return;
+  await reportStore()
+    .save({ host_id: g.host_id, code: g.code, mode: g.mode, set_title: g.set_title, data: buildReport(g, players) })
+    .catch(() => {});
 }
 
 /** Locker XP for everyone signed in, once, when a game ends. */
@@ -938,5 +998,9 @@ async function pickChest(g: LiveGameRow, me: LivePlayerRow, index: unknown): Pro
 }
 
 export async function deleteExpiredLiveGames(): Promise<number> {
-  return liveStore().deleteExpiredGames(new Date().toISOString());
+  const now = new Date().toISOString();
+  await reportStore()
+    .deleteExpired(now)
+    .catch(() => 0);
+  return liveStore().deleteExpiredGames(now);
 }

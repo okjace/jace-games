@@ -71,6 +71,11 @@ export function LiveHome() {
             <Link href="/live/locker" className={secondary}>
               🎽 Locker
             </Link>
+            {user && (
+              <Link href="/live/reports" className={secondary}>
+                📋 Reports
+              </Link>
+            )}
           </div>
         </div>
         <form
