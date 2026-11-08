@@ -318,6 +318,7 @@ function ClassicPlay({ view, busy, skew, act }: { view: PlayerView; busy: boolea
 /** The end of a solo game: how you did, and the same game again in one tap. */
 function SoloResults({ view }: { view: PlayerView }) {
   const router = useRouter();
+  const { user } = useScores();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const again = async () => {
@@ -349,6 +350,11 @@ function SoloResults({ view }: { view: PlayerView }) {
       </p>
       <XpGained view={view} />
       <Review view={view} />
+      {user && !view.noSet && (view.review?.length ?? 0) > 0 && (
+        <Link href="/live/reports" className="text-sm text-accent hover:underline">
+          📋 Saved to your Reports
+        </Link>
+      )}
       {error && <p className="text-sm text-danger">{error}</p>}
       <div className="flex flex-wrap justify-center gap-2">
         <button type="button" onClick={again} disabled={busy} className={primary}>

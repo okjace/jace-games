@@ -33,6 +33,8 @@ export type GameReport = {
   mode: string;
   modeName: string;
   setTitle: string | null;
+  /** A solo game: the one player is the person who made it. */
+  solo?: boolean;
   status: "lobby" | "playing" | "ended";
   startedAt: string | null;
   endedAt: string | null;
@@ -40,7 +42,19 @@ export type GameReport = {
   players: ReportPlayer[];
 };
 
-export type ReportSummary = { id: string; code: string; modeName: string; setTitle: string | null; endedAt: string; players: number; questions: number };
+export type ReportSummary = {
+  id: string;
+  code: string;
+  modeName: string;
+  setTitle: string | null;
+  endedAt: string;
+  players: number;
+  questions: number;
+  solo: boolean;
+  /** Solo: how many tries were right, out of how many. */
+  right?: number;
+  answered?: number;
+};
 
 /** Share of tries at question q that were right (null if nobody tried it). */
 export function percentRight(r: GameReport, q: number): number | null {

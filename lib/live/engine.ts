@@ -137,6 +137,7 @@ function buildReport(g: LiveGameRow, players: LivePlayerRow[]): GameReport {
     mode: g.mode,
     modeName: MODES[g.mode].name,
     setTitle: g.set_title,
+    solo: !!(g.settings as GameSettings).solo,
     status: g.status,
     startedAt: g.started_at,
     endedAt: g.ended_at,
@@ -631,10 +632,14 @@ async function endGame(g: LiveGameRow, winner?: string) {
   await push(ended);
 }
 
-/** A copy of the report for the host to see later (games themselves are deleted after 12 hours). Solo games and games without questions skip it. */
+/**
+ * A copy of the report to see later (games themselves are deleted after 12
+ * hours). Solo games save one for the player when they're signed in (their
+ * id is the host id); games without questions skip it.
+ */
 async function saveReport(g: LiveGameRow) {
   const settings = g.settings as GameSettings;
-  if (settings.solo || settings.noSet || questionsOf(g).length === 0) return;
+  if (settings.noSet || questionsOf(g).length === 0 || g.host_id.startsWith("solo:")) return;
   const players = await liveStore().players(g.id);
   if (players.length === 0) return;
   await reportStore()

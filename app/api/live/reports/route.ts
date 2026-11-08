@@ -18,6 +18,8 @@ export async function GET(): Promise<NextResponse> {
       endedAt: r.data.endedAt ?? r.created_at,
       players: r.data.players.length,
       questions: r.data.questions.length,
+      solo: !!r.data.solo,
+      ...(r.data.solo && r.data.players[0] ? { right: r.data.players[0].correct, answered: r.data.players[0].answered } : {}),
     }));
     return NextResponse.json({ reports }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {

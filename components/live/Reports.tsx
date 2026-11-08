@@ -15,6 +15,7 @@ const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyl
 export function ReportList() {
   const { user } = useScores();
   const [reports, setReports] = useState<ReportSummary[] | null>(null);
+  const [filter, setFilter] = useState<"all" | "hosted" | "solo">("all");
 
   useEffect(() => {
     if (!user) return;
@@ -31,7 +32,7 @@ export function ReportList() {
           ← Live
         </Link>
         <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-        <p className="text-muted">What every player answered in the games you hosted. Kept for 90 days.</p>
+        <p className="text-muted">What everyone answered in the games you hosted, and your own solo games. Kept for 90 days.</p>
       </div>
       {!user ? (
         <div className={`${card} text-center`}>
@@ -43,17 +44,39 @@ export function ReportList() {
       ) : reports === null ? (
         <p className="animate-pulse text-muted">Loading…</p>
       ) : reports.length === 0 ? (
-        <p className={`${card} text-sm text-muted`}>No reports yet. Host a game with a question set, and its report shows up here when it ends.</p>
+        <p className={`${card} text-sm text-muted`}>
+          No reports yet. Host a game or play solo with a question set, and its report shows up here when it ends.
+        </p>
       ) : (
+        <>
+        <div className="flex gap-1 self-start rounded-full border border-line bg-panel p-1 text-sm font-semibold" role="tablist">
+          {(
+            [
+              ["all", `All (${reports.length})`],
+              ["hosted", `Hosted (${reports.filter((r) => !r.solo).length})`],
+              ["solo", `Solo (${reports.filter((r) => r.solo).length})`],
+            ] as const
+          ).map(([f, label]) => (
+            <button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => setFilter(f)} className={`rounded-full px-4 py-1.5 ${filter === f ? "bg-accent text-on-accent" : "text-muted"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
         <ul className="flex flex-col gap-2">
-          {reports.map((r) => (
+          {reports.filter((r) => filter === "all" || (filter === "solo") === r.solo).map((r) => (
             <li key={r.id}>
               <Link href={`/live/reports/${r.id}`} className="flex items-center gap-3 rounded-2xl border border-line bg-panel p-4 hover:border-accent/50">
-                <span className="text-2xl">📋</span>
+                <span className="text-2xl">{r.solo ? "🎮" : "📋"}</span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold">{r.setTitle ?? "Untitled set"}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="truncate font-semibold">{r.setTitle ?? "Untitled set"}</span>
+                    {r.solo && <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-xs font-bold text-accent">Solo</span>}
+                  </span>
                   <span className="block text-sm text-muted">
-                    {r.modeName} · {when(r.endedAt)} · {r.players} player{r.players === 1 ? "" : "s"} · {r.questions} questions
+                    {r.modeName} · {when(r.endedAt)} ·{" "}
+                    {r.solo
+                      ? `${r.right ?? 0}/${r.answered ?? 0} right${r.answered ? ` (${Math.round(((r.right ?? 0) / r.answered) * 100)}%)` : ""}`
+                      : `${r.players} player${r.players === 1 ? "" : "s"} · ${r.questions} questions`}
                   </span>
                 </span>
                 <span className="text-muted">→</span>
@@ -61,6 +84,7 @@ export function ReportList() {
             </li>
           ))}
         </ul>
+        </>
       )}
     </div>
   );
@@ -109,6 +133,7 @@ export function SavedReport({ id }: { id: string }) {
           </Link>
           <h1 className="text-2xl font-bold tracking-tight">{r.setTitle ?? "Untitled set"}</h1>
           <p className="text-sm text-muted">
+            {r.solo ? "Solo · " : ""}
             {r.modeName} · game {r.code}
             {r.endedAt && ` · ended ${when(r.endedAt)}`} · kept until {new Date(data.expiresAt).toLocaleDateString()}
           </p>

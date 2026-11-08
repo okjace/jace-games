@@ -10,7 +10,8 @@ import { ANSWER_COLORS, ANSWER_SHAPES, secondary } from "./ui";
  * each option, % right) or by player (all their answers). Downloads as CSV.
  */
 export function ReportView({ report }: { report: GameReport }) {
-  const [tab, setTab] = useState<"questions" | "players">("questions");
+  // A solo report is about one person, so it opens on their answers.
+  const [tab, setTab] = useState<"questions" | "players">(report.solo ? "players" : "questions");
   const [player, setPlayer] = useState(0);
 
   const download = () => {
