@@ -9,7 +9,7 @@ import { MODES } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
 import type { Avatar } from "@/lib/live/locker";
 import { Answer } from "./Answer";
-import { LiveAvatar, guestAvatar } from "./LiveAvatar";
+import { LiveAvatar, LiveTitle, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { PARTY_MODES, PartyPlay } from "./party";
@@ -131,7 +131,7 @@ export function PlayLive({ code }: { code: string }) {
     );
   }
   if (!loaded) return null;
-  if (!token) return <JoinForm code={code} defaultName={user?.username ?? ""} note={error} onJoined={(t) => (setToken(code, t), setTok(t))} />;
+  if (!token) return <JoinForm code={code} defaultName={user?.displayName || user?.username || ""} note={error} onJoined={(t) => (setToken(code, t), setTok(t))} />;
   if (!view) return <Centered>{error ? <p className="text-muted">{error}</p> : <p className="animate-pulse text-muted">Joining…</p>}</Centered>;
 
   // Self-paced modes play full screen on their own stage, with their own HUD.
@@ -151,6 +151,7 @@ export function PlayLive({ code }: { code: string }) {
         <span className="flex min-w-0 items-center gap-2">
           <LiveAvatar avatar={view.me.avatar} size={30} />
           <span className="truncate font-semibold">{view.me.name}</span>
+          <LiveTitle avatar={view.me.avatar} />
         </span>
         <span className="flex items-center gap-3 text-sm">
           <FullscreenButton on={full.on} toggle={full.toggle} className="-my-2 text-muted hover:text-foreground" />
@@ -426,9 +427,20 @@ function Review({ view }: { view: PlayerView }) {
 function XpGained({ view }: { view: PlayerView }) {
   if (view.me.xp === null) return null;
   return (
-    <Link href="/live/locker" className="rounded-full bg-accent/15 px-4 py-1.5 text-sm font-bold text-accent hover:bg-accent/25">
-      +{view.me.xp} XP · open your locker →
-    </Link>
+    <div className="flex flex-col items-center gap-1.5">
+      <Link href="/live/locker" className="rounded-full bg-accent/15 px-4 py-1.5 text-sm font-bold text-accent hover:bg-accent/25">
+        +{view.me.xp} XP · open your locker →
+      </Link>
+      {view.me.xpParts.length > 1 && (
+        <ul className="flex flex-wrap justify-center gap-1 text-xs text-muted">
+          {view.me.xpParts.map((p, i) => (
+            <li key={i} className="rounded-full bg-foreground/[.05] px-2 py-0.5">
+              {p.label} +{p.xp}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -439,6 +451,7 @@ function Top({ view }: { view: PlayerView }) {
         <li key={i} className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${p.you ? "bg-accent/10 ring-1 ring-accent/30" : "bg-foreground/[.03]"}`}>
           <span className="w-5 font-mono text-muted">{i + 1}</span>
           <LiveAvatar avatar={p.avatar} size={24} />
+          <LiveTitle avatar={p.avatar} />
           <span className="flex-1 truncate">{p.name}</span>
           <span className="font-mono tabular-nums">{score(view, p.score)}</span>
         </li>

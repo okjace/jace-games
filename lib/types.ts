@@ -3,6 +3,8 @@ export type SessionUser = {
   id: string;
   username: string;
   picture: string | null;
+  /** The name they chose on their profile ("" or missing: show the username). */
+  displayName?: string;
 };
 
 /** A score as Jace's API returns it (GET /api/oauth/scores). */

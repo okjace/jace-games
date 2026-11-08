@@ -51,6 +51,8 @@ type ScoresContextValue = {
   dismissNotice: () => void;
   /** Ask Jace again (after "coming soon" or an error). */
   retry: () => void;
+  /** After the profile page changes the display name or refreshes from Jace. */
+  updateUser: (u: SessionUser) => void;
 };
 
 const ScoresContext = createContext<ScoresContextValue | null>(null);
@@ -324,6 +326,10 @@ export function ScoresProvider({
       notice,
       dismissNotice: () => setNotice(null),
       retry,
+      updateUser: (u: SessionUser) => {
+        userRef.current = u;
+        setUser(u);
+      },
     }),
     [user, sync, pendingCount, history, record, anonymousCount, declined, uploadAnonymous, declineUpload, notice, retry],
   );

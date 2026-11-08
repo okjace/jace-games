@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { exchangeCode, getUserInfo } from "@/lib/jace";
+import { profileStore } from "@/lib/db/profiles";
 import { appOrigin, redirectUri, safeNext } from "@/lib/routes";
 import {
   STATE_COOKIE,
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     clearStateCookie(res);
     setSessionCookie(res, {
       token,
-      user: { id: info.sub, username: info.username, picture: info.picture },
+      user: { id: info.sub, username: info.username, picture: info.picture, displayName: await profileStore().displayName(info.sub).catch(() => "") },
       iat: Date.now(),
     });
     return res;

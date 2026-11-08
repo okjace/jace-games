@@ -5,7 +5,7 @@ import { lockerStore } from "@/lib/db/liveLocker";
 import { mapStore } from "@/lib/db/liveMaps";
 import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
-import { cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar } from "./locker";
+import { cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar, type XpPart } from "./locker";
 import { DEFAULT_MAP, cleanMap, type TowerMap } from "./maps";
 import type { GameReport, ReportAttempt, ReportQuestion } from "./report";
 import { broadcast } from "@/lib/realtime/server";
@@ -99,8 +99,9 @@ type PlayerData = PartyData & {
   last?: Record<string, unknown> | null;
   /** The icon and frame they show (from their locker, or picked when joining). */
   avatar?: Avatar;
-  /** Locker XP this game gave them (set when it ends). */
+  /** Locker XP this game gave them (set when it ends), and what earned it. */
   xp?: number;
+  xpParts?: XpPart[];
   /** Self-paced modes: every answer, for the review at the end. */
   log?: { qi: number; a: unknown; correct: boolean }[];
 };
@@ -314,7 +315,7 @@ export async function createLiveGame(
 export async function joinLiveGame(code: string, rawName: unknown, session: Session | null, rawAvatar?: unknown): Promise<{ token: string; playerId: string }> {
   const g = await getGame(code);
   if (g.status === "ended") throw new LiveError("That game has ended.", 409);
-  const name = cleanName(rawName ?? session?.user.username);
+  const name = cleanName(rawName ?? (session?.user.displayName || session?.user.username));
   if (!name) throw new LiveError("Pick a nickname.");
   const store = liveStore();
   const players = await store.players(g.id);
@@ -326,6 +327,9 @@ export async function joinLiveGame(code: string, rawName: unknown, session: Sess
   let avatar = cleanAvatar(rawAvatar, 1, null);
   if (session) {
     const locker = await lockerStore().get(session.user.id).catch(() => null);
+    void lockerStore()
+      .touch(session.user.id, session.user.username)
+      .catch(() => {});
     if (locker) avatar = cleanAvatar(locker, levelInfo(locker.xp).level, safePicture(session.user.picture));
   }
   await store.updatePlayer(g.id, added.id, { data: { avatar } });
@@ -408,7 +412,7 @@ export type PlayerView = {
   solo: { setId: string | null; minutes: number; shuffle: boolean; mapId: string | null; gameId: string | null } | null;
   phase: string;
   topic: string;
-  me: { id: string; name: string; score: number; rank: number; streak: number; correct: number; answered: number; avatar: Avatar | null; xp: number | null };
+  me: { id: string; name: string; score: number; rank: number; streak: number; correct: number; answered: number; avatar: Avatar | null; xp: number | null; xpParts: XpPart[] };
   playerCount: number;
   top: { name: string; score: number; you: boolean; avatar: Avatar | null }[];
   endsAt: number | null;
@@ -483,7 +487,7 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
       : null,
     phase: s.phase,
     topic: topicOf(g),
-    me: { id: me.id, name: me.name, score: me.score, rank, streak: me.streak, correct: me.correct, answered: me.answered, avatar: avatarOf(me), xp: d.xp ?? null },
+    me: { id: me.id, name: me.name, score: me.score, rank, streak: me.streak, correct: me.correct, answered: me.answered, avatar: avatarOf(me), xp: d.xp ?? null, xpParts: d.xpParts ?? [] },
     playerCount: all.length,
     top: sorted.slice(0, 5).map((p) => ({ name: p.name, score: p.score, you: p.id === me.id, avatar: avatarOf(p) })),
     endsAt: s.endsAt ?? null,
@@ -619,7 +623,7 @@ export async function startSoloGame(
 ): Promise<{ code: string; token: string }> {
   const host: Session = session ?? { token: "", iat: Date.now(), user: { id: `solo:${randomBytes(9).toString("base64url")}`, username: "Solo", picture: null } };
   const code = await createLiveGame(host, { ...opts, settings: { ...opts.settings, solo: true } });
-  const { token } = await joinLiveGame(code, session?.user.username ?? "You", session, avatar);
+  const { token } = await joinLiveGame(code, session ? session.user.displayName || session.user.username : "You", session, avatar);
   await step(await getGame(code), "start");
   return { code, token };
 }
@@ -653,11 +657,28 @@ async function giveXp(g: LiveGameRow) {
   const players = ranked(await store.players(g.id));
   await Promise.all(
     players.map(async (p, i) => {
-      if (!p.user_id || dataOf(p).xp !== undefined) return;
-      const xp = xpForGame({ correct: p.correct, answered: p.answered, rank: i + 1, players: players.length });
-      await store.updatePlayer(g.id, p.id, { data: { ...dataOf(p), xp } });
+      const d = dataOf(p);
+      if (!p.user_id || d.xp !== undefined) return;
+      // Best run of right answers, in the order they were given.
+      const results =
+        g.mode === "classic"
+          ? Object.entries(d.answers ?? {})
+              .sort(([a], [b]) => Number(a) - Number(b))
+              .map(([, a]) => a.correct)
+          : (d.log ?? []).map((l) => l.correct);
+      let run = 0;
+      let bestStreak = 0;
+      for (const ok of results) {
+        run = ok ? run + 1 : 0;
+        bestStreak = Math.max(bestStreak, run);
+      }
+      const daily = await lockerStore()
+        .claimDaily(p.user_id)
+        .catch(() => false);
+      const { total, parts } = xpForGame({ correct: p.correct, answered: p.answered, rank: i + 1, players: players.length, bestStreak, daily });
+      await store.updatePlayer(g.id, p.id, { data: { ...d, xp: total, xpParts: parts } });
       await lockerStore()
-        .addXp(p.user_id, xp)
+        .addXp(p.user_id, total)
         .catch(() => {});
     }),
   );

@@ -24,11 +24,9 @@ export class StudioError extends Error {
 const GAMES_PER_HOUR = 20;
 const MAX_GAMES = 100;
 
-/** The Jace account that runs the site and can take games down (SITE_OWNER_JACE_ID). */
-export function isSiteOwner(userId: string | null | undefined): boolean {
-  const owner = process.env.SITE_OWNER_JACE_ID?.trim();
-  return !!owner && !!userId && owner === userId;
-}
+/** The Jace account that runs the site and can take games down (see lib/owner.ts). */
+import { isSiteOwner } from "@/lib/owner";
+export { isSiteOwner };
 
 // ---------- What people can see ----------
 

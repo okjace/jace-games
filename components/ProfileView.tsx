@@ -6,6 +6,7 @@ import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import { SyncStatus } from "@/components/SyncStatus";
 import { MultiplayerRecord } from "@/components/MultiplayerRecord";
+import { ProfileName } from "@/components/ProfileName";
 import { SOLO_GAMES } from "@/lib/games";
 import { timeAgo } from "@/lib/format";
 import { useBests } from "@/lib/useBest";
@@ -19,9 +20,9 @@ export function ProfileView() {
       <section className="flex flex-col gap-4 rounded-2xl border border-line bg-panel p-6 sm:flex-row sm:items-center sm:justify-between">
         {user ? (
           <div className="flex items-center gap-4">
-            <Avatar name={user.username} src={user.picture} size={64} />
+            <Avatar name={user.displayName || user.username} src={user.picture} size={64} />
             <div className="flex flex-col gap-1.5">
-              <h1 className="text-2xl font-bold tracking-tight">{user.username}</h1>
+              <ProfileName user={user} />
               <div>
                 <SyncStatus />
               </div>

@@ -1,4 +1,15 @@
-import { DEFAULT_AVATAR, frameById, iconById, type Avatar } from "@/lib/live/locker";
+import { DEFAULT_AVATAR, frameById, iconById, titleById, type Avatar } from "@/lib/live/locker";
+
+/** A player's title (from their locker), as a small colored word. */
+export function LiveTitle({ avatar, className = "" }: { avatar: Avatar | null | undefined; className?: string }) {
+  const t = avatar?.title ? titleById(avatar.title) : undefined;
+  if (!t || !t.id) return null;
+  return (
+    <span className={`shrink-0 text-[0.7em] font-black uppercase tracking-wider ${className}`} style={{ color: t.color }}>
+      {t.name}
+    </span>
+  );
+}
 
 /** A player's Live icon (or Jace picture) inside their frame. */
 export function LiveAvatar({ avatar, size = 32, className = "" }: { avatar: Avatar | null | undefined; size?: number; className?: string }) {

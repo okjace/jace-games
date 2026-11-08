@@ -62,8 +62,8 @@ export function SiteHeader() {
               aria-current={pathname === "/profile" ? "page" : undefined}
               className="flex items-center gap-2 rounded-full border border-line bg-panel py-1 pl-1 pr-1 text-sm font-medium transition-colors hover:bg-foreground/[.05] sm:pr-3"
             >
-              <Avatar name={user.username} src={user.picture} size={26} />
-              <span className="hidden max-w-32 truncate sm:inline">{user.username}</span>
+              <Avatar name={user.displayName || user.username} src={user.picture} size={26} />
+              <span className="hidden max-w-32 truncate sm:inline">{user.displayName || user.username}</span>
             </Link>
           ) : (
             <a

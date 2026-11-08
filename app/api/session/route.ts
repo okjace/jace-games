@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { JaceUnauthorized, JaceUnavailable, getUserInfo } from "@/lib/jace";
+import { profileStore } from "@/lib/db/profiles";
 import { clearSessionCookie, getSession, setSessionCookie } from "@/lib/session";
 
 /**
@@ -17,9 +18,13 @@ export async function GET(): Promise<NextResponse> {
       clearSessionCookie(res);
       return res;
     }
-    const user = { id: info.sub, username: info.username, picture: info.picture };
+    const displayName = await profileStore()
+      .displayName(info.sub)
+      .catch(() => session.user.displayName ?? "");
+    const user = { id: info.sub, username: info.username, picture: info.picture, displayName };
     const res = NextResponse.json({ user });
-    if (user.username !== session.user.username || user.picture !== session.user.picture) {
+    if (user.username !== session.user.username) await profileStore().rename(user.id, user.username).catch(() => 0);
+    if (user.username !== session.user.username || user.picture !== session.user.picture || displayName !== (session.user.displayName ?? "")) {
       setSessionCookie(res, { ...session, user });
     }
     return res;

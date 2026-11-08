@@ -8,7 +8,7 @@ import { openRoomChannel } from "@/lib/realtime/client";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { HostReport } from "./HostReport";
 import { HtmlFrame } from "./HtmlFrame";
-import { LiveAvatar } from "./LiveAvatar";
+import { LiveAvatar, LiveTitle } from "./LiveAvatar";
 import { Markdown, QuestionMediaView } from "./Markdown";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
 
@@ -161,6 +161,7 @@ function Lobby({ view, busy, onStart, onKick }: { view: HostView; busy: boolean;
             >
               <LiveAvatar avatar={p.avatar} size={28} />
               {p.name}
+              <LiveTitle avatar={p.avatar} />
             </button>
           </li>
         ))}
@@ -308,6 +309,7 @@ function Podium({ view }: { view: HostView }) {
               <span className="text-4xl">{medals[i]}</span>
               <LiveAvatar avatar={p.avatar} size={56} />
               <span className="w-full truncate text-center font-bold">{p.name}</span>
+              <LiveTitle avatar={p.avatar} />
               <span className="font-mono text-sm text-muted">{fmt(p.score)}</span>
               <div className={`w-full rounded-t-2xl bg-accent/80 ${heights[i]}`} />
             </div>
