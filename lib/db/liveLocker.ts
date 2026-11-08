@@ -1,13 +1,46 @@
 import "server-only";
+import { EMPTY_STATS, type CustomFrame, type LiveStats } from "@/lib/live/locker";
 import { supabase, usingSupabase } from "./rooms";
 
 /** Lockers (supabase/migrations/009_live_locker.sql); in memory during development without Supabase. */
 
-export type LockerRow = { user_id: string; xp: number; icon: string; frame: string; title?: string; username?: string | null; last_daily?: string | null };
+export type LockerRow = {
+  user_id: string;
+  xp: number;
+  icon: string;
+  frame: string;
+  title?: string;
+  custom_frame?: CustomFrame | null;
+  fx?: string;
+  name_color?: string;
+  effect?: string;
+  badge?: string;
+  stats?: Partial<LiveStats> | null;
+  username?: string | null;
+  last_daily?: string | null;
+};
+
+/** What someone picked in their locker, as stored. */
+export type Look = { icon: string; frame: string; title: string; custom_frame: CustomFrame | null; fx: string; name_color: string; effect: string; badge: string };
+
+/** A stored row as avatar choices (to check with cleanAvatar). */
+export const lookOf = (r: LockerRow) => ({
+  icon: r.icon,
+  frame: r.frame,
+  custom: r.custom_frame ?? undefined,
+  fx: r.fx,
+  title: r.title,
+  nameColor: r.name_color,
+  effect: r.effect,
+  badge: r.badge,
+});
+export const statsOf = (r: LockerRow): LiveStats => ({ ...EMPTY_STATS, ...(r.stats ?? {}) });
 
 export interface LockerStore {
   get(userId: string): Promise<LockerRow>;
-  setLook(userId: string, look: { icon: string; frame: string; title: string }): Promise<void>;
+  setLook(userId: string, look: Look): Promise<void>;
+  /** After a game: adds it to their stats (for badges). */
+  addStats(userId: string, change: (s: LiveStats) => LiveStats): Promise<void>;
   addXp(userId: string, amount: number): Promise<void>;
   /** Keeps the username on file (so the site owner can find people). */
   touch(userId: string, username: string): Promise<void>;
@@ -28,11 +61,16 @@ function check<T>(res: { data: T; error: { message: string } | null }): T {
 
 const supabaseStore: LockerStore = {
   async get(userId) {
-    const row = check(await supabase().from("live_lockers").select("user_id, xp, icon, frame, title").eq("user_id", userId).maybeSingle()) as LockerRow | null;
+    const row = check(await supabase().from("live_lockers").select("user_id, xp, icon, frame, title, custom_frame, fx, name_color, effect, badge, stats").eq("user_id", userId).maybeSingle()) as LockerRow | null;
     return row ?? blank(userId);
   },
   async setLook(userId, look) {
     check(await supabase().from("live_lockers").upsert({ user_id: userId, ...look, updated_at: new Date().toISOString() }, { onConflict: "user_id" }));
+  },
+  async addStats(userId, change) {
+    const row = (check(await supabase().from("live_lockers").select("stats").eq("user_id", userId).maybeSingle()) as { stats: Partial<LiveStats> | null } | null) ?? null;
+    const next = change({ ...EMPTY_STATS, ...(row?.stats ?? {}) });
+    check(await supabase().from("live_lockers").upsert({ user_id: userId, stats: next }, { onConflict: "user_id" }));
   },
   async addXp(userId, amount) {
     check(await supabase().rpc("live_locker_add_xp", { uid: userId, amount }));
@@ -73,6 +111,10 @@ const memoryStore: LockerStore = {
   },
   async setLook(userId, look) {
     mem().set(userId, { ...(mem().get(userId) ?? blank(userId)), ...look });
+  },
+  async addStats(userId, change) {
+    const row = mem().get(userId) ?? blank(userId);
+    mem().set(userId, { ...row, stats: change(statsOf(row)) });
   },
   async addXp(userId, amount) {
     const row = mem().get(userId) ?? blank(userId);

@@ -4,11 +4,39 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
-import { DEFAULT_AVATAR, FRAMES, ICONS, TITLES, levelInfo, type Avatar } from "@/lib/live/locker";
-import { LiveAvatar, LiveTitle, guestAvatar, setGuestAvatar } from "./LiveAvatar";
+import {
+  BADGES,
+  CUSTOM_FRAME_LEVEL,
+  CUSTOM_STYLES,
+  DEFAULT_AVATAR,
+  EFFECTS,
+  EMPTY_STATS,
+  FRAMES,
+  FRAME_FX,
+  ICONS,
+  NAME_COLORS,
+  TITLES,
+  levelInfo,
+  type Avatar,
+  type CustomFrame,
+  type LiveStats,
+} from "@/lib/live/locker";
+import { Celebration, LiveAvatar, LiveName, guestAvatar, setGuestAvatar } from "./LiveAvatar";
 import { card, input, primary } from "./ui";
 
-type LockerData = { xp: number; level: number; into: number; need: number; avatar: Avatar; picture: string | null; owner?: boolean };
+type LockerData = {
+  xp: number;
+  level: number;
+  into: number;
+  need: number;
+  avatar: Avatar;
+  picture: string | null;
+  stats: LiveStats;
+  badges: string[];
+  owner?: boolean;
+};
+
+const DEFAULT_CUSTOM: CustomFrame = { style: "gradient", colors: ["#3ddc84", "#38bdf8"], width: 2 };
 
 /**
  * /live/locker: pick the icon and frame you show in Live games. Signed in,
@@ -20,6 +48,9 @@ export function Locker() {
   const [data, setData] = useState<LockerData | null>(null);
   const [look, setLook] = useState<Avatar>(DEFAULT_AVATAR);
   const [status, setStatus] = useState<string | null>(null);
+  const [making, setMaking] = useState(false);
+  const [draft, setDraft] = useState<CustomFrame>(DEFAULT_CUSTOM);
+  const [celebrate, setCelebrate] = useState(0);
 
   useEffect(() => {
     if (!user) {
@@ -46,7 +77,16 @@ export function Locker() {
       return;
     }
     setStatus("Saving…");
-    const res = await fetch("/api/live/locker", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ icon: next.icon, frame: next.frame, title: next.title ?? "" }) }).catch(() => null);
+    const res = await fetch("/api/live/locker", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+        icon: next.icon,
+        frame: next.frame,
+        custom: next.custom,
+        fx: next.fx ?? "",
+        title: next.title ?? "",
+        nameColor: next.nameColor ?? "",
+        effect: next.effect ?? "",
+        badge: next.badge ?? "",
+      }) }).catch(() => null);
     const body = await res?.json().catch(() => null);
     setStatus(res?.ok ? "Saved. You'll show like this in your next game." : (body?.error ?? "Couldn't save."));
   };
@@ -69,15 +109,15 @@ export function Locker() {
       <section className={`${card} flex flex-wrap items-center gap-5`}>
         <LiveAvatar avatar={look.icon === "jace" ? { ...look, picture: data?.picture } : look} size={88} />
         <div className="min-w-0 flex-1">
-          <p className="text-lg font-bold">{user ? user.displayName || user.username : "Guest"}</p>
-          <LiveTitle avatar={look} className="text-base" />
+          <LiveName name={user ? user.displayName || user.username : "Guest"} avatar={look} className="text-lg font-bold" />
           {user && data ? (
             <>
               <p className="text-sm text-muted">
-                Level <b className="text-foreground">{data.level}</b> · {data.into}/{data.need} XP to level {data.level + 1}
+                Level <b className="text-foreground">{data.level}</b> ·{" "}
+                {data.level >= 99 ? `Max level! ${data.xp.toLocaleString()} XP` : `${data.into}/${data.need} XP to level ${data.level + 1}`}
               </p>
               <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-foreground/10">
-                <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${Math.round((data.into / data.need) * 100)}%` }} />
+                <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${data.level >= 99 ? 100 : Math.round((data.into / data.need) * 100)}%` }} />
               </div>
               <p className="mt-1 text-xs text-muted">Finish Live games (hosted or solo) to earn XP. Right answers and good placings earn more.</p>
             </>
@@ -150,8 +190,74 @@ export function Locker() {
               </button>
             );
           })}
+          <button
+            type="button"
+            disabled={level < CUSTOM_FRAME_LEVEL}
+            onClick={() => {
+              setDraft(look.custom ?? DEFAULT_CUSTOM);
+              setMaking(true);
+            }}
+            aria-pressed={look.frame === "custom"}
+            aria-label={level < CUSTOM_FRAME_LEVEL ? `Make your own frame, unlocks at level ${CUSTOM_FRAME_LEVEL}` : "Make your own frame"}
+            className={tile(look.frame === "custom", level < CUSTOM_FRAME_LEVEL)}
+          >
+            {look.custom ? <LiveAvatar avatar={{ ...look, frame: "custom", picture: data?.picture }} size={44} /> : <span className="text-3xl">🎨</span>}
+            {level < CUSTOM_FRAME_LEVEL ? `🔒 Lv ${CUSTOM_FRAME_LEVEL}` : "Custom"}
+          </button>
         </div>
+        {making && (
+          <FrameMaker
+            level={level}
+            draft={draft}
+            setDraft={setDraft}
+            look={{ ...look, picture: data?.picture }}
+            onSave={() => {
+              setMaking(false);
+              void choose({ ...look, frame: "custom", custom: draft });
+            }}
+            onCancel={() => setMaking(false)}
+          />
+        )}
       </section>
+
+      <Picker
+        title="Frame effect"
+        note="How your frame moves."
+        items={FRAME_FX}
+        level={level}
+        signedIn={!!user}
+        selected={look.fx ?? ""}
+        onPick={(id) => choose({ ...look, fx: id || undefined })}
+        render={(f) => <LiveAvatar avatar={{ ...look, fx: f.id, picture: data?.picture }} size={40} />}
+      />
+
+      <Picker
+        title="Name color"
+        note="How your name looks in games."
+        items={NAME_COLORS}
+        level={level}
+        signedIn={!!user}
+        selected={look.nameColor ?? ""}
+        onPick={(id) => choose({ ...look, nameColor: id || undefined })}
+        render={(c) => <LiveName name="Aa" avatar={{ ...DEFAULT_AVATAR, nameColor: c.id }} title={false} className="text-xl font-black" />}
+      />
+
+      <Picker
+        title="Win celebration"
+        note="Rains down on your results screen (and the host's podium) when you win."
+        items={EFFECTS}
+        level={level}
+        signedIn={!!user}
+        selected={look.effect ?? ""}
+        onPick={(id) => {
+          void choose({ ...look, effect: id || undefined });
+          if (id) setCelebrate((n) => n + 1);
+        }}
+        render={(e) => <span className="text-2xl">{e.emojis.slice(0, 2).join("") || "—"}</span>}
+      />
+      {celebrate > 0 && <Celebration key={celebrate} effect={look.effect} />}
+
+      <Badges stats={data?.stats ?? EMPTY_STATS} earned={data?.badges ?? []} level={level} signedIn={!!user} selected={look.badge} onPick={(id) => choose({ ...look, badge: id })} />
 
       <section className={card}>
         <h2 className="mb-1 text-sm font-semibold">Title</h2>
@@ -272,6 +378,226 @@ function OwnerXp({ me, onMine }: { me: string; onMine: (xp: number) => void }) {
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+const tileClass = (selected: boolean, locked: boolean) =>
+  `relative flex flex-col items-center gap-1 rounded-xl border p-2 text-xs transition-colors ${
+    selected ? "border-accent bg-accent/10" : locked ? "border-line opacity-45" : "border-line hover:border-accent/50"
+  }`;
+
+/** A grid of level-locked choices (frame effects, name colors, celebrations). */
+function Picker<T extends { id: string; name: string; level: number }>({
+  title,
+  note,
+  items,
+  level,
+  signedIn,
+  selected,
+  onPick,
+  render,
+}: {
+  title: string;
+  note: string;
+  items: T[];
+  level: number;
+  signedIn: boolean;
+  selected: string;
+  onPick: (id: string) => void;
+  render: (item: T) => React.ReactNode;
+}) {
+  return (
+    <section className={card}>
+      <h2 className="mb-1 text-sm font-semibold">{title}</h2>
+      <p className="mb-3 text-xs text-muted">
+        {note}
+        {!signedIn && " Sign in to unlock these."}
+      </p>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+        {items.map((it) => {
+          const locked = !!it.id && (!signedIn || it.level > level);
+          return (
+            <button
+              key={it.id || "none"}
+              type="button"
+              disabled={locked}
+              onClick={() => onPick(it.id)}
+              aria-pressed={selected === it.id}
+              aria-label={locked ? `${it.name}, unlocks at level ${it.level}` : it.name}
+              className={tileClass(selected === it.id, locked)}
+            >
+              <span className="flex h-10 items-center">{render(it)}</span>
+              {locked ? `🔒 Lv ${it.level}` : it.name}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/** Make your own frame: a style, your colors, and a thickness, with a live preview. */
+function FrameMaker({
+  level,
+  draft,
+  setDraft,
+  look,
+  onSave,
+  onCancel,
+}: {
+  level: number;
+  draft: CustomFrame;
+  setDraft: (c: CustomFrame) => void;
+  look: Avatar;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  const style = CUSTOM_STYLES.find((st) => st.id === draft.style) ?? CUSTOM_STYLES[0];
+  const [min, max] = style.colors;
+  const colors = draft.colors.slice(0, max);
+  while (colors.length < min) colors.push(["#facc15", "#ec4899", "#6366f1", "#22c55e"][colors.length]);
+  const set = (patch: Partial<CustomFrame>) => setDraft({ ...draft, colors, ...patch });
+  return (
+    <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-accent/40 bg-accent/[.04] p-4">
+      <div className="flex flex-wrap items-center gap-4">
+        <LiveAvatar avatar={{ ...look, frame: "custom", custom: { ...draft, colors } }} size={96} />
+        <div>
+          <p className="font-semibold">🎨 Frame maker</p>
+          <p className="text-xs text-muted">Pick a style and your colors. More styles unlock as you level up.</p>
+        </div>
+      </div>
+      <div>
+        <p className="mb-1.5 text-xs font-semibold">Style</p>
+        <div className="flex flex-wrap gap-1.5">
+          {CUSTOM_STYLES.map((st) => {
+            const locked = st.level > level;
+            return (
+              <button
+                key={st.id}
+                type="button"
+                disabled={locked}
+                aria-pressed={draft.style === st.id}
+                onClick={() => set({ style: st.id })}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${draft.style === st.id ? "border-accent bg-accent text-on-accent" : "border-line"} disabled:opacity-40`}
+              >
+                {locked ? `🔒 ${st.name} (Lv ${st.level})` : st.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div>
+        <p className="mb-1.5 text-xs font-semibold">Colors</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {colors.map((c, i) => (
+            <label key={i} className="flex items-center gap-1 rounded-full border border-line py-1 pl-1 pr-2 text-xs">
+              <input
+                type="color"
+                value={c}
+                onChange={(e) => set({ colors: colors.map((x, j) => (j === i ? e.target.value : x)) })}
+                aria-label={`Color ${i + 1}`}
+                className="h-7 w-7 cursor-pointer rounded-full border-0 bg-transparent p-0"
+              />
+              {i + 1}
+              {colors.length > min && (
+                <button type="button" aria-label={`Remove color ${i + 1}`} onClick={() => set({ colors: colors.filter((_, j) => j !== i) })} className="ml-1 text-muted hover:text-danger">
+                  ✕
+                </button>
+              )}
+            </label>
+          ))}
+          {colors.length < max && (
+            <button type="button" onClick={() => set({ colors: [...colors, "#ffffff"] })} className="rounded-full border border-dashed border-line px-3 py-1.5 text-xs">
+              + Add a color
+            </button>
+          )}
+        </div>
+      </div>
+      <div>
+        <p className="mb-1.5 text-xs font-semibold">Thickness</p>
+        <div className="flex gap-1.5">
+          {([1, 2, 3] as const).map((w) => (
+            <button
+              key={w}
+              type="button"
+              aria-pressed={draft.width === w}
+              onClick={() => set({ width: w })}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${draft.width === w ? "border-accent bg-accent text-on-accent" : "border-line"}`}
+            >
+              {["Thin", "Normal", "Thick"][w - 1]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button type="button" onClick={onSave} className="h-10 rounded-full bg-accent px-5 text-sm font-semibold text-on-accent">
+          Use this frame
+        </button>
+        <button type="button" onClick={onCancel} className="h-10 rounded-full px-4 text-sm text-muted hover:text-foreground">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Badges: earned by doing things in Live. Pick one to show next to your name. */
+function Badges({
+  stats,
+  earned,
+  level,
+  signedIn,
+  selected,
+  onPick,
+}: {
+  stats: LiveStats;
+  earned: string[];
+  level: number;
+  signedIn: boolean;
+  selected: string | undefined;
+  onPick: (id: string | undefined) => void;
+}) {
+  void level;
+  return (
+    <section className={card}>
+      <h2 className="mb-1 text-sm font-semibold">
+        Badges <span className="font-normal text-muted">({earned.length}/{BADGES.length})</span>
+      </h2>
+      <p className="mb-3 text-xs text-muted">
+        Earned by what you do in Live{signedIn ? "" : " (sign in to earn them)"}. Pick one to show next to your name.
+        {signedIn && ` So far: ${stats.games} games, ${stats.wins} wins, ${stats.right} right answers, best streak ${stats.bestStreak}.`}
+      </p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+        <button type="button" onClick={() => onPick(undefined)} aria-pressed={!selected} className={tileClass(!selected, false)}>
+          <span className="text-2xl">—</span>
+          Don&apos;t show one
+        </button>
+        {BADGES.map((b) => {
+          const has = earned.includes(b.id);
+          const prog = b.progress?.(stats);
+          return (
+            <button
+              key={b.id}
+              type="button"
+              disabled={!has}
+              onClick={() => onPick(b.id)}
+              aria-pressed={selected === b.id}
+              title={b.how}
+              className={tileClass(selected === b.id, !has)}
+            >
+              <span className={`text-3xl ${has ? "" : "grayscale"}`}>{b.emoji}</span>
+              <span className="font-semibold">{b.name}</span>
+              <span className="text-[10px] leading-tight text-muted">{has ? "Earned!" : b.how}</span>
+              {!has && prog && (
+                <span className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-foreground/10">
+                  <span className="block h-full rounded-full bg-accent" style={{ width: `${Math.min(100, Math.round((prog[0] / prog[1]) * 100))}%` }} />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </section>
   );
 }

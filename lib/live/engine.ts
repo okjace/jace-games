@@ -1,11 +1,11 @@
 import "server-only";
 import { createHash, randomBytes, randomInt } from "crypto";
 import { liveStore, type LiveGameRow, type LivePlayerRow } from "@/lib/db/live";
-import { lockerStore } from "@/lib/db/liveLocker";
+import { lockerStore, lookOf, statsOf } from "@/lib/db/liveLocker";
 import { mapStore } from "@/lib/db/liveMaps";
 import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
-import { cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar, type XpPart } from "./locker";
+import { addGameToStats, cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar, type XpPart } from "./locker";
 import { DEFAULT_MAP, cleanMap, type TowerMap } from "./maps";
 import type { GameReport, ReportAttempt, ReportQuestion } from "./report";
 import { broadcast } from "@/lib/realtime/server";
@@ -330,7 +330,7 @@ export async function joinLiveGame(code: string, rawName: unknown, session: Sess
     void lockerStore()
       .touch(session.user.id, session.user.username)
       .catch(() => {});
-    if (locker) avatar = cleanAvatar(locker, levelInfo(locker.xp).level, safePicture(session.user.picture));
+    if (locker) avatar = cleanAvatar(lookOf(locker), levelInfo(locker.xp).level, safePicture(session.user.picture), statsOf(locker));
   }
   await store.updatePlayer(g.id, added.id, { data: { avatar } });
   await push(g, "players");
@@ -679,6 +679,11 @@ async function giveXp(g: LiveGameRow) {
       await store.updatePlayer(g.id, p.id, { data: { ...d, xp: total, xpParts: parts } });
       await lockerStore()
         .addXp(p.user_id, total)
+        .catch(() => {});
+      // Stats for badges.
+      const won = players.length > 1 && i === 0 && p.score > 0;
+      await lockerStore()
+        .addStats(p.user_id, (st) => addGameToStats(st, { won, perfect: p.answered >= 5 && p.correct === p.answered, right: p.correct, bestStreak }))
         .catch(() => {});
     }),
   );

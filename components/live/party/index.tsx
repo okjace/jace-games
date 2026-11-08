@@ -16,7 +16,7 @@ import { Shop } from "./Shop";
 import { SnackShack } from "./SnackShack";
 import type { Act } from "./shared";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "../fx/useStageFullscreen";
-import { LiveAvatar, LiveTitle } from "../LiveAvatar";
+import { LiveAvatar, LiveName } from "../LiveAvatar";
 import { Markdown } from "../Markdown";
 import { StudioMode } from "./StudioMode";
 import { TowerSiege } from "./TowerSiege";
@@ -244,7 +244,7 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
               <span className="w-6 text-center">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</span>
               <LiveAvatar avatar={p.avatar} size={26} />
               <span className="flex-1 truncate">
-                {p.name} <LiveTitle avatar={p.avatar} className="ml-1" />
+                <LiveName name={p.name} avatar={p.avatar} />
               </span>
               <span className="font-mono tabular-nums">{def.unit(p.score)}</span>
             </li>

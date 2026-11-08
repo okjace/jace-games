@@ -8,7 +8,7 @@ import { openRoomChannel } from "@/lib/realtime/client";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { HostReport } from "./HostReport";
 import { HtmlFrame } from "./HtmlFrame";
-import { LiveAvatar, LiveTitle } from "./LiveAvatar";
+import { Celebration, LiveAvatar, LiveName } from "./LiveAvatar";
 import { Markdown, QuestionMediaView } from "./Markdown";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
 
@@ -160,8 +160,7 @@ function Lobby({ view, busy, onStart, onKick }: { view: HostView; busy: boolean;
               className="animate-pop flex items-center gap-2 rounded-full bg-foreground/[.08] py-1.5 pl-1.5 pr-4 text-sm font-semibold hover:bg-danger/20 hover:line-through"
             >
               <LiveAvatar avatar={p.avatar} size={28} />
-              {p.name}
-              <LiveTitle avatar={p.avatar} />
+              <LiveName name={p.name} avatar={p.avatar} />
             </button>
           </li>
         ))}
@@ -257,7 +256,7 @@ function SelfPaced({ view, secondsLeft }: { view: HostView; secondsLeft: number 
           <li key={p.id} className="flex items-center gap-3 rounded-xl bg-panel px-4 py-3">
             <span className="w-6 text-center font-mono text-muted">{i + 1}</span>
             <LiveAvatar avatar={p.avatar} size={28} />
-            <span className="w-32 truncate font-semibold sm:w-48">{p.name}</span>
+            <LiveName name={p.name} avatar={p.avatar} title={false} className="w-32 font-semibold sm:w-48" />
             <span className="relative h-6 flex-1 overflow-hidden rounded-full bg-foreground/[.06]">
               <span
                 className="absolute inset-y-0 left-0 rounded-full bg-accent transition-[width] duration-500"
@@ -285,7 +284,7 @@ function Board({ view }: { view: HostView }) {
         <li key={p.id} className="flex items-center gap-3 rounded-xl bg-panel px-4 py-2">
           <span className="w-6 font-mono text-muted">{i + 1}</span>
           <LiveAvatar avatar={p.avatar} size={28} />
-          <span className="flex-1 truncate font-semibold">{p.name}</span>
+          <LiveName name={p.name} avatar={p.avatar} className="flex-1 font-semibold" />
           {p.streak >= 3 && <span title={`${p.streak} in a row`}>🔥{p.streak}</span>}
           <span className="font-mono tabular-nums">{p.score.toLocaleString()}</span>
         </li>
@@ -299,17 +298,18 @@ function Podium({ view }: { view: HostView }) {
   const order = [top[1], top[0], top[2]];
   const heights = ["h-28", "h-40", "h-20"];
   const medals = ["🥈", "🥇", "🥉"];
+  const winner = view.players[0];
   const fmt = MODES[view.mode].unit;
   return (
     <div className="flex flex-col gap-6">
+      {winner && view.players.length > 1 && <Celebration effect={winner.avatar?.effect} />}
       <div className="flex items-end justify-center gap-3 pt-6">
         {order.map((p, i) =>
           p ? (
             <div key={p.id} className="flex w-28 flex-col items-center gap-2 sm:w-40">
               <span className="text-4xl">{medals[i]}</span>
               <LiveAvatar avatar={p.avatar} size={56} />
-              <span className="w-full truncate text-center font-bold">{p.name}</span>
-              <LiveTitle avatar={p.avatar} />
+              <LiveName name={p.name} avatar={p.avatar} className="w-full justify-center text-center font-bold" />
               <span className="font-mono text-sm text-muted">{fmt(p.score)}</span>
               <div className={`w-full rounded-t-2xl bg-accent/80 ${heights[i]}`} />
             </div>
@@ -323,7 +323,7 @@ function Podium({ view }: { view: HostView }) {
           <li key={p.id} className="flex items-center gap-3 rounded-lg px-3 py-1.5 odd:bg-foreground/[.03]">
             <span className="w-6 font-mono text-muted">{i + 1}</span>
             <LiveAvatar avatar={p.avatar} size={24} />
-            <span className="flex-1 truncate">{p.name}</span>
+            <LiveName name={p.name} avatar={p.avatar} className="flex-1" />
             <span className="text-xs text-muted">
               {p.correct}/{p.answered} right
             </span>

@@ -122,6 +122,25 @@ body {
   0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.0); }
   50% { box-shadow: 0 0 24px 6px rgba(250, 204, 21, 0.55); }
 }
+/* Live locker frame effects (lib/live/locker.ts FRAME_FX). The frame moves; the icon inside stays upright. */
+@keyframes jg-spin { to { transform: rotate(360deg); } }
+@keyframes jg-pulse-ring { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+@keyframes jg-glow-ring { 0%, 100% { filter: drop-shadow(0 0 2px rgba(255,255,255,0.4)); } 50% { filter: drop-shadow(0 0 8px rgba(255,255,255,0.95)); } }
+@keyframes jg-bounce-ring { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12%); } }
+@keyframes jg-shimmer { 0%, 100% { filter: brightness(1) saturate(1); } 50% { filter: brightness(1.35) saturate(1.4); } }
+@keyframes jg-rain { from { transform: translateY(-10vh) rotate(0deg); opacity: 1; } to { transform: translateY(110vh) rotate(540deg); opacity: 0.9; } }
+.jg-fx-pulse { animation: jg-pulse-ring 1.6s ease-in-out infinite; }
+.jg-fx-glow { animation: jg-glow-ring 1.8s ease-in-out infinite; }
+.jg-fx-spin { animation: jg-spin 4s linear infinite; }
+.jg-fx-spin > * { animation: jg-spin 4s linear infinite reverse; }
+.jg-fx-bounce { animation: jg-bounce-ring 1.2s ease-in-out infinite; }
+.jg-fx-shimmer { animation: jg-shimmer 2.2s ease-in-out infinite; }
+.jg-fx-orbit { position: relative; }
+.jg-fx-orbit::after { content: ""; position: absolute; inset: -3px; border-radius: 9999px; border: 2px dotted rgba(255,255,255,0.85); animation: jg-spin 3s linear infinite; pointer-events: none; }
+.jg-fx-hyper { animation: jg-spin 0.9s linear infinite, jg-glow-ring 1.2s ease-in-out infinite; }
+.jg-fx-hyper > * { animation: jg-spin 0.9s linear infinite reverse; }
+
 @media (prefers-reduced-motion: reduce) {
   [class*="animate-[jg-"] { animation: none !important; }
+  [class*="jg-fx-"], [class*="jg-fx-"] > *, [class*="jg-fx-"]::after, .jg-rain { animation: none !important; }
 }

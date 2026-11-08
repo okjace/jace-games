@@ -9,7 +9,7 @@ import { MODES } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
 import type { Avatar } from "@/lib/live/locker";
 import { Answer } from "./Answer";
-import { LiveAvatar, LiveTitle, guestAvatar } from "./LiveAvatar";
+import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { PARTY_MODES, PartyPlay } from "./party";
@@ -150,8 +150,7 @@ export function PlayLive({ code }: { code: string }) {
       <div className="flex items-center justify-between rounded-2xl border border-line bg-panel px-4 py-3">
         <span className="flex min-w-0 items-center gap-2">
           <LiveAvatar avatar={view.me.avatar} size={30} />
-          <span className="truncate font-semibold">{view.me.name}</span>
-          <LiveTitle avatar={view.me.avatar} />
+          <LiveName name={view.me.name} avatar={view.me.avatar} className="font-semibold" />
         </span>
         <span className="flex items-center gap-3 text-sm">
           <FullscreenButton on={full.on} toggle={full.toggle} className="-my-2 text-muted hover:text-foreground" />
@@ -177,6 +176,7 @@ export function PlayLive({ code }: { code: string }) {
 
       {view.status === "ended" && !view.solo && (
         <Centered>
+          {view.me.rank === 1 && view.playerCount > 1 && <Celebration effect={view.me.avatar?.effect} />}
           <p className="text-5xl">{view.me.rank === 1 ? "🥇" : view.me.rank === 2 ? "🥈" : view.me.rank === 3 ? "🥉" : "🎮"}</p>
           <p className="text-2xl font-bold">
             {view.me.rank === 1 ? "You won!" : `You came #${view.me.rank} of ${view.playerCount}`}
@@ -344,6 +344,7 @@ function SoloResults({ view }: { view: PlayerView }) {
   return (
     <Centered>
       <p className="text-5xl">{def.icon}</p>
+      <Celebration effect={view.me.avatar?.effect} />
       <p className="text-2xl font-bold">Nice run!</p>
       <p className="text-4xl font-black tabular-nums">{score(view, view.me.score)}</p>
       <p className="text-muted">
@@ -451,8 +452,7 @@ function Top({ view }: { view: PlayerView }) {
         <li key={i} className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${p.you ? "bg-accent/10 ring-1 ring-accent/30" : "bg-foreground/[.03]"}`}>
           <span className="w-5 font-mono text-muted">{i + 1}</span>
           <LiveAvatar avatar={p.avatar} size={24} />
-          <LiveTitle avatar={p.avatar} />
-          <span className="flex-1 truncate">{p.name}</span>
+          <LiveName name={p.name} avatar={p.avatar} className="flex-1" />
           <span className="font-mono tabular-nums">{score(view, p.score)}</span>
         </li>
       ))}
