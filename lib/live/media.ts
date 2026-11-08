@@ -10,7 +10,31 @@
 export type QuestionMedia =
   | { kind: "image"; url: string; alt: string }
   | { kind: "youtube"; id: string; start: number }
-  | { kind: "vimeo"; id: string };
+  | { kind: "vimeo"; id: string }
+  /** A picture or video someone uploaded (stored in our bucket; only its path is kept). */
+  | { kind: "upload"; path: string; type: "image" | "video"; alt: string };
+
+/** What can be uploaded, and how big. The bucket enforces these too (supabase/migrations/011_live_uploads.sql). */
+export const UPLOAD = {
+  types: {
+    "image/png": { ext: "png", kind: "image" },
+    "image/jpeg": { ext: "jpg", kind: "image" },
+    "image/gif": { ext: "gif", kind: "image" },
+    "image/webp": { ext: "webp", kind: "image" },
+    "video/mp4": { ext: "mp4", kind: "video" },
+    "video/webm": { ext: "webm", kind: "video" },
+    "video/quicktime": { ext: "mov", kind: "video" },
+  } as Record<string, { ext: string; kind: "image" | "video" }>,
+  maxImageBytes: 8 * 1024 * 1024,
+  maxVideoBytes: 50 * 1024 * 1024,
+  perDay: 50,
+};
+
+/** An uploaded file's path: the uploader's folder, then a random id. */
+export const UPLOAD_PATH = /^[A-Za-z0-9_-]{1,64}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|gif|webp|mp4|webm|mov)$/;
+
+/** Where an uploaded file is served from (our own address, which points at the bucket). */
+export const uploadSrc = (path: string) => `/api/live/media/${path}`;
 
 export const MAX_MEDIA = 3;
 
@@ -59,6 +83,10 @@ export function cleanMedia(raw: unknown): QuestionMedia[] {
       out.push({ kind: "youtube", id: m.id, start: Number.isInteger(m.start) ? Math.min(86_400, Math.max(0, m.start as number)) : 0 });
     } else if (m.kind === "vimeo" && typeof m.id === "string" && /^\d{5,12}$/.test(m.id)) {
       out.push({ kind: "vimeo", id: m.id });
+    } else if (m.kind === "upload" && typeof m.path === "string" && UPLOAD_PATH.test(m.path)) {
+      const ext = m.path.split(".").pop()!;
+      const type = ["mp4", "webm", "mov"].includes(ext) ? "video" : "image";
+      out.push({ kind: "upload", path: m.path, type, alt: typeof m.alt === "string" ? m.alt.trim().slice(0, 120) : "" });
     } else if (m.kind === "image" && typeof m.url === "string") {
       const p = parseMediaLink(m.url, typeof m.alt === "string" ? m.alt : "");
       if (p.ok && p.media.kind === "image") out.push(p.media);

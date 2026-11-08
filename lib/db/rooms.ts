@@ -75,7 +75,7 @@ export interface RoomStore {
 
 // ---------- Supabase ----------
 
-function supabaseUrl(): string | undefined {
+export function supabaseUrl(): string | undefined {
   return process.env.SUPABASE_URL?.trim().replace(/\/(rest|realtime|auth)\/v1.*$/, "").replace(/\/+$/, "") || undefined;
 }
 

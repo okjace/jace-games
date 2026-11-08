@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { MAX_MEDIA, parseMediaLink } from "@/lib/live/media";
+import { MAX_MEDIA, UPLOAD, parseMediaLink } from "@/lib/live/media";
 import { LIMITS, type Question } from "@/lib/live/types";
 import { Markdown, QuestionMediaView } from "./Markdown";
 import { input } from "./ui";
@@ -37,7 +37,47 @@ export function PromptEditor({ q, onChange }: { q: Question; onChange: (fn: (q: 
   const [alt, setAlt] = useState("");
   const [linkError, setLinkError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
+  const [upload, setUpload] = useState<{ name: string; pct: number } | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const media = q.media ?? [];
+
+  /** Uploads a picture (shrunk first) or video straight to storage, with progress. */
+  const uploadFile = async (picked: File) => {
+    setUploadError(null);
+    let file: Blob = picked;
+    let type = picked.type;
+    if (!UPLOAD.types[type]) return setUploadError("Upload a picture (PNG, JPG, GIF or WebP) or a video (MP4, WebM or MOV).");
+    if (UPLOAD.types[type].kind === "image" && type !== "image/gif") {
+      const small = await shrinkImage(picked).catch(() => null);
+      if (small) {
+        file = small;
+        type = small.type;
+      }
+    }
+    const kind = UPLOAD.types[type]?.kind;
+    const max = kind === "image" ? UPLOAD.maxImageBytes : UPLOAD.maxVideoBytes;
+    if (file.size > max) return setUploadError(`${kind === "image" ? "Pictures" : "Videos"} can be at most ${max / 1024 / 1024} MB.`);
+    setUpload({ name: picked.name, pct: 0 });
+    const res = await fetch("/api/live/media/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, size: file.size }) }).catch(() => null);
+    const start = await res?.json().catch(() => null);
+    if (!res?.ok) {
+      setUpload(null);
+      return setUploadError(start?.error ?? "Couldn't start the upload.");
+    }
+    const ok = await new Promise<boolean>((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", start.uploadUrl);
+      xhr.setRequestHeader("Content-Type", type);
+      xhr.upload.onprogress = (e) => e.lengthComputable && setUpload({ name: picked.name, pct: Math.round((e.loaded / e.total) * 100) });
+      xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300);
+      xhr.onerror = () => resolve(false);
+      xhr.send(file);
+    });
+    setUpload(null);
+    if (!ok) return setUploadError("The upload didn't finish. Check your connection and try again.");
+    onChange((x) => ({ ...x, media: [...(x.media ?? []), { kind: "upload" as const, path: start.path, type: start.kind, alt: "" }].slice(0, MAX_MEDIA) }));
+  };
 
   const setPrompt = (prompt: string) => onChange((x) => ({ ...x, prompt: prompt.slice(0, LIMITS.prompt) }));
 
@@ -116,9 +156,23 @@ export function PromptEditor({ q, onChange }: { q: Question; onChange: (fn: (q: 
             </button>
           ))}
           <span className="mx-1 h-5 w-px bg-line" />
-          <button type="button" title="Add a picture or video" disabled={media.length >= MAX_MEDIA} onClick={() => setAdding((v) => !v)} className={btn} aria-expanded={adding}>
-            🖼️ <span className="ml-1 text-xs">Picture / video</span>
+          <button type="button" title="Upload a picture or video from your device" disabled={media.length >= MAX_MEDIA || !!upload} onClick={() => fileRef.current?.click()} className={btn}>
+            ⬆️ <span className="ml-1 text-xs">Upload</span>
           </button>
+          <button type="button" title="Add a picture or video by link" disabled={media.length >= MAX_MEDIA} onClick={() => setAdding((v) => !v)} className={btn} aria-expanded={adding}>
+            🔗 <span className="ml-1 text-xs">Picture / video link</span>
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            hidden
+            accept={Object.keys(UPLOAD.types).join(",")}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) void uploadFile(f);
+            }}
+          />
           <button type="button" aria-pressed={preview} onClick={() => setPreview((v) => !v)} className={`${btn} ml-auto text-xs font-semibold ${preview ? "bg-accent text-on-accent hover:bg-accent" : ""}`}>
             {preview ? "✏️ Edit" : "👁 Preview"}
           </button>
@@ -151,6 +205,18 @@ export function PromptEditor({ q, onChange }: { q: Question; onChange: (fn: (q: 
       <p className="text-right text-xs text-muted">
         {q.prompt.length}/{LIMITS.prompt}
       </p>
+
+      {upload && (
+        <div className="flex flex-col gap-1 rounded-xl border border-line p-3 text-sm" role="status">
+          <span>
+            Uploading <b>{upload.name}</b>… {upload.pct}%
+          </span>
+          <span className="h-2 overflow-hidden rounded-full bg-foreground/10">
+            <span className="block h-full rounded-full bg-accent transition-all" style={{ width: `${upload.pct}%` }} />
+          </span>
+        </div>
+      )}
+      {uploadError && <p className="text-sm text-danger">{uploadError}</p>}
 
       {adding && (
         <div className="flex flex-col gap-2 rounded-xl border border-line bg-foreground/[.03] p-3">
@@ -206,4 +272,18 @@ export function PromptEditor({ q, onChange }: { q: Question; onChange: (fn: (q: 
       )}
     </div>
   );
+}
+
+/** Pictures are shrunk to at most 1600px and saved as WebP (or JPEG), unless that would make them bigger. */
+async function shrinkImage(file: File): Promise<Blob | null> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const out = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/webp", 0.85));
+  const blob = out?.type === "image/webp" ? out : await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+  return blob && blob.size < file.size ? blob : null;
 }

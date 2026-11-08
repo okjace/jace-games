@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState, type ReactNode } from "react";
-import { embedUrl, type QuestionMedia } from "@/lib/live/media";
+import { embedUrl, uploadSrc, type QuestionMedia } from "@/lib/live/media";
 
 /**
  * A small, safe markdown renderer for question text. It builds React
@@ -157,6 +157,16 @@ export function QuestionMediaView({ media, className = "" }: { media?: QuestionM
               />
             </div>
           );
+        }
+        if (m.kind === "upload") {
+          if (m.type === "video") {
+            return (
+              <video key={i} src={uploadSrc(m.path)} controls playsInline preload="metadata" aria-label={m.alt || "Video"} className="mx-auto max-h-96 w-full rounded-xl bg-black">
+                Your browser can&apos;t play this video.
+              </video>
+            );
+          }
+          return <Picture key={i} url={uploadSrc(m.path)} alt={m.alt} />;
         }
         if (m.kind !== "image") return null;
         return <Picture key={i} url={m.url} alt={m.alt} />;
