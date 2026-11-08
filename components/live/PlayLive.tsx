@@ -154,6 +154,17 @@ export function PlayLive({ code }: { code: string }) {
         </span>
         <span className="flex items-center gap-3 text-sm">
           <FullscreenButton on={full.on} toggle={full.toggle} className="-my-2 text-muted hover:text-foreground" />
+          {view.solo && view.status === "playing" && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => confirm("End this game now? Your score so far counts.") && void act({ action: "solo", op: "end" })}
+              title="End the game now"
+              className="-my-1 rounded-full border border-line px-2.5 py-1 text-xs font-semibold hover:bg-foreground/[.05]"
+            >
+              🏁 End
+            </button>
+          )}
           {view.me.streak >= 2 && <span title="Streak">🔥 {view.me.streak}</span>}
           <span className="font-mono font-bold tabular-nums">{score(view, view.me.score)}</span>
           {view.status !== "lobby" && <span className="text-muted">#{view.me.rank}</span>}

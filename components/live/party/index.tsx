@@ -222,6 +222,16 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
           )}
           <MuteButton />
           <FullscreenButton on={full.on} toggle={full.toggle} className="bg-black/25 backdrop-blur" />
+          {view.solo && (
+            <button
+              type="button"
+              onClick={() => confirm("End this game now? Your score so far counts.") && void act({ action: "solo", op: "end" })}
+              title="End the game now"
+              className="rounded-full bg-black/25 px-3 py-2 text-sm font-bold backdrop-blur hover:bg-black/40"
+            >
+              🏁 End
+            </button>
+          )}
         </div>
 
         {view.last?.kind === "robbed" && <Alert>🦝 {String(view.last.by)} stole {String(view.last.amount)} of your gold!</Alert>}
