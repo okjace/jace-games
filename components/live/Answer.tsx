@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { PlayerQuestion } from "@/lib/live/types";
 import { HtmlFrame } from "./HtmlFrame";
+import { Markdown, QuestionMediaView } from "./Markdown";
 import { ANSWER_COLORS, ANSWER_SHAPES, input, primary } from "./ui";
 
 /** Answer buttons/inputs for a question, used by every mode. */
@@ -10,7 +11,8 @@ export function Answer({ q, disabled, onAnswer }: { q: PlayerQuestion; disabled:
   const [text, setText] = useState("");
   return (
     <div className="flex flex-col gap-3">
-      {q.prompt && <p className="text-center text-xl font-bold">{q.prompt}</p>}
+      {q.prompt && <Markdown text={q.prompt} className="text-center text-xl font-bold" />}
+      <QuestionMediaView media={q.media} />
       {q.html && <HtmlFrame html={q.html} title="Question" height={q.type === "html" ? 340 : 220} locked={disabled} onAnswer={q.type === "html" ? (v) => onAnswer(v) : undefined} />}
       {(q.type === "choice" || q.type === "truefalse") && (
         <div className="grid grid-cols-2 gap-3">
@@ -26,7 +28,7 @@ export function Answer({ q, disabled, onAnswer }: { q: PlayerQuestion; disabled:
               <span aria-hidden="true" className="text-2xl">
                 {ANSWER_SHAPES[i]}
               </span>
-              <span className="text-sm sm:text-base">{c}</span>
+              <Markdown inline text={c} className="text-sm sm:text-base" />
             </button>
           ))}
         </div>

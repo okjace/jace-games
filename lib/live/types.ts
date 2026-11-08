@@ -6,13 +6,17 @@
  * questions, the accepted values) before a question leaves the server.
  */
 
+import { cleanMedia, type QuestionMedia } from "./media";
+
 export type QuestionType = "choice" | "truefalse" | "type" | "html";
 
 export type Question = {
   id: string;
   type: QuestionType;
-  /** The question text (plain text). */
+  /** The question text. Markdown: bold, italics, lists, links, code (see components/live/Markdown.tsx). */
   prompt: string;
+  /** Pictures and videos shown with the question (see lib/live/media.ts). */
+  media?: QuestionMedia[];
   /**
    * Optional HTML shown with the question (all types), or for "html"
    * questions the whole interactive question. It runs in a sandboxed iframe
@@ -157,7 +161,7 @@ export const LIMITS = {
   tags: 6,
   tag: 24,
   questions: 100,
-  prompt: 300,
+  prompt: 1000,
   choice: 120,
   accepted: 10,
   html: 64 * 1024,
@@ -219,6 +223,7 @@ export function cleanQuestions(raw: unknown): { ok: true; questions: Question[] 
       type,
       prompt: str(q.prompt, LIMITS.prompt),
       ...(html ? { html } : {}),
+      ...(cleanMedia(q.media).length ? { media: cleanMedia(q.media) } : {}),
       time,
       points: points as 0 | 1 | 2,
     };
@@ -244,7 +249,7 @@ export function cleanQuestions(raw: unknown): { ok: true; questions: Question[] 
 
 /** A question can be played once it has a prompt (or HTML) and a right answer. */
 export function isPlayable(q: Question): boolean {
-  const hasPrompt = !!q.prompt.trim() || !!q.html;
+  const hasPrompt = !!q.prompt.trim() || !!q.html || (q.media?.length ?? 0) > 0;
   if (q.type === "choice") return hasPrompt && (q.choices ?? []).filter((c) => c.trim()).length >= 2 && (q.correct ?? []).length > 0 && (q.choices ?? []).every((c) => c.trim());
   if (q.type === "truefalse") return hasPrompt && (q.correct ?? []).length > 0;
   if (q.type === "html") return !!q.html && (q.accepted ?? []).length > 0;

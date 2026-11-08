@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { LiveSet, PlayerQuestion } from "@/lib/live/types";
+import { Markdown, QuestionMediaView } from "./Markdown";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
 
 const TYPE_LABEL = { choice: "Multiple choice", truefalse: "True or false", type: "Type the answer", html: "Custom HTML" };
@@ -68,13 +69,14 @@ export function SetView({ id }: { id: string }) {
             <p className="text-xs text-muted">
               {i + 1}. {TYPE_LABEL[q.type]} · {q.time}s{q.points === 2 ? " · double points" : q.points === 0 ? " · no points" : ""}
             </p>
-            <p className="mt-1 font-medium">{q.prompt || (q.html ? "Custom HTML question" : "")}</p>
+            {q.prompt ? <Markdown text={q.prompt} className="mt-1 font-medium" /> : <p className="mt-1 font-medium">{q.html ? "Custom HTML question" : ""}</p>}
+            <QuestionMediaView media={q.media} className="mt-2 max-w-md" />
             {q.choices && q.type === "choice" && (
               <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
                 {q.choices.map((c, j) => (
                   <li key={j} className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm text-white" style={{ background: ANSWER_COLORS[j] }}>
                     <span aria-hidden="true">{ANSWER_SHAPES[j]}</span>
-                    {c}
+                    <Markdown inline text={c} />
                   </li>
                 ))}
               </ul>

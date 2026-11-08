@@ -9,6 +9,7 @@ import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/use
 import { HostReport } from "./HostReport";
 import { HtmlFrame } from "./HtmlFrame";
 import { LiveAvatar } from "./LiveAvatar";
+import { Markdown, QuestionMediaView } from "./Markdown";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
 
 /**
@@ -187,7 +188,8 @@ function Classic({ view, secondsLeft, busy, onReveal, onNext }: { view: HostView
         </span>
       </div>
       <div className={`${card} flex flex-col items-center gap-4 py-8 text-center`}>
-        <p className="text-2xl font-bold sm:text-4xl">{q.prompt}</p>
+        {q.prompt && <Markdown text={q.prompt} className="text-2xl font-bold sm:text-4xl" />}
+        <QuestionMediaView media={q.media} className="w-full max-w-3xl" />
         {q.html && <HtmlFrame html={q.html} title="Question" height={q.type === "html" ? 360 : 240} locked />}
         {!reveal && <p className={`font-mono text-5xl font-black tabular-nums ${secondsLeft <= 5 ? "text-danger" : ""}`}>{secondsLeft}</p>}
       </div>
@@ -202,7 +204,7 @@ function Classic({ view, secondsLeft, busy, onReveal, onNext }: { view: HostView
                 style={{ background: ANSWER_COLORS[i] }}
               >
                 <span aria-hidden="true">{ANSWER_SHAPES[i]}</span>
-                <span className="flex-1">{c}</span>
+                <Markdown inline text={c} className="flex-1" />
                 {reveal && (
                   <span className="flex items-center gap-2 text-base">
                     {right && "✓"}

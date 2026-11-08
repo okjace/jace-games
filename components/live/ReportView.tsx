@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { percentRight, reportCsv, type GameReport } from "@/lib/live/report";
 import { LiveAvatar } from "./LiveAvatar";
+import { Markdown } from "./Markdown";
 import { ANSWER_COLORS, ANSWER_SHAPES, secondary } from "./ui";
 
 /**
@@ -69,7 +70,7 @@ export function ReportView({ report }: { report: GameReport }) {
                 <div className="flex items-start gap-3">
                   <span className="font-mono text-sm text-muted">Q{i + 1}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold">{q.prompt}</p>
+                    <Markdown text={q.prompt} className="font-semibold" />
                     <p className="text-sm text-muted">
                       Right answer: <b className="text-green-600 dark:text-green-400">{q.right || "—"}</b>
                     </p>
@@ -153,7 +154,7 @@ export function ReportView({ report }: { report: GameReport }) {
                   return (
                     <li key={i} className={`rounded-xl border-l-4 p-3 text-sm ${tries.length === 0 ? "border-line" : tries.every((t) => t.correct) ? "border-green-500 bg-green-500/[.07]" : "border-red-500 bg-red-500/[.07]"}`}>
                       <p className="font-semibold">
-                        Q{i + 1}. {q.prompt}
+                        Q{i + 1}. <Markdown inline text={q.prompt} />
                       </p>
                       {tries.length === 0 ? (
                         <p className="text-muted">Didn&apos;t answer</p>

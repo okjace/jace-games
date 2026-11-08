@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { PlayerQuestion } from "@/lib/live/types";
 import { HtmlFrame } from "../HtmlFrame";
+import { Markdown, QuestionMediaView } from "../Markdown";
 import { useJuice } from "./Juice";
 import { sfx } from "./sfx";
 
@@ -76,7 +77,12 @@ export function GameQuestion({
             🔥 {streak} streak
           </span>
         )}
-        <p className="text-xl font-extrabold leading-snug sm:text-2xl">{q.prompt || (q.type === "html" ? "Answer below" : "")}</p>
+        {q.prompt ? (
+          <Markdown text={q.prompt} className="text-xl font-extrabold leading-snug sm:text-2xl" />
+        ) : (
+          <p className="text-xl font-extrabold leading-snug sm:text-2xl">{q.type === "html" ? "Answer below" : ""}</p>
+        )}
+        <QuestionMediaView media={q.media} className="mt-3" />
         {q.html && (
           <div className="mt-3">
             <HtmlFrame html={q.html} title="Question" height={q.type === "html" ? 320 : 200} locked={!!result} onAnswer={q.type === "html" ? (v) => void send(v, null) : undefined} />
@@ -104,7 +110,7 @@ export function GameQuestion({
                 <span aria-hidden="true" className="text-3xl drop-shadow">
                   {TILE[i].shape}
                 </span>
-                <span className="text-base font-extrabold leading-tight drop-shadow sm:text-lg">{c}</span>
+                <Markdown inline text={c} className="text-base font-extrabold leading-tight drop-shadow sm:text-lg" />
                 {result && mine && (
                   <span className="absolute -right-2 -top-2 flex h-10 w-10 items-center justify-center rounded-full bg-white text-2xl shadow-lg animate-pop">{result.correct ? "✅" : "❌"}</span>
                 )}

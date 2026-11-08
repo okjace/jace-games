@@ -1,4 +1,5 @@
 import type { Avatar } from "./locker";
+import { plainText } from "./media";
 
 /**
  * A host's report for a Live game: every question, and exactly what each
@@ -70,7 +71,7 @@ export function reportCsv(r: GameReport): string {
     // Quote everything, and stop spreadsheet apps treating a cell as a formula.
     return `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
   };
-  const head = ["Player", "Score", "Right", "Answered", ...r.questions.map((q, i) => `Q${i + 1}: ${q.prompt}`)];
+  const head = ["Player", "Score", "Right", "Answered", ...r.questions.map((q, i) => `Q${i + 1}: ${plainText(q.prompt)}`)];
   const key = ["Right answer", "", "", "", ...r.questions.map((q) => q.right)];
   const rows = r.players.map((p) => [
     p.name,

@@ -17,6 +17,7 @@ import { SnackShack } from "./SnackShack";
 import type { Act } from "./shared";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "../fx/useStageFullscreen";
 import { LiveAvatar } from "../LiveAvatar";
+import { Markdown } from "../Markdown";
 import { StudioMode } from "./StudioMode";
 import { TowerSiege } from "./TowerSiege";
 
@@ -65,7 +66,7 @@ function FeedbackCard({ f, onDone, accent }: { f: Feedback; onDone: () => void; 
       <p className="text-3xl font-black">Not quite!</p>
       {f.shielded && <p className="font-bold">🛡️ Your shield saved your streak.</p>}
       <div className="rounded-2xl bg-black/25 p-3 text-left">
-        <p className="text-sm font-semibold text-white/80">{f.prompt}</p>
+        <Markdown text={f.prompt} className="text-sm font-semibold text-white/80" />
         <p className="mt-2 text-sm">
           You said: <b className="line-through decoration-2">{f.yours}</b>
         </p>

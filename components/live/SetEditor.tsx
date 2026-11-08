@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isPlayable, type LiveSet, type Question, type QuestionType } from "@/lib/live/types";
+import { plainText } from "@/lib/live/media";
 import { HTML_TEMPLATE, HtmlFrame } from "./HtmlFrame";
+import { PromptEditor } from "./PromptEditor";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, input, primary, secondary } from "./ui";
 
 const TIMES = [5, 10, 20, 30, 60, 90, 120];
@@ -28,7 +30,7 @@ function blank(type: QuestionType = "choice"): Question {
 /** Switching type keeps the prompt, time and points and resets the rest. */
 function retype(q: Question, type: QuestionType): Question {
   const fresh = blank(type);
-  return { ...fresh, id: q.id, prompt: q.prompt, time: q.time, points: q.points, ...(q.html && type !== "html" ? { html: q.html } : {}) };
+  return { ...fresh, id: q.id, prompt: q.prompt, time: q.time, points: q.points, ...(q.media ? { media: q.media } : {}), ...(q.html && type !== "html" ? { html: q.html } : {}) };
 }
 
 export function SetEditor({ id }: { id: string }) {
@@ -183,7 +185,9 @@ export function SetEditor({ id }: { id: string }) {
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => setOpen(expanded ? null : q.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-expanded={expanded}>
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-foreground/[.06] text-sm font-semibold">{i + 1}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium">{q.prompt || (q.type === "html" ? "Custom HTML question" : <span className="text-muted">New question</span>)}</span>
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                  {plainText(q.prompt) || (q.media?.length ? "🖼️ Picture question" : q.type === "html" ? "Custom HTML question" : <span className="text-muted">New question</span>)}
+                </span>
                   {!ready && <span className="shrink-0 text-xs text-warn">Not finished</span>}
                 </button>
                 <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="h-8 w-8 rounded-full text-muted hover:bg-foreground/[.06] disabled:opacity-30">
@@ -292,14 +296,7 @@ function QuestionForm({
         </select>
       </div>
 
-      <textarea
-        value={q.prompt}
-        onChange={(e) => onChange((x) => ({ ...x, prompt: e.target.value.slice(0, 300) }))}
-        placeholder={q.type === "html" ? "Question text (optional; your HTML can show it instead)" : "Type your question"}
-        aria-label="Question"
-        rows={2}
-        className={`${input} h-auto py-2 text-base`}
-      />
+      <PromptEditor q={q} onChange={onChange} />
 
       {q.type === "choice" && (
         <div className="grid gap-2 sm:grid-cols-2">

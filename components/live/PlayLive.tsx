@@ -10,6 +10,7 @@ import { openRoomChannel } from "@/lib/realtime/client";
 import type { Avatar } from "@/lib/live/locker";
 import { Answer } from "./Answer";
 import { LiveAvatar, guestAvatar } from "./LiveAvatar";
+import { Markdown } from "./Markdown";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { PARTY_MODES, PartyPlay } from "./party";
 import { card, getToken, input, primary, secondary, setToken } from "./ui";
@@ -403,7 +404,7 @@ function Review({ view }: { view: PlayerView }) {
           {shown.map(({ r, i }) => (
             <li key={i} className={`rounded-xl border-l-4 p-3 text-sm ${r.correct ? "border-green-500 bg-green-500/[.07]" : "border-red-500 bg-red-500/[.07]"}`}>
               <p className="font-semibold">
-                {r.correct ? "✅" : "❌"} {r.prompt}
+                {r.correct ? "✅" : "❌"} <Markdown inline text={r.prompt} />
               </p>
               <p className="mt-1 text-muted">
                 You said: <span className={r.correct ? "font-semibold text-foreground" : "line-through"}>{r.yours}</span>
