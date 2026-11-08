@@ -124,8 +124,8 @@ export function PromptEditor({ q, onChange }: { q: Question; onChange: (fn: (q: 
           </button>
         </div>
         {preview ? (
-          <div className="min-h-[88px] bg-white p-4 text-center text-lg font-bold text-neutral-900">
-            {q.prompt.trim() ? <Markdown text={q.prompt} /> : <p className="font-normal text-neutral-400">Nothing to preview yet.</p>}
+          <div className="min-h-[88px] bg-background p-4 text-center text-lg font-bold text-foreground">
+            {q.prompt.trim() ? <Markdown text={q.prompt} /> : <p className="font-normal text-muted">Nothing to preview yet.</p>}
             <QuestionMediaView media={media} className="mt-3" />
           </div>
         ) : (
