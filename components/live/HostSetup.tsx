@@ -8,7 +8,7 @@ import { signInHref } from "@/components/site/SiteHeader";
 import { MODES, type LiveMode, type SetSummary } from "@/lib/live/types";
 import { guestAvatar } from "./LiveAvatar";
 import { MapCard, type MapSummaryView } from "./MapList";
-import { card, primary, secondary, setToken } from "./ui";
+import { card, primary, secondary, setPin, setToken } from "./ui";
 
 /**
  * Choose what to host: a set (or none: players just tap a button) and a game
@@ -85,6 +85,7 @@ export function HostSetup() {
     const body = await res?.json().catch(() => null);
     if (res?.ok) {
       setToken(body.code, body.token);
+      setPin(body.code, body.pin ?? null);
       router.push(`/live/play/${body.code}`);
     } else {
       setError(body?.error ?? "Couldn't start the game.");

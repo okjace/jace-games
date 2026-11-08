@@ -9,9 +9,9 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/live/games/
   const { code } = await ctx.params;
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   if (!allow(`live-join:${ip}`, 20, 60_000)) return NextResponse.json({ error: "Too many tries. Wait a minute." }, { status: 429 });
-  const body = (await req.json().catch(() => null)) as { name?: unknown; avatar?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as { name?: unknown; avatar?: unknown; pin?: unknown } | null;
   try {
-    return NextResponse.json(await joinLiveGame(code, body?.name, await getSession(), body?.avatar));
+    return NextResponse.json(await joinLiveGame(code, body?.name, await getSession(), body?.avatar, body?.pin));
   } catch (e) {
     return liveError(e);
   }

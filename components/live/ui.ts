@@ -25,3 +25,30 @@ export function setToken(code: string, token: string | null) {
     else localStorage.removeItem(tokenKey(code));
   } catch {}
 }
+
+/** A guest's rejoin PIN for a game (shown so they can get back in from another device). */
+const pinKey = (code: string) => `jace-games:live:pin:${code}`;
+export function getPin(code: string): string | null {
+  try {
+    return localStorage.getItem(pinKey(code));
+  } catch {
+    return null;
+  }
+}
+export function setPin(code: string, pin: string | null) {
+  try {
+    if (pin) localStorage.setItem(pinKey(code), pin);
+    else localStorage.removeItem(pinKey(code));
+  } catch {}
+}
+
+/** Game codes this browser has joined (newest first isn't known, so in storage order). */
+export function joinedCodes(): string[] {
+  try {
+    return Object.keys(localStorage)
+      .map((k) => k.match(/^jace-games:live:(\d{6})$/)?.[1])
+      .filter((c): c is string => !!c);
+  } catch {
+    return [];
+  }
+}

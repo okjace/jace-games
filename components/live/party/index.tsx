@@ -18,6 +18,7 @@ import type { Act } from "./shared";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "../fx/useStageFullscreen";
 import { LiveAvatar, LiveName } from "../LiveAvatar";
 import { Markdown } from "../Markdown";
+import { RejoinPin } from "../PlayLive";
 import { StudioMode } from "./StudioMode";
 import { TowerSiege } from "./TowerSiege";
 
@@ -248,6 +249,7 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
         {mode === "baseball" && <Baseball {...stageProps} />}
         {mode === "custom" && <StudioMode {...stageProps} />}
 
+        <RejoinPin code={view.code} small />
         <ol className="flex flex-col gap-1.5 rounded-3xl bg-black/25 p-3 text-sm backdrop-blur">
           {view.top.map((p, i) => (
             <li key={p.name} className={`flex items-center gap-2 rounded-xl px-3 py-1.5 transition-colors ${p.you ? "bg-white/20 font-bold" : ""}`}>

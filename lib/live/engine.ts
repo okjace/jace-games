@@ -54,6 +54,8 @@ export class LiveError extends Error {
   constructor(
     message: string,
     public status = 400,
+    /** Extra fields for the page (e.g. needsPin when rejoining). */
+    public extra: Record<string, unknown> = {},
   ) {
     super(message);
   }
@@ -101,6 +103,8 @@ type PlayerData = PartyData & {
   /** Locker XP this game gave them (set when it ends), and what earned it. */
   xp?: number;
   xpParts?: XpPart[];
+  /** Guests: the hash of their rejoin PIN. */
+  pinHash?: string;
   /** Self-paced modes: every answer, for the review at the end. */
   log?: { qi: number; a: unknown; correct: boolean }[];
 };
@@ -307,7 +311,19 @@ export async function createLiveGame(
   throw new LiveError("Couldn't start a game.");
 }
 
-export async function joinLiveGame(code: string, rawName: unknown, session: Session | null, rawAvatar?: unknown): Promise<{ token: string; playerId: string }> {
+/**
+ * Join a game, or rejoin it after leaving by accident: someone signed in
+ * gets their old spot back by joining with the same name; a guest needs the
+ * 4-digit rejoin PIN they were shown. Rejoining issues a new token, so the
+ * old device stops working for that player.
+ */
+export async function joinLiveGame(
+  code: string,
+  rawName: unknown,
+  session: Session | null,
+  rawAvatar?: unknown,
+  rawPin?: unknown,
+): Promise<{ token: string; playerId: string; pin?: string; rejoined?: boolean }> {
   const g = await getGame(code);
   if (g.status === "ended") throw new LiveError("That game has ended.", 409);
   const name = cleanName(rawName ?? (session?.user.displayName || session?.user.username));
@@ -317,7 +333,29 @@ export async function joinLiveGame(code: string, rawName: unknown, session: Sess
   if (players.length >= MAX_PLAYERS) throw new LiveError("This game is full.", 409);
   const token = randomBytes(24).toString("base64url");
   const added = await store.addPlayer({ game_id: g.id, name, user_id: session?.user.id ?? null, token_hash: sha(token) });
-  if (added === "name_taken") throw new LiveError("Someone already has that name here. Try another.", 409);
+  if (added === "name_taken") {
+    const existing = (await store.players(g.id)).find((p) => p.name.toLowerCase() === name.toLowerCase());
+    if (!existing) throw new LiveError("Someone already has that name here. Try another.", 409);
+    const pinHash = dataOf(existing).pinHash;
+    const pinGiven = typeof rawPin === "string" && rawPin.length > 0;
+    // Limit PIN tries before checking one, so a PIN can't be guessed.
+    if (pinGiven && !existing.user_id && !allowPinTry(g.id, existing.id)) {
+      throw new LiveError("Too many PIN tries. Wait a minute, or ask the host.", 429, { needsPin: true });
+    }
+    const yours =
+      (!!session && existing.user_id === session.user.id) ||
+      (!existing.user_id && typeof rawPin === "string" && /^\d{4}$/.test(rawPin) && !!pinHash && sha(`${rawPin}:${existing.id}`) === pinHash);
+    if (yours) {
+      await store.updatePlayer(g.id, existing.id, { token_hash: sha(token) });
+      await push(g, "players");
+      return { token, playerId: existing.id, rejoined: true };
+    }
+    if (existing.user_id) throw new LiveError("Someone signed in already has that name here. Pick another.", 409);
+    if (pinGiven) {
+      throw new LiveError("That PIN isn't right. It's the 4 numbers shown on the screen you joined from.", 403, { needsPin: true });
+    }
+    throw new LiveError("Someone already has that name here. If it's you, enter your rejoin PIN. Otherwise pick another name.", 409, { needsPin: true });
+  }
   // What they show: their locker when signed in, otherwise a starter icon they picked.
   let avatar = cleanAvatar(rawAvatar, 1, null);
   if (session) {
@@ -327,9 +365,22 @@ export async function joinLiveGame(code: string, rawName: unknown, session: Sess
       .catch(() => {});
     if (locker) avatar = cleanAvatar(lookOf(locker), levelInfo(locker.xp).level, safePicture(session.user.picture), statsOf(locker), grantedOf(locker));
   }
-  await store.updatePlayer(g.id, added.id, { data: { avatar } });
+  // Guests get a rejoin PIN (signed-in players rejoin with their Jace account).
+  const pin = session ? undefined : String(randomInt(1000, 10000));
+  await store.updatePlayer(g.id, added.id, { data: { avatar, ...(pin ? { pinHash: sha(`${pin}:${added.id}`) } : {}) } });
   await push(g, "players");
-  return { token, playerId: added.id };
+  return { token, playerId: added.id, ...(pin ? { pin } : {}) };
+}
+
+/** Rejoin PIN tries: 5 per player per minute (10,000 PINs would take over a day to try). */
+const pinTries = new Map<string, number[]>();
+function allowPinTry(gameId: string, playerId: string): boolean {
+  const key = `${gameId}:${playerId}`;
+  const now = Date.now();
+  const recent = (pinTries.get(key) ?? []).filter((t) => now - t < 60_000);
+  recent.push(now);
+  pinTries.set(key, recent);
+  return recent.length <= 5;
 }
 
 async function playerFor(g: LiveGameRow, token: unknown): Promise<LivePlayerRow> {
@@ -615,12 +666,12 @@ export async function startSoloGame(
   session: Session | null,
   opts: { setId: string | null; mode: LiveMode; settings: Record<string, unknown> },
   avatar?: unknown,
-): Promise<{ code: string; token: string }> {
+): Promise<{ code: string; token: string; pin?: string }> {
   const host: Session = session ?? { token: "", iat: Date.now(), user: { id: `solo:${randomBytes(9).toString("base64url")}`, username: "Solo", picture: null } };
   const code = await createLiveGame(host, { ...opts, settings: { ...opts.settings, solo: true } });
-  const { token } = await joinLiveGame(code, session ? session.user.displayName || session.user.username : "You", session, avatar);
+  const { token, pin } = await joinLiveGame(code, session ? session.user.displayName || session.user.username : "You", session, avatar);
   await step(await getGame(code), "start");
-  return { code, token };
+  return { code, token, ...(pin ? { pin } : {}) };
 }
 
 async function endGame(g: LiveGameRow, winner?: string) {

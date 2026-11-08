@@ -13,7 +13,7 @@ import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { PARTY_MODES, PartyPlay } from "./party";
-import { card, getToken, input, primary, secondary, setToken } from "./ui";
+import { card, getPin, getToken, input, primary, secondary, setPin, setToken } from "./ui";
 
 /** A player's screen for a Live game (usually a phone). */
 export function PlayLive({ code }: { code: string }) {
@@ -171,6 +171,7 @@ export function PlayLive({ code }: { code: string }) {
         </span>
       </div>
       {error && <p className="text-center text-sm text-danger">{error}</p>}
+      {view.status === "playing" && <RejoinPin code={view.code} small />}
 
       {view.status === "lobby" && (
         <Centered>
@@ -178,6 +179,7 @@ export function PlayLive({ code }: { code: string }) {
           <p className="text-xl font-bold">You&apos;re in!</p>
           <p className="text-muted">Watch the big screen. The game starts soon.</p>
           <p className="text-sm text-muted">{view.playerCount} playing</p>
+          <RejoinPin code={view.code} />
         </Centered>
       )}
 
@@ -224,6 +226,8 @@ function JoinForm({ code, defaultName, note, onJoined }: { code: string; default
   }, []);
   const [error, setError] = useState<string | null>(note);
   const [busy, setBusy] = useState(false);
+  const [needsPin, setNeedsPin] = useState(false);
+  const [pin, setPinText] = useState("");
   return (
     <form
       className={`${card} mx-auto flex w-full max-w-sm flex-col gap-3`}
@@ -233,12 +237,18 @@ function JoinForm({ code, defaultName, note, onJoined }: { code: string; default
         const res = await fetch(`/api/live/games/${code}/join`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, avatar: guestAvatar() }),
+          body: JSON.stringify({ name, avatar: guestAvatar(), ...(needsPin && pin ? { pin } : {}) }),
         }).catch(() => null);
         const body = await res?.json().catch(() => null);
         setBusy(false);
-        if (res?.ok) onJoined(body.token);
-        else setError(body?.error ?? "Couldn't join.");
+        if (res?.ok) {
+          // Keep the PIN: a new one when joining, or the one they typed when rejoining.
+          setPin(code, body.pin ?? (body.rejoined && pin ? pin : null));
+          onJoined(body.token);
+        } else {
+          setError(body?.error ?? "Couldn't join.");
+          if (body?.needsPin) setNeedsPin(true);
+        }
       }}
     >
       <p className="text-center text-sm text-muted">
@@ -251,11 +261,47 @@ function JoinForm({ code, defaultName, note, onJoined }: { code: string; default
         </Link>
       </p>
       <input value={name} onChange={(e) => setName(e.target.value.slice(0, 20))} placeholder="Your nickname" aria-label="Nickname" autoFocus maxLength={20} className={`${input} h-12 text-center text-lg`} />
+      {needsPin && (
+        <input
+          value={pin}
+          onChange={(e) => setPinText(e.target.value.replace(/\D/g, "").slice(0, 4))}
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="Rejoin PIN"
+          aria-label="Rejoin PIN"
+          autoFocus
+          className={`${input} h-12 text-center font-mono text-2xl tracking-[0.4em]`}
+        />
+      )}
       {error && <p className="text-center text-sm text-danger">{error}</p>}
-      <button type="submit" disabled={!name.trim() || busy} className={primary}>
-        {busy ? "Joining…" : "Join"}
+      <button type="submit" disabled={!name.trim() || busy || (needsPin && pin.length > 0 && pin.length < 4)} className={primary}>
+        {busy ? "Joining…" : needsPin && pin.length === 4 ? "Rejoin" : "Join"}
       </button>
+      <p className="text-center text-xs text-muted">Left by accident? Join with the same name. Signed in, you&apos;re back right away; as a guest, enter the PIN you were shown.</p>
     </form>
+  );
+}
+
+/** A guest's rejoin PIN, so they can get back in from another device if they leave by accident. */
+export function RejoinPin({ code, small = false }: { code: string; small?: boolean }) {
+  const [pin, setPinState] = useState<string | null>(null);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPinState(getPin(code));
+  }, [code]);
+  if (!pin) return null;
+  if (small) {
+    return (
+      <p className="text-center text-xs text-muted" title="If you leave by accident, join again with the same name and this PIN.">
+        🔑 Rejoin PIN <b className="font-mono tracking-widest text-foreground">{pin}</b>
+      </p>
+    );
+  }
+  return (
+    <p className="rounded-xl bg-foreground/[.05] px-4 py-2 text-sm">
+      🔑 Your rejoin PIN: <b className="font-mono text-lg tracking-widest">{pin}</b>
+      <span className="block text-xs text-muted">Left by accident? Join again with the same name and this PIN.</span>
+    </p>
   );
 }
 
@@ -345,6 +391,7 @@ function SoloResults({ view }: { view: PlayerView }) {
     const body = await res?.json().catch(() => null);
     if (res?.ok) {
       setToken(body.code, body.token);
+      setPin(body.code, body.pin ?? null);
       router.push(`/live/play/${body.code}`);
     } else {
       setError(body?.error ?? "Couldn't start another game.");
