@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { lockerStore, lookOf, statsOf } from "@/lib/db/liveLocker";
+import { grantedOf, lockerStore, lookOf, statsOf } from "@/lib/db/liveLocker";
 import { liveError } from "@/lib/live/http";
-import { BADGES, cleanAvatar, levelInfo, safePicture } from "@/lib/live/locker";
+import { BADGES, cleanAvatar, hasBadge, levelInfo, safePicture } from "@/lib/live/locker";
 import { isSiteOwner } from "@/lib/owner";
 import { allow } from "@/lib/rateLimit";
 import { getSession } from "@/lib/session";
@@ -27,8 +27,9 @@ export async function GET(): Promise<NextResponse> {
         xp: row.xp,
         ...info,
         stats,
-        badges: BADGES.filter((b) => b.earned(stats, info.level)).map((b) => b.id),
-        avatar: cleanAvatar(lookOf(row), info.level, picture, stats),
+        badges: BADGES.filter((b) => hasBadge(b.id, stats, info.level, grantedOf(row))).map((b) => b.id),
+        granted: grantedOf(row),
+        avatar: cleanAvatar(lookOf(row), info.level, picture, stats, grantedOf(row)),
         picture,
         owner: isSiteOwner(session.user.id),
       },
@@ -47,7 +48,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   try {
     const row = await lockerStore().get(session.user.id);
     const level = levelInfo(row.xp).level;
-    const avatar = cleanAvatar(body, level, safePicture(session.user.picture), statsOf(row));
+    const avatar = cleanAvatar(body, level, safePicture(session.user.picture), statsOf(row), grantedOf(row));
     // Anything asked for that didn't survive the check wasn't unlocked.
     const same = (a: unknown, b: unknown) => (a ?? "") === (b ?? "");
     if (

@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash, randomBytes, randomInt } from "crypto";
 import { liveStore, type LiveGameRow, type LivePlayerRow } from "@/lib/db/live";
-import { lockerStore, lookOf, statsOf } from "@/lib/db/liveLocker";
+import { grantedOf, lockerStore, lookOf, statsOf } from "@/lib/db/liveLocker";
 import { mapStore } from "@/lib/db/liveMaps";
 import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
@@ -330,7 +330,7 @@ export async function joinLiveGame(code: string, rawName: unknown, session: Sess
     void lockerStore()
       .touch(session.user.id, session.user.username)
       .catch(() => {});
-    if (locker) avatar = cleanAvatar(lookOf(locker), levelInfo(locker.xp).level, safePicture(session.user.picture), statsOf(locker));
+    if (locker) avatar = cleanAvatar(lookOf(locker), levelInfo(locker.xp).level, safePicture(session.user.picture), statsOf(locker), grantedOf(locker));
   }
   await store.updatePlayer(g.id, added.id, { data: { avatar } });
   await push(g, "players");

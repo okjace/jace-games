@@ -33,6 +33,7 @@ type LockerData = {
   picture: string | null;
   stats: LiveStats;
   badges: string[];
+  granted: string[];
   owner?: boolean;
 };
 
@@ -257,7 +258,7 @@ export function Locker() {
       />
       {celebrate > 0 && <Celebration key={celebrate} effect={look.effect} />}
 
-      <Badges stats={data?.stats ?? EMPTY_STATS} earned={data?.badges ?? []} level={level} signedIn={!!user} selected={look.badge} onPick={(id) => choose({ ...look, badge: id })} />
+      <Badges stats={data?.stats ?? EMPTY_STATS} earned={data?.badges ?? []} granted={data?.granted ?? []} level={level} signedIn={!!user} selected={look.badge} onPick={(id) => choose({ ...look, badge: id })} />
 
       <section className={card}>
         <h2 className="mb-1 text-sm font-semibold">Title</h2>
@@ -286,7 +287,13 @@ export function Locker() {
         </div>
       </section>
 
-      {data?.owner && <OwnerXp me={user?.id ?? ""} onMine={(xp) => setData((d) => (d ? { ...d, xp, ...levelInfo(xp) } : d))} />}
+      {data?.owner && (
+        <OwnerXp
+          me={user?.id ?? ""}
+          onMine={(xp) => setData((d) => (d ? { ...d, xp, ...levelInfo(xp) } : d))}
+          onBadges={(badges) => setData((d) => (d ? { ...d, badges } : d))}
+        />
+      )}
 
       <Link href="/live" className={`${primary} self-start`}>
         Done
@@ -295,14 +302,14 @@ export function Locker() {
   );
 }
 
-type Person = { userId: string; username: string | null; xp: number; level: number };
+type Person = { userId: string; username: string | null; xp: number; level: number; badges: string[]; granted: string[] };
 
 /**
  * Site owner only: find anyone with a locker (people who've opened theirs or
  * played Live signed in) and give them XP, or set it exactly. The server
  * checks it's really the owner.
  */
-function OwnerXp({ me, onMine }: { me: string; onMine: (xp: number) => void }) {
+function OwnerXp({ me, onMine, onBadges }: { me: string; onMine: (xp: number) => void; onBadges?: (badges: string[]) => void }) {
   const [q, setQ] = useState("");
   const [people, setPeople] = useState<Person[] | null>(null);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
@@ -317,6 +324,18 @@ function OwnerXp({ me, onMine }: { me: string; onMine: (xp: number) => void }) {
     }, 250);
     return () => clearTimeout(t);
   }, [q]);
+
+  /** Give or take back a badge (or give them all). */
+  const badge = async (p: Person, change: { badge?: string; give?: boolean; all?: boolean }) => {
+    setStatus("Saving…");
+    const res = await fetch("/api/live/admin/badges", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: p.userId, ...change }) }).catch(() => null);
+    const body = await res?.json().catch(() => null);
+    if (!res?.ok) return setStatus(body?.error ?? "Couldn't save.");
+    setPeople((list) => (list ?? []).map((x) => (x.userId === p.userId ? { ...x, badges: body.badges, granted: body.granted } : x)));
+    if (p.userId === me) onBadges?.(body.badges);
+    const name = p.username ?? "That player";
+    setStatus(change.all ? `${name} has every badge now.` : change.give === false ? `Took that badge back from ${name}.` : `Gave ${name} a badge.`);
+  };
 
   const give = async (p: Person, mode: "add" | "set", amount: number) => {
     setStatus("Saving…");
@@ -374,6 +393,30 @@ function OwnerXp({ me, onMine }: { me: string; onMine: (xp: number) => void }) {
               <button type="button" onClick={() => give(p, "set", MAX_LEVEL_XP)} className="h-9 rounded-full border border-line px-3">
                 Max level
               </button>
+              <div className="flex w-full flex-wrap items-center gap-1 border-t border-line pt-2">
+                <span className="mr-1 text-xs text-muted">Badges:</span>
+                {BADGES.map((b) => {
+                  const has = p.badges.includes(b.id);
+                  const given = p.granted.includes(b.id);
+                  const earnedByPlaying = has && !given;
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      disabled={earnedByPlaying}
+                      onClick={() => badge(p, { badge: b.id, give: !given })}
+                      aria-pressed={has}
+                      title={earnedByPlaying ? `${b.name}: earned by playing` : given ? `${b.name}: given by you (tap to take back)` : `Give ${b.name}`}
+                      className={`h-8 w-8 rounded-lg text-lg transition ${has ? "bg-accent/15 ring-1 ring-accent/50" : "opacity-35 grayscale hover:opacity-80 hover:grayscale-0"} ${given ? "ring-amber-400" : ""}`}
+                    >
+                      {b.emoji}
+                    </button>
+                  );
+                })}
+                <button type="button" onClick={() => badge(p, { all: true })} className="ml-1 h-8 rounded-full border border-line px-3 text-xs">
+                  All badges
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -546,6 +589,7 @@ function FrameMaker({
 function Badges({
   stats,
   earned,
+  granted,
   level,
   signedIn,
   selected,
@@ -553,12 +597,12 @@ function Badges({
 }: {
   stats: LiveStats;
   earned: string[];
+  granted: string[];
   level: number;
   signedIn: boolean;
   selected: string | undefined;
   onPick: (id: string | undefined) => void;
 }) {
-  void level;
   return (
     <section className={card}>
       <h2 className="mb-1 text-sm font-semibold">
@@ -588,7 +632,7 @@ function Badges({
             >
               <span className={`text-3xl ${has ? "" : "grayscale"}`}>{b.emoji}</span>
               <span className="font-semibold">{b.name}</span>
-              <span className="text-[10px] leading-tight text-muted">{has ? "Earned!" : b.how}</span>
+              <span className="text-[10px] leading-tight text-muted">{has ? (granted.includes(b.id) && !b.earned(stats, level) ? "Given by the owner" : "Earned!") : b.how}</span>
               {!has && prog && (
                 <span className="mt-0.5 h-1.5 w-full overflow-hidden rounded-full bg-foreground/10">
                   <span className="block h-full rounded-full bg-accent" style={{ width: `${Math.min(100, Math.round((prog[0] / prog[1]) * 100))}%` }} />

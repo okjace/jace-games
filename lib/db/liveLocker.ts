@@ -16,6 +16,7 @@ export type LockerRow = {
   effect?: string;
   badge?: string;
   stats?: Partial<LiveStats> | null;
+  granted_badges?: string[] | null;
   username?: string | null;
   last_daily?: string | null;
 };
@@ -35,10 +36,14 @@ export const lookOf = (r: LockerRow) => ({
   badge: r.badge,
 });
 export const statsOf = (r: LockerRow): LiveStats => ({ ...EMPTY_STATS, ...(r.stats ?? {}) });
+/** Badges the site owner gave this person. */
+export const grantedOf = (r: LockerRow): string[] => (Array.isArray(r.granted_badges) ? r.granted_badges.filter((b) => typeof b === "string") : []);
 
 export interface LockerStore {
   get(userId: string): Promise<LockerRow>;
   setLook(userId: string, look: Look): Promise<void>;
+  /** Site owner: the badges given to this person by hand. */
+  setGranted(userId: string, badges: string[]): Promise<void>;
   /** After a game: adds it to their stats (for badges). */
   addStats(userId: string, change: (s: LiveStats) => LiveStats): Promise<void>;
   addXp(userId: string, amount: number): Promise<void>;
@@ -61,11 +66,14 @@ function check<T>(res: { data: T; error: { message: string } | null }): T {
 
 const supabaseStore: LockerStore = {
   async get(userId) {
-    const row = check(await supabase().from("live_lockers").select("user_id, xp, icon, frame, title, custom_frame, fx, name_color, effect, badge, stats").eq("user_id", userId).maybeSingle()) as LockerRow | null;
+    const row = check(await supabase().from("live_lockers").select("user_id, xp, icon, frame, title, custom_frame, fx, name_color, effect, badge, stats, granted_badges").eq("user_id", userId).maybeSingle()) as LockerRow | null;
     return row ?? blank(userId);
   },
   async setLook(userId, look) {
     check(await supabase().from("live_lockers").upsert({ user_id: userId, ...look, updated_at: new Date().toISOString() }, { onConflict: "user_id" }));
+  },
+  async setGranted(userId, badges) {
+    check(await supabase().from("live_lockers").upsert({ user_id: userId, granted_badges: badges }, { onConflict: "user_id" }));
   },
   async addStats(userId, change) {
     const row = (check(await supabase().from("live_lockers").select("stats").eq("user_id", userId).maybeSingle()) as { stats: Partial<LiveStats> | null } | null) ?? null;
@@ -82,7 +90,7 @@ const supabaseStore: LockerStore = {
     check(await supabase().from("live_lockers").upsert({ user_id: userId, username }, { onConflict: "user_id" }));
   },
   async search(q, limit) {
-    let query = supabase().from("live_lockers").select("user_id, xp, icon, frame, username").order("xp", { ascending: false }).limit(limit);
+    let query = supabase().from("live_lockers").select("user_id, xp, icon, frame, username, stats, granted_badges").order("xp", { ascending: false }).limit(limit);
     const term = q.trim().replace(/[%_\\]/g, "");
     if (term) query = query.ilike("username", `%${term}%`);
     return check(await query) as LockerRow[];
@@ -111,6 +119,9 @@ const memoryStore: LockerStore = {
   },
   async setLook(userId, look) {
     mem().set(userId, { ...(mem().get(userId) ?? blank(userId)), ...look });
+  },
+  async setGranted(userId, badges) {
+    mem().set(userId, { ...(mem().get(userId) ?? blank(userId)), granted_badges: badges });
   },
   async addStats(userId, change) {
     const row = mem().get(userId) ?? blank(userId);

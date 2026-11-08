@@ -274,7 +274,11 @@ export function cleanCustomFrame(raw: unknown, level: number): CustomFrame | nul
  * A choice from a request, checked against what's unlocked. "jace" needs a
  * Jace picture. Anything not allowed falls back to the default.
  */
-export function cleanAvatar(raw: unknown, level: number, picture: string | null, stats: LiveStats = EMPTY_STATS): Avatar {
+/** Does this person have the badge: earned by playing, or given by the site owner? */
+export const hasBadge = (id: string, stats: LiveStats, level: number, granted: string[] = []) =>
+  granted.includes(id) || !!badgeById(id)?.earned(stats, level);
+
+export function cleanAvatar(raw: unknown, level: number, picture: string | null, stats: LiveStats = EMPTY_STATS, granted: string[] = []): Avatar {
   const r = (raw ?? {}) as Record<string, unknown>;
   const unlocked = <T extends LockerItem>(find: (id: string) => T | undefined, v: unknown) =>
     typeof v === "string" && v && (find(v)?.level ?? 999) <= level ? v : undefined;
@@ -283,7 +287,7 @@ export function cleanAvatar(raw: unknown, level: number, picture: string | null,
   // Unknown ids count as never unlocked; "custom" needs a valid design.
   const custom = r.frame === "custom" ? cleanCustomFrame(r.custom, level) : null;
   const frame = custom ? "custom" : typeof r.frame === "string" && (frameById(r.frame)?.level ?? 999) <= level ? r.frame : DEFAULT_AVATAR.frame;
-  const badge = typeof r.badge === "string" && badgeById(r.badge)?.earned(stats, level) ? r.badge : undefined;
+  const badge = typeof r.badge === "string" && badgeById(r.badge) && hasBadge(r.badge, stats, level, granted) ? r.badge : undefined;
   const out: Avatar = { icon, frame };
   if (custom) out.custom = custom;
   const fx = unlocked(fxById, r.fx);

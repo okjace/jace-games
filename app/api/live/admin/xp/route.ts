@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { lockerStore } from "@/lib/db/liveLocker";
-import { levelInfo } from "@/lib/live/locker";
+import { grantedOf, lockerStore, statsOf } from "@/lib/db/liveLocker";
+import { BADGES, hasBadge, levelInfo } from "@/lib/live/locker";
 import { isSiteOwner } from "@/lib/owner";
 import { getSession } from "@/lib/session";
 
@@ -20,7 +20,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const q = (req.nextUrl.searchParams.get("q") ?? "").slice(0, 40);
   const rows = await lockerStore().search(q, 50);
   return NextResponse.json(
-    { people: rows.map((r) => ({ userId: r.user_id, username: r.username ?? null, xp: r.xp, level: levelInfo(r.xp).level })) },
+    {
+      people: rows.map((r) => {
+        const level = levelInfo(r.xp).level;
+        const granted = grantedOf(r);
+        return {
+          userId: r.user_id,
+          username: r.username ?? null,
+          xp: r.xp,
+          level,
+          granted,
+          badges: BADGES.filter((b) => hasBadge(b.id, statsOf(r), level, granted)).map((b) => b.id),
+        };
+      }),
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
