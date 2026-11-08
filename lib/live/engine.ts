@@ -60,7 +60,6 @@ export class LiveError extends Error {
 }
 
 const MAX_PLAYERS = 200;
-const MAX_GAMES_PER_HOUR = 30;
 const GRACE_MS = 1500; // answers can arrive a little after the timer on slow connections
 const ROCKET_GOAL = 100;
 
@@ -239,11 +238,7 @@ export async function createLiveGame(
 ): Promise<string> {
   const mode = MODES[opts.mode] ? opts.mode : "classic";
   const store = liveStore();
-  const since = new Date(Date.now() - 3_600_000).toISOString();
   const solo = opts.settings.solo === true;
-  if (!solo && (await store.countGamesByHostSince(session.user.id, since)) >= MAX_GAMES_PER_HOUR) {
-    throw new LiveError("You've hosted a lot of games this hour. Try again in a bit.", 429);
-  }
   const noSet = !opts.setId;
   if (noSet && MODES[mode].needsSet) throw new LiveError(`${MODES[mode].name} needs a question set.`);
   let questions: Question[] | null = null;
