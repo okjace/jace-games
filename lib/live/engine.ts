@@ -6,6 +6,7 @@ import { mapStore } from "@/lib/db/liveMaps";
 import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
 import { addGameToStats, cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar, type XpPart } from "./locker";
+import { GO_BANANAS_MS, bananaBase, boostBananas, rollBanana } from "./banana";
 import { DEFAULT_MAP, cleanMap, type TowerMap } from "./maps";
 import type { GameReport, ReportAttempt, ReportQuestion } from "./report";
 import { broadcast } from "@/lib/realtime/server";
@@ -103,6 +104,8 @@ type PlayerData = PartyData & {
   /** Locker XP this game gave them (set when it ends), and what earned it. */
   xp?: number;
   xpParts?: XpPart[];
+  /** Banana Bonanza: GO BANANAS lasts until this time. */
+  goUntil?: number;
   /** Guests: the hash of their rejoin PIN. */
   pinHash?: string;
   /** Self-paced modes: every answer, for the review at the end. */
@@ -481,6 +484,8 @@ export type PlayerView = {
     /** Studio-game mode: which game (its code comes from customGameHtml). */
     custom?: { title: string; icon: string; owner: string } | null;
     catches?: Catch[];
+    /** Banana Bonanza: when GO BANANAS ends (0 if it isn't on). */
+    goUntil?: number;
     /** Fishdex: fish id → heaviest caught. */
     caught?: Record<string, number>;
     frenzy?: number;
@@ -570,6 +575,7 @@ function partyView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]): Pla
     return { ball: { ...b, strikes: b.strikes ?? 0, pitch: b.pitch ? { id: b.pitch.issuedAt, type: b.pitch.type, ms: b.pitch.ms, curve: b.pitch.curve } : null } };
   }
   if (g.mode === "fishing") return { catches: d.catches ?? [], caught: d.caught ?? {}, frenzy: d.frenzy ?? 0, stormed: !!d.stormed };
+  if (g.mode === "banana") return { goUntil: (d.goUntil ?? 0) > Date.now() ? d.goUntil : 0 };
   if (g.mode === "hack") {
     return {
       password: d.pw ?? null,
@@ -976,6 +982,43 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
           firstCatch: c.kind === "fish" && !fresh.caught?.[c.id],
         },
       },
+    }))!;
+  } else if (earned && g.mode === "banana") {
+    // Peel a banana event. Some reach other players too.
+    const fresh = dataOf(me);
+    const going = (fresh.goUntil ?? 0) > now;
+    let id = rollBanana();
+    const others = (await store.players(g.id)).filter((p) => p.id !== me.id);
+    let gain = boostBananas(bananaBase(id, me.score), me.streak, going);
+    let target: string | undefined;
+    if (id === "monkey") {
+      // Your monkey raids a rival with bananas (or, with nobody to raid, finds a bunch).
+      const rich = others.filter((o) => o.score > 0);
+      const victim = rich[randomInt(rich.length || 1)];
+      if (victim) {
+        const stolen = Math.min(150, Math.max(1, Math.round(victim.score * 0.15)));
+        await store.updatePlayer(g.id, victim.id, { score: victim.score - stolen, data: { ...dataOf(victim), last: { kind: "monkeyed", by: me.name, amount: stolen } } });
+        gain = boostBananas(stolen, me.streak, going);
+        target = victim.name;
+      } else {
+        id = "bunch";
+        gain = boostBananas(bananaBase("bunch", me.score), me.streak, going);
+      }
+    } else if (id === "rain") {
+      // Bananas for everyone.
+      for (const o of others) await store.updatePlayer(g.id, o.id, { score: o.score + 10, data: { ...dataOf(o), last: { kind: "rained", by: me.name, amount: 10 } } });
+    } else if (id === "split") {
+      // Share with whoever has the fewest.
+      const low = [...others].sort((a, b) => a.score - b.score)[0];
+      if (low) {
+        await store.updatePlayer(g.id, low.id, { score: low.score + 30, data: { ...dataOf(low), last: { kind: "split", by: me.name, amount: 30 } } });
+        target = low.name;
+      }
+    }
+    const goUntil = id === "go" ? now + GO_BANANAS_MS : (fresh.goUntil ?? 0);
+    me = (await store.updatePlayer(g.id, me.id, {
+      score: Math.max(0, me.score + gain),
+      data: { ...fresh, goUntil, last: { kind: "banana", event: id, amount: gain, going, goUntil, target } },
     }))!;
   } else if (earned && g.mode === "baseball") {
     // A right answer (or a tap) brings a pitch to swing at.

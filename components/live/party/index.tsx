@@ -6,6 +6,7 @@ import { MODES, type LiveMode } from "@/lib/live/types";
 import { GameQuestion, type AnswerResult } from "../fx/GameQuestion";
 import { Juice, MuteButton, useCountUp, useJuice } from "../fx/Juice";
 import { sfx } from "../fx/sfx";
+import { BananaBonanza } from "./BananaBonanza";
 import { Baseball } from "./Baseball";
 import { CodeBreakers } from "./CodeBreakers";
 import { GadgetFactory } from "./GadgetFactory";
@@ -23,7 +24,7 @@ import { StudioMode } from "./StudioMode";
 import { TowerSiege } from "./TowerSiege";
 
 /** Every self-paced mode plays on this stage. */
-export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom"];
+export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom", "banana"];
 
 /** Each mode's look: background, accent, and its tap button with questions off. */
 export const THEMES: Record<string, { bg: string; accent: string; tap: [string, string] }> = {
@@ -36,6 +37,7 @@ export const THEMES: Record<string, { bg: string; accent: string; tap: [string, 
   hack: { bg: "linear-gradient(180deg, #04130b 0%, #000 100%)", accent: "#3ddc84", tap: ["💻 MINE", "Each tap mines a few bits."] },
   baseball: { bg: "linear-gradient(180deg, #166534 0%, #14532d 70%, #052e16 100%)", accent: "#facc15", tap: ["⚾ PLAY BALL", "Each tap puts you up to bat."] },
   custom: { bg: "linear-gradient(180deg, #4338ca 0%, #1e1b4b 100%)", accent: "#a5f3fc", tap: ["🪙 EARN", "Each tap earns a few coins."] },
+  banana: { bg: "radial-gradient(circle at 50% 0%, #fde047 0%, #f59e0b 55%, #b45309 100%)", accent: "#fef08a", tap: ["🍌 PEEL", "Each peel is a random banana event!"] },
 };
 
 const REWARD_TEXT: Partial<Record<LiveMode, (v: PlayerView) => string | null>> = {
@@ -129,7 +131,7 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
   useEffect(() => {
     if (lastKey === seenLast.current) return;
     seenLast.current = lastKey;
-    if (lastKind === "robbed" || lastKind === "hacked") {
+    if (lastKind === "robbed" || lastKind === "hacked" || lastKind === "monkeyed") {
       sfx.alarm();
       juice.flash("rgba(229,72,77,0.45)");
       juice.shake();
@@ -238,6 +240,9 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
         {view.last?.kind === "robbed" && <Alert>🦝 {String(view.last.by)} stole {String(view.last.amount)} of your gold!</Alert>}
         {view.last?.kind === "swapped" && <Alert>🔄 {String(view.last.by)} swapped gold with you!</Alert>}
         {view.last?.kind === "stormed" && <Alert>⛈️ {String(view.last.by)} sent a storm your way: your next catch is halved.</Alert>}
+        {view.last?.kind === "monkeyed" && <Alert>🐒 {String(view.last.by)}&apos;s monkey stole {String(view.last.amount)} of your bananas!</Alert>}
+        {view.last?.kind === "rained" && <Alert>🌧️🍌 {String(view.last.by)} made it rain: +{String(view.last.amount)} bananas!</Alert>}
+        {view.last?.kind === "split" && <Alert>🍨 {String(view.last.by)} shared a banana split with you: +{String(view.last.amount)}!</Alert>}
 
         {mode === "gold" && <GoldRush {...stageProps} />}
         {mode === "rocket" && <RocketRace {...stageProps} />}
@@ -248,6 +253,7 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
         {mode === "hack" && <CodeBreakers {...stageProps} />}
         {mode === "baseball" && <Baseball {...stageProps} />}
         {mode === "custom" && <StudioMode {...stageProps} />}
+        {mode === "banana" && <BananaBonanza {...stageProps} />}
 
         <RejoinPin code={view.code} small />
         <ol className="flex flex-col gap-1.5 rounded-3xl bg-black/25 p-3 text-sm backdrop-blur">

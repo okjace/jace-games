@@ -55,6 +55,7 @@ export const TAP_COOLDOWN_MS: Record<LiveMode, number> = {
   hack: 1200,
   baseball: 1500,
   custom: 900,
+  banana: 900,
 };
 
 // ---------- Device modes ----------

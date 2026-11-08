@@ -55,7 +55,7 @@ export type LiveSet = {
 
 export type SetSummary = Omit<LiveSet, "questions"> & { questionCount: number };
 
-export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom";
+export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana";
 
 export type ModeDef = {
   name: string;
@@ -141,6 +141,14 @@ export const MODES: Record<LiveMode, ModeDef> = {
     needsSet: false,
     selfPaced: true,
     unit: (n) => num(n) + (n === 1 ? " run" : " runs"),
+  },
+  banana: {
+    name: "Banana Bonanza",
+    icon: "🍌",
+    blurb: "Every right answer peels a random banana event: golden bananas, monkey raids, banana rain, rotten bunches… and sometimes you GO BANANAS. Most bananas wins.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => "🍌 " + num(n),
   },
   custom: {
     name: "Studio game",
