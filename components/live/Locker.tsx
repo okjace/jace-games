@@ -353,6 +353,9 @@ function OwnerXp({ me, onMine, onBadges }: { me: string; onMine: (xp: number) =>
       <div>
         <h2 className="text-sm font-semibold">👑 Give XP (site owner)</h2>
         <p className="text-xs text-muted">Only you see this. People show up here once they&apos;ve opened their locker or played Live signed in.</p>
+        <Link href="/live/moderation" className="mt-1 inline-block text-xs text-accent hover:underline">
+          🚩 Review reported sets →
+        </Link>
       </div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by username" aria-label="Search by username" className={`${input} h-10`} />
       {status && (

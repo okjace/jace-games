@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useScores } from "@/components/ScoresProvider";
+import { signInHref } from "@/components/site/SiteHeader";
 import type { LiveSet, PlayerQuestion } from "@/lib/live/types";
 import { Markdown, QuestionMediaView } from "./Markdown";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
@@ -40,6 +42,7 @@ export function SetView({ id }: { id: string }) {
               by {set.owner_name} · {set.questions.length} questions · played {set.plays} time{set.plays === 1 ? "" : "s"}
             </p>
             {set.description && <p className="mt-2 max-w-2xl text-sm">{set.description}</p>}
+            {!mine && <ReportSet id={id} />}
             <div className="mt-2 flex flex-wrap gap-1.5">
               {set.tags.map((t) => (
                 <Link key={t} href={`/live/discover`} className="rounded-full bg-foreground/[.06] px-2 py-0.5 text-xs text-muted">
@@ -85,5 +88,65 @@ export function SetView({ id }: { id: string }) {
         ))}
       </ol>
     </div>
+  );
+}
+
+/** "🚩 Report": tell the site owner something's wrong with this set (signed in, once per set). */
+function ReportSet({ id }: { id: string }) {
+  const { user } = useScores();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ text: string; good: boolean } | null>(null);
+  if (note?.good) return <p className="mt-2 text-xs text-muted">{note.text}</p>;
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="mt-2 text-xs text-muted hover:text-danger">
+        🚩 Report this set
+      </button>
+    );
+  }
+  if (!user) {
+    return (
+      <p className="mt-2 text-xs text-muted">
+        <a href={signInHref(`/live/sets/${id}`)} className="text-accent hover:underline">
+          Sign in with Jace
+        </a>{" "}
+        to report a set.
+      </p>
+    );
+  }
+  return (
+    <form
+      className="mt-2 flex max-w-md flex-col gap-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        const res = await fetch(`/api/live/sets/${id}/report`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) }).catch(() => null);
+        const body = await res?.json().catch(() => null);
+        setBusy(false);
+        if (res?.ok) setNote({ text: body.already ? "You already reported this set. Thanks!" : "Thanks. The site owner will take a look.", good: true });
+        else setNote({ text: body?.error ?? "Couldn't send the report.", good: false });
+      }}
+    >
+      <textarea
+        value={reason}
+        onChange={(e) => setReason(e.target.value.slice(0, 500))}
+        rows={3}
+        placeholder="What's wrong with it? (rude, wrong answers, copied, spam…)"
+        aria-label="Why are you reporting this set?"
+        autoFocus
+        className="rounded-xl border border-line bg-background p-2 text-sm outline-none focus:border-accent"
+      />
+      {note && <p className="text-xs text-danger">{note.text}</p>}
+      <div className="flex gap-2">
+        <button type="submit" disabled={busy || reason.trim().length < 3} className="h-8 rounded-full bg-danger px-3 text-xs font-semibold text-white disabled:opacity-50">
+          Send report
+        </button>
+        <button type="button" onClick={() => setOpen(false)} className="h-8 rounded-full px-3 text-xs text-muted">
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
