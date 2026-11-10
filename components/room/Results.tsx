@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Avatar } from "@/components/Avatar";
 import { TURN_COMPONENTS } from "@/components/multi";
 import { getGame } from "@/lib/games";
 import type { RoomPayload, useRoom } from "./useRoom";
+import { UserAvatar, UserName } from "@/components/UserLook";
 
 const primary =
   "inline-flex h-11 items-center justify-center rounded-full bg-accent px-6 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50";
@@ -55,8 +55,8 @@ export function Results({
               <span className="w-7 text-center text-lg">
                 {p.dnf ? "—" : p.placement === 1 ? "🥇" : p.placement === 2 ? "🥈" : p.placement === 3 ? "🥉" : p.placement}
               </span>
-              <Avatar name={p.username} src={picture(p.userId)} size={28} />
-              <span className="flex-1 truncate font-medium">{p.username}</span>
+              <UserAvatar userId={p.userId} name={p.username} picture={picture(p.userId)} size={28} />
+              <UserName userId={p.userId} name={p.username} className="flex-1 font-medium" title />
               <span className="font-mono text-sm font-semibold tabular-nums">
                 {p.dnf ? "Didn't finish" : p.score !== undefined && game?.solo !== false && data.room.mode === "race" ? game?.format(p.score) : p.score ?? ""}
               </span>

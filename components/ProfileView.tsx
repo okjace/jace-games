@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Avatar } from "@/components/Avatar";
 import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import { SyncStatus } from "@/components/SyncStatus";
 import { MultiplayerRecord } from "@/components/MultiplayerRecord";
+import { ProfileLook } from "@/components/ProfileLook";
 import { ProfileName } from "@/components/ProfileName";
+import { UserAvatar } from "@/components/UserLook";
 import { SOLO_GAMES } from "@/lib/games";
 import { timeAgo } from "@/lib/format";
 import { useBests } from "@/lib/useBest";
@@ -20,7 +21,7 @@ export function ProfileView() {
       <section className="flex flex-col gap-4 rounded-2xl border border-line bg-panel p-6 sm:flex-row sm:items-center sm:justify-between">
         {user ? (
           <div className="flex items-center gap-4">
-            <Avatar name={user.displayName || user.username} src={user.picture} size={64} />
+            <UserAvatar userId={user.id} name={user.displayName || user.username} picture={user.picture} size={64} />
             <div className="flex flex-col gap-1.5">
               <ProfileName user={user} />
               <div>
@@ -54,6 +55,8 @@ export function ProfileView() {
           </a>
         )}
       </section>
+
+      {user && <ProfileLook user={user} />}
 
       <section>
         <div className="mb-3 flex items-baseline justify-between gap-2">

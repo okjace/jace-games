@@ -2,11 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Avatar } from "@/components/Avatar";
 import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import { compareScores, type GameDef } from "@/lib/games";
 import type { LeaderboardRow } from "@/lib/types";
+import { UserAvatar, UserName } from "@/components/UserLook";
 
 type State =
   | { kind: "loading" }
@@ -70,7 +70,7 @@ export function Leaderboard({ game, limit = 10, refreshKey = 0 }: { game: GameDe
         {deviceTop.length > 0 && (
           <ol className="space-y-1">
             {deviceTop.map((s, i) => (
-              <Row key={s.id} rank={i + 1} name={user?.username ?? "You"} picture={user?.picture} score={game.format(s.score)} you />
+              <Row key={s.id} rank={i + 1} userId={user?.id} name={user?.displayName || user?.username || "You"} picture={user?.picture} score={game.format(s.score)} you />
             ))}
           </ol>
         )}
@@ -98,6 +98,7 @@ export function Leaderboard({ game, limit = 10, refreshKey = 0 }: { game: GameDe
         <Row
           key={r.user_id}
           rank={i + 1}
+          userId={r.user_id}
           name={r.username}
           picture={r.picture}
           score={game.format(r.score)}
@@ -110,12 +111,14 @@ export function Leaderboard({ game, limit = 10, refreshKey = 0 }: { game: GameDe
 
 function Row({
   rank,
+  userId,
   name,
   picture,
   score,
   you,
 }: {
   rank: number;
+  userId?: string | null;
   name: string;
   picture?: string | null;
   score: string;
@@ -129,10 +132,10 @@ function Row({
       }`}
     >
       <span className="w-6 shrink-0 text-center font-mono text-muted">{medal ?? rank}</span>
-      <Avatar name={name} src={picture} size={24} />
-      <span className="min-w-0 flex-1 truncate font-medium">
-        {name}
-        {you && <span className="ml-1.5 text-xs font-normal text-muted">(you)</span>}
+      <UserAvatar userId={userId} name={name} picture={picture} size={24} />
+      <span className="flex min-w-0 flex-1 items-center font-medium">
+        <UserName userId={userId} name={name} />
+        {you && <span className="ml-1.5 shrink-0 text-xs font-normal text-muted">(you)</span>}
       </span>
       <span className={`shrink-0 font-mono font-semibold tabular-nums ${rank === 1 ? "text-accent" : ""}`}>{score}</span>
     </li>

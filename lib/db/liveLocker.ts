@@ -47,6 +47,8 @@ export interface LockerStore {
   /** After a game: adds it to their stats (for badges). */
   addStats(userId: string, change: (s: LiveStats) => LiveStats): Promise<void>;
   addXp(userId: string, amount: number): Promise<void>;
+  /** Several people's lockers at once (for showing their looks around the site). */
+  many(userIds: string[]): Promise<LockerRow[]>;
   /** Keeps the username on file (so the site owner can find people). */
   touch(userId: string, username: string): Promise<void>;
   /** Site owner: people whose username matches (or everyone, newest XP first). */
@@ -68,6 +70,12 @@ const supabaseStore: LockerStore = {
   async get(userId) {
     const row = check(await supabase().from("live_lockers").select("user_id, xp, icon, frame, title, custom_frame, fx, name_color, effect, badge, stats, granted_badges").eq("user_id", userId).maybeSingle()) as LockerRow | null;
     return row ?? blank(userId);
+  },
+  async many(userIds) {
+    if (userIds.length === 0) return [];
+    return check(
+      await supabase().from("live_lockers").select("user_id, xp, icon, frame, title, custom_frame, fx, name_color, effect, badge, stats, granted_badges").in("user_id", userIds),
+    ) as LockerRow[];
   },
   async setLook(userId, look) {
     check(await supabase().from("live_lockers").upsert({ user_id: userId, ...look, updated_at: new Date().toISOString() }, { onConflict: "user_id" }));
@@ -119,6 +127,12 @@ const memoryStore: LockerStore = {
   },
   async setLook(userId, look) {
     mem().set(userId, { ...(mem().get(userId) ?? blank(userId)), ...look });
+  },
+  async many(userIds) {
+    return userIds.flatMap((id) => {
+      const r = mem().get(id);
+      return r ? [{ ...r }] : [];
+    });
   },
   async setGranted(userId, badges) {
     mem().set(userId, { ...(mem().get(userId) ?? blank(userId)), granted_badges: badges });

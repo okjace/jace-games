@@ -21,6 +21,7 @@ import {
   type CustomFrame,
   type LiveStats,
 } from "@/lib/live/locker";
+import { refreshLook } from "@/components/UserLook";
 import { Celebration, LiveAvatar, LiveName, guestAvatar, setGuestAvatar } from "./LiveAvatar";
 import { card, input, primary } from "./ui";
 
@@ -89,7 +90,8 @@ export function Locker() {
         badge: next.badge ?? "",
       }) }).catch(() => null);
     const body = await res?.json().catch(() => null);
-    setStatus(res?.ok ? "Saved. You'll show like this in your next game." : (body?.error ?? "Couldn't save."));
+    if (res?.ok && user) refreshLook(user.id);
+    setStatus(res?.ok ? "Saved. This is how you show up across Jace Games now." : (body?.error ?? "Couldn't save."));
   };
 
   const tile = (selected: boolean, locked: boolean) =>
@@ -104,7 +106,7 @@ export function Locker() {
           ← Live
         </Link>
         <h1 className="text-3xl font-bold tracking-tight">Locker</h1>
-        <p className="text-muted">Choose how you show up in Live games.</p>
+        <p className="text-muted">Choose how you show up across Jace Games: your profile, leaderboards, multiplayer and Live.</p>
       </div>
 
       <section className={`${card} flex flex-wrap items-center gap-5`}>

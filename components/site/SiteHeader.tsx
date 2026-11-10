@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Avatar } from "@/components/Avatar";
 import { useScores } from "@/components/ScoresProvider";
 import { Logo } from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
+import { UserAvatar } from "@/components/UserLook";
 
 const LINKS = [
   { href: "/", label: "Games" },
@@ -62,7 +62,7 @@ export function SiteHeader() {
               aria-current={pathname === "/profile" ? "page" : undefined}
               className="flex items-center gap-2 rounded-full border border-line bg-panel py-1 pl-1 pr-1 text-sm font-medium transition-colors hover:bg-foreground/[.05] sm:pr-3"
             >
-              <Avatar name={user.displayName || user.username} src={user.picture} size={26} />
+              <UserAvatar userId={user.id} name={user.displayName || user.username} picture={user.picture} size={26} />
               <span className="hidden max-w-32 truncate sm:inline">{user.displayName || user.username}</span>
             </Link>
           ) : (

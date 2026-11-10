@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
+import { UserAvatar, UserName } from "@/components/UserLook";
 
 /** Most multiplayer wins for a game (from match results kept by Jace Games). */
 export function WinsBoard({ gameId, limit = 10 }: { gameId: string; limit?: number }) {
@@ -31,7 +32,8 @@ export function WinsBoard({ gameId, limit = 10 }: { gameId: string; limit?: numb
           className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm ${r.user_id === user?.id ? "bg-accent/10 ring-1 ring-accent/30" : "odd:bg-foreground/[.03]"}`}
         >
           <span className="w-6 text-center font-mono text-muted">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : i + 1}</span>
-          <span className="min-w-0 flex-1 truncate font-medium">{r.username}</span>
+          <UserAvatar userId={r.user_id} name={r.username} size={24} />
+          <UserName userId={r.user_id} name={r.username} className="min-w-0 flex-1 font-medium" />
           <span className="font-mono font-semibold tabular-nums">
             {r.wins} <span className="font-normal text-muted">/ {r.played}</span>
           </span>

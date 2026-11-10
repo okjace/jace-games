@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Avatar } from "@/components/Avatar";
 import { SEAT_COLORS } from "@/components/multi/types";
 import { getGame } from "@/lib/games";
 import type { PresenceMember } from "@/lib/realtime/client";
 import { FriendInvites } from "./FriendInvites";
 import type { RoomPayload, useRoom } from "./useRoom";
+import { UserAvatar, UserName } from "@/components/UserLook";
 
 const primary =
   "inline-flex h-11 items-center justify-center rounded-full bg-accent px-6 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50";
@@ -89,14 +89,14 @@ export function Lobby({
               <li key={p.userId} className="flex h-14 items-center gap-3 rounded-xl bg-foreground/[.03] px-3">
                 <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: SEAT_COLORS[p.seat % SEAT_COLORS.length] }} />
                 <span className="relative">
-                  <Avatar name={p.username} src={p.picture} size={32} />
+                  <UserAvatar userId={p.userId} name={p.username} picture={p.picture} size={32} />
                   <span
                     title={onlineIds.has(p.userId) ? "Connected" : "Not connected"}
                     className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-panel ${onlineIds.has(p.userId) ? "bg-accent" : "bg-muted"}`}
                   />
                 </span>
-                <span className="min-w-0 flex-1 truncate font-medium">
-                  {p.username}
+                <span className="flex min-w-0 flex-1 items-center font-medium">
+                  <UserName userId={p.userId} name={p.username} />
                   {p.userId === data.me?.userId && <span className="ml-1.5 text-xs font-normal text-muted">(you)</span>}
                   {host && <span className="ml-1.5 text-xs" title="Host">👑</span>}
                 </span>
