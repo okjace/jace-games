@@ -375,6 +375,31 @@ export async function joinLiveGame(
   return { token, playerId: added.id, ...(pin ? { pin } : {}) };
 }
 
+/** A signed-in player's unfinished games (any device), for the Rejoin list. */
+export async function myActiveGames(session: Session): Promise<{ code: string; mode: LiveMode; status: string; name: string; solo: boolean }[]> {
+  const list = await liveStore().activeForUser(session.user.id);
+  return list.map(({ game, player }) => ({
+    code: game.code,
+    mode: game.mode,
+    status: game.status,
+    name: player.name,
+    solo: !!(game.settings as GameSettings).solo,
+  }));
+}
+
+/** One-tap rejoin for a signed-in player: a fresh key for their spot in this game (the old device stops working). */
+export async function rejoinMine(code: string, session: Session): Promise<{ token: string; playerId: string }> {
+  const g = await getGame(code);
+  if (g.status === "ended") throw new LiveError("That game has ended.", 409);
+  const store = liveStore();
+  const mine = (await store.players(g.id)).find((p) => p.user_id === session.user.id);
+  if (!mine) throw new LiveError("You're not in that game.", 404);
+  const token = randomBytes(24).toString("base64url");
+  await store.updatePlayer(g.id, mine.id, { token_hash: sha(token) });
+  await push(g, "players");
+  return { token, playerId: mine.id };
+}
+
 /** Rejoin PIN tries: 5 per player per minute (10,000 PINs would take over a day to try). */
 const pinTries = new Map<string, number[]>();
 function allowPinTry(gameId: string, playerId: string): boolean {

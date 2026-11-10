@@ -62,6 +62,8 @@ export interface LiveStore {
   deleteExpiredGames(now: string): Promise<number>;
 
   players(gameId: string): Promise<LivePlayerRow[]>;
+  /** Games this Jace account is playing in that haven't ended yet (newest first), with their player in each. */
+  activeForUser(userId: string): Promise<{ game: LiveGameRow; player: LivePlayerRow }[]>;
   player(gameId: string, id: string): Promise<LivePlayerRow | null>;
   playerByToken(gameId: string, tokenHash: string): Promise<LivePlayerRow | null>;
   addPlayer(p: Pick<LivePlayerRow, "game_id" | "name" | "user_id" | "token_hash">): Promise<LivePlayerRow | "name_taken">;
@@ -143,6 +145,22 @@ const supabaseStore: LiveStore = {
   },
   async players(gameId) {
     return check(await supabase().from("live_players").select().eq("game_id", gameId).order("joined_at")) as LivePlayerRow[];
+  },
+  async activeForUser(userId) {
+    const mine = check(await supabase().from("live_players").select().eq("user_id", userId).order("joined_at", { ascending: false }).limit(20)) as LivePlayerRow[];
+    if (mine.length === 0) return [];
+    const games = check(
+      await supabase()
+        .from("live_games")
+        .select()
+        .in("id", [...new Set(mine.map((p) => p.game_id))])
+        .neq("status", "ended")
+        .gt("expires_at", new Date().toISOString()),
+    ) as LiveGameRow[];
+    return mine.flatMap((player) => {
+      const game = games.find((gm) => gm.id === player.game_id);
+      return game ? [{ game, player }] : [];
+    });
   },
   async player(gameId, id) {
     return (check(await supabase().from("live_players").select().eq("game_id", gameId).eq("id", id).maybeSingle()) as LivePlayerRow | null) ?? null;
@@ -249,6 +267,16 @@ const memoryStore: LiveStore = {
   },
   async players(gameId) {
     return clone(mem().players.get(gameId) ?? []);
+  },
+  async activeForUser(userId) {
+    const now = new Date().toISOString();
+    const out: { game: LiveGameRow; player: LivePlayerRow }[] = [];
+    for (const [gameId, list] of mem().players) {
+      const game = mem().games.get(gameId);
+      if (!game || game.status === "ended" || game.expires_at < now) continue;
+      for (const player of list) if (player.user_id === userId) out.push(clone({ game, player }));
+    }
+    return out.sort((a, b) => b.player.joined_at.localeCompare(a.player.joined_at)).slice(0, 20);
   },
   async player(gameId, id) {
     return clone(mem().players.get(gameId)?.find((p) => p.id === id) ?? null);

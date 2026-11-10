@@ -293,14 +293,14 @@ export function RejoinPin({ code, small = false }: { code: string; small?: boole
   if (small) {
     return (
       <p className="text-center text-xs text-muted" title="If you leave by accident, join again with the same name and this PIN.">
-        🔑 Rejoin PIN <b className="font-mono tracking-widest text-foreground">{pin}</b>
+        🔑 Game <b className="font-mono tracking-widest text-foreground">{code}</b> · Rejoin PIN <b className="font-mono tracking-widest text-foreground">{pin}</b>
       </p>
     );
   }
   return (
     <p className="rounded-xl bg-foreground/[.05] px-4 py-2 text-sm">
       🔑 Your rejoin PIN: <b className="font-mono text-lg tracking-widest">{pin}</b>
-      <span className="block text-xs text-muted">Left by accident? Join again with the same name and this PIN.</span>
+      <span className="block text-xs text-muted">Left by accident? Join game {code} again with the same name and this PIN.</span>
     </p>
   );
 }

@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import type { SetSummary } from "@/lib/live/types";
-import { MODES, type LiveMode } from "@/lib/live/types";
-import { card, getToken, input, joinedCodes, primary, secondary, setToken } from "./ui";
+import { RejoinBanner } from "./RejoinBanner";
+import { card, input, primary, secondary } from "./ui";
 
 export function LiveHome() {
   const { user } = useScores();
@@ -159,51 +159,5 @@ export function SetGrid({ sets, mine = false }: { sets: SetSummary[]; mine?: boo
         </li>
       ))}
     </ul>
-  );
-}
-
-/**
- * Games this browser is still in (left by accident: pressed Back, closed the
- * tab). Checks each saved game and offers to jump back in to the ones that
- * are still going.
- */
-function RejoinBanner() {
-  const [games, setGames] = useState<{ code: string; mode: LiveMode; name: string; status: string }[]>([]);
-  useEffect(() => {
-    let stop = false;
-    const codes = joinedCodes().slice(0, 8);
-    Promise.all(
-      codes.map(async (code) => {
-        const token = getToken(code);
-        if (!token) return null;
-        const res = await fetch(`/api/live/games/${code}/play`, { headers: { "X-Live-Token": token }, cache: "no-store" }).catch(() => null);
-        if (res?.status === 401 || res?.status === 404) {
-          // That game is gone (or they were removed): forget it.
-          setToken(code, null);
-          return null;
-        }
-        const v = res?.ok ? await res.json().catch(() => null) : null;
-        return v && v.status !== "ended" ? { code, mode: v.mode as LiveMode, name: v.me.name as string, status: v.status as string } : null;
-      }),
-    ).then((list) => !stop && setGames(list.filter((g): g is NonNullable<typeof g> => !!g)));
-    return () => {
-      stop = true;
-    };
-  }, []);
-  if (games.length === 0) return null;
-  return (
-    <section className="flex flex-col gap-2 rounded-2xl border border-accent/40 bg-accent/[.06] p-4">
-      <p className="font-semibold">👋 You&apos;re still in {games.length === 1 ? "a game" : `${games.length} games`}</p>
-      <ul className="flex flex-wrap gap-2">
-        {games.map((g) => (
-          <li key={g.code}>
-            <Link href={`/live/play/${g.code}`} className={primary}>
-              {MODES[g.mode]?.icon} Rejoin {MODES[g.mode]?.name ?? "game"} {g.code} as {g.name}
-              {g.status === "lobby" ? " (waiting to start)" : ""}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

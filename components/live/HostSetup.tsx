@@ -7,6 +7,7 @@ import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import { MODES, type LiveMode, type SetSummary } from "@/lib/live/types";
 import { guestAvatar } from "./LiveAvatar";
+import { RejoinBanner } from "./RejoinBanner";
 import { MapCard, type MapSummaryView } from "./MapList";
 import { card, primary, secondary, setPin, setToken } from "./ui";
 
@@ -115,6 +116,7 @@ export function HostSetup() {
     <div className="mx-auto flex max-w-3xl flex-col gap-5">
       <h1 className="text-3xl font-bold tracking-tight">{soloFirst ? "Play solo" : "Host a game"}</h1>
       {soloFirst && <p className="-mt-3 text-muted">Pick a set and a mode and play on your own, no host or room needed.</p>}
+      <RejoinBanner />
 
       <section className={card}>
         <h2 className="text-sm font-semibold">1. Questions</h2>
