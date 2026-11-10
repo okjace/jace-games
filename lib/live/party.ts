@@ -56,6 +56,12 @@ export const TAP_COOLDOWN_MS: Record<LiveMode, number> = {
   baseball: 1500,
   custom: 900,
   banana: 900,
+  summit: 900,
+  survival: 900,
+  boss: 900,
+  tug: 900,
+  hatchery: 1200,
+  pinata: 900,
 };
 
 // ---------- Device modes ----------

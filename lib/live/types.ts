@@ -55,7 +55,7 @@ export type LiveSet = {
 
 export type SetSummary = Omit<LiveSet, "questions"> & { questionCount: number };
 
-export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana";
+export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata";
 
 export type ModeDef = {
   name: string;
@@ -149,6 +149,54 @@ export const MODES: Record<LiveMode, ModeDef> = {
     needsSet: false,
     selfPaced: true,
     unit: (n) => "🍌 " + num(n),
+  },
+  summit: {
+    name: "Summit Climb",
+    icon: "🏔️",
+    blurb: "No luck, just answers: each right one climbs a step (two on a streak), wrong ones slide you back. First to the summit wins.",
+    needsSet: true,
+    selfPaced: true,
+    unit: (n) => `${num(n)} step${n === 1 ? "" : "s"}`,
+  },
+  survival: {
+    name: "Last One Standing",
+    icon: "❤️",
+    blurb: "No luck: everyone has 3 lives and every wrong answer costs one. Most right answers wins; it's over when everyone's out.",
+    needsSet: true,
+    selfPaced: true,
+    unit: (n) => `${num(n)} right`,
+  },
+  boss: {
+    name: "Boss Battle",
+    icon: "🐉",
+    blurb: "The whole room vs one boss, no luck: right answers hit it (harder on a streak), wrong ones heal it. Beat it together!",
+    needsSet: true,
+    selfPaced: true,
+    unit: (n) => `${num(n)} dmg`,
+  },
+  tug: {
+    name: "Tug of War",
+    icon: "🪢",
+    blurb: "Red vs Blue, no luck: every right answer pulls the rope your way (harder on a streak). First team to drag it over the line wins.",
+    needsSet: true,
+    selfPaced: true,
+    unit: (n) => `${num(n)} pull${n === 1 ? "" : "s"}`,
+  },
+  hatchery: {
+    name: "Dragon Hatchery",
+    icon: "🥚",
+    blurb: "Every right answer hatches a dragon egg. Collect all 15 (the rarest are mighty). Most dragon power wins.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => `⚡ ${num(n)}`,
+  },
+  pinata: {
+    name: "Piñata Party",
+    icon: "🪅",
+    blurb: "Every right answer whacks the piñata: candy, candy explosions, and the rare golden piñata. Most candy wins.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => `🍬 ${num(n)}`,
   },
   custom: {
     name: "Studio game",

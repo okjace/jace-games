@@ -7,6 +7,7 @@ import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
 import { addGameToStats, cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar, type XpPart } from "./locker";
 import { GO_BANANAS_MS, bananaBase, boostBananas, rollBanana } from "./banana";
+import { BOSS_HEAL, SUMMIT_STEPS, SURVIVAL_LIVES, bossHit, bossMaxHp, hatch, summitClimb, tugGoal, tugPull, whack, type Team } from "./moreModes";
 import { DEFAULT_MAP, cleanMap, type TowerMap } from "./maps";
 import type { GameReport, ReportAttempt, ReportQuestion } from "./report";
 import { broadcast } from "@/lib/realtime/server";
@@ -106,6 +107,14 @@ type PlayerData = PartyData & {
   /** Locker XP this game gave them (set when it ends), and what earned it. */
   xp?: number;
   xpParts?: XpPart[];
+  /** Last One Standing: lives left, and whether they're out. */
+  lives?: number;
+  out?: boolean;
+  /** Boss Battle: how much this player's wrong answers healed the boss. */
+  heal?: number;
+  /** Dragon Hatchery: best power of each dragon hatched, and the last few hatched. */
+  dragons?: Record<string, number>;
+  hatched?: { id: string; power: number }[];
   /** Banana Bonanza: GO BANANAS lasts until this time. */
   goUntil?: number;
   /** Guests: the hash of their rejoin PIN. */
@@ -520,6 +529,26 @@ export type PlayerView = {
     catches?: Catch[];
     /** Banana Bonanza: when GO BANANAS ends (0 if it isn't on). */
     goUntil?: number;
+    /** The skill modes: the summit leader, lives left, the boss's health, or the rope. */
+    skill?: {
+      goal?: number;
+      leader?: { name: string; value: number } | null;
+      lives?: number;
+      maxLives?: number;
+      out?: boolean;
+      alive?: number;
+      hp?: number;
+      maxHp?: number;
+      dealt?: number;
+      healed?: number;
+      team?: Team;
+      rope?: number;
+      red?: number;
+      blue?: number;
+    };
+    /** Dragon Hatchery: best power of each dragon hatched, and the latest hatches. */
+    dragons?: Record<string, number>;
+    hatched?: { id: string; power: number }[];
     /** Fishdex: fish id → heaviest caught. */
     caught?: Record<string, number>;
     frenzy?: number;
@@ -610,6 +639,23 @@ function partyView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]): Pla
   }
   if (g.mode === "fishing") return { catches: d.catches ?? [], caught: d.caught ?? {}, frenzy: d.frenzy ?? 0, stormed: !!d.stormed };
   if (g.mode === "banana") return { goUntil: (d.goUntil ?? 0) > Date.now() ? d.goUntil : 0 };
+  if (g.mode === "summit") {
+    const best = [...all].sort((a, b) => b.score - a.score)[0];
+    return { skill: { goal: SUMMIT_STEPS, leader: best ? { name: best.name, value: best.score } : null } };
+  }
+  if (g.mode === "survival") {
+    return { skill: { lives: d.lives ?? SURVIVAL_LIVES, maxLives: SURVIVAL_LIVES, out: !!d.out, alive: all.filter((p) => !dataOf(p).out).length } };
+  }
+  if (g.mode === "boss") {
+    const t = skillTotals(all);
+    const max = bossMaxHp(all.length);
+    return { skill: { hp: Math.max(0, max - (t.dealt - t.healed)), maxHp: max, dealt: me.score, healed: d.heal ?? 0 } };
+  }
+  if (g.mode === "tug") {
+    const t = skillTotals(all);
+    return { skill: { team: teamOf(me, all), rope: t.red - t.blue, goal: tugGoal(all.length), red: t.red, blue: t.blue } };
+  }
+  if (g.mode === "hatchery") return { dragons: d.dragons ?? {}, hatched: d.hatched ?? [] };
   if (g.mode === "hack") {
     return {
       password: d.pw ?? null,
@@ -733,6 +779,73 @@ async function endGame(g: LiveGameRow, winner?: string) {
   await giveXp(ended);
   await saveReport(ended);
   await push(ended);
+}
+
+/** Tug of War: teams by join order (alternating), so they stay balanced and nothing extra is stored. */
+function teamOf(p: LivePlayerRow, all: LivePlayerRow[]): Team {
+  const order = [...all].sort((a, b) => a.joined_at.localeCompare(b.joined_at) || a.id.localeCompare(b.id));
+  return order.findIndex((x) => x.id === p.id) % 2 === 0 ? "red" : "blue";
+}
+
+/** Totals the skill modes need: boss damage and healing, tug team pulls. */
+function skillTotals(all: LivePlayerRow[]) {
+  let dealt = 0;
+  let healed = 0;
+  let red = 0;
+  let blue = 0;
+  for (const p of all) {
+    dealt += p.score;
+    healed += dataOf(p).heal ?? 0;
+    if (teamOf(p, all) === "red") red += p.score;
+    else blue += p.score;
+  }
+  return { dealt, healed, red, blue };
+}
+
+/** A wrong answer in the skill modes: slide back, lose a life, or heal the boss. */
+async function wrongAnswer(g: LiveGameRow, me: LivePlayerRow): Promise<LivePlayerRow> {
+  const store = liveStore();
+  const d = dataOf(me);
+  if (g.mode === "summit") {
+    return (await store.updatePlayer(g.id, me.id, { score: Math.max(0, me.score - 1), data: { ...d, last: { ...(d.last ?? {}), slid: me.score > 0 } } }))!;
+  }
+  if (g.mode === "boss") {
+    return (await store.updatePlayer(g.id, me.id, { data: { ...d, heal: (d.heal ?? 0) + BOSS_HEAL, last: { ...(d.last ?? {}), healed: BOSS_HEAL } } }))!;
+  }
+  if (g.mode === "survival") {
+    const lives = (d.lives ?? SURVIVAL_LIVES) - 1;
+    const updated = (await store.updatePlayer(g.id, me.id, {
+      data: { ...d, lives: Math.max(0, lives), out: lives <= 0, last: { ...(d.last ?? {}), lostLife: true, out: lives <= 0 } },
+      ...(lives <= 0 ? { finished_at: new Date().toISOString() } : {}),
+    }))!;
+    // Everyone out: game over (most right answers wins).
+    const all = await store.players(g.id);
+    if (all.every((p) => dataOf(p).out)) {
+      const latest = await store.gameByCode(g.code);
+      if (latest && latest.status === "playing") await endGame(latest);
+    }
+    return updated;
+  }
+  return me;
+}
+
+/** After a right answer in a skill mode: did someone (or everyone) just win? */
+async function checkSkillWin(g: LiveGameRow, me: LivePlayerRow) {
+  const store = liveStore();
+  const all = await store.players(g.id);
+  let winner: string | null = null;
+  if (g.mode === "summit" && me.score >= SUMMIT_STEPS) winner = me.name;
+  if (g.mode === "boss") {
+    const t = skillTotals(all);
+    if (t.dealt - t.healed >= bossMaxHp(all.length)) winner = "Everyone";
+  }
+  if (g.mode === "tug") {
+    const t = skillTotals(all);
+    if (Math.abs(t.red - t.blue) >= tugGoal(all.length)) winner = t.red > t.blue ? "Red team" : "Blue team";
+  }
+  if (!winner) return;
+  const latest = await store.gameByCode(g.code);
+  if (latest && latest.status === "playing") await endGame(latest, winner);
 }
 
 /**
@@ -949,6 +1062,7 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
 
   if (body.action === "next") {
     if (settings.noSet || d.chests || d.cur) return buildPlayerView(g, me, await store.players(g.id));
+    if (g.mode === "survival" && d.out) throw new LiveError("You're out! Watch the others finish.", 409);
     // Avoid repeating the last few questions.
     const recent = d.recent ?? [];
     const pool = qs.map((_, i) => i).filter((i) => !recent.includes(i));
@@ -977,6 +1091,7 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
       },
     }))!;
     earned = correct;
+    if (!correct) me = await wrongAnswer(g, me);
     // Home Run Derby: a wrong answer is a strike; strike three is an out.
     if (!correct && g.mode === "baseball") {
       const fresh = dataOf(me);
@@ -1067,6 +1182,29 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
       score: Math.max(0, me.score + gain),
       data: { ...fresh, goUntil, last: { kind: "banana", event: id, amount: gain, going, goUntil, target } },
     }))!;
+  } else if (earned && (g.mode === "summit" || g.mode === "survival" || g.mode === "boss" || g.mode === "tug")) {
+    // Skill modes: what a right answer is worth depends only on your streak.
+    const fresh = dataOf(me);
+    const gain = g.mode === "summit" ? summitClimb(me.streak) : g.mode === "boss" ? bossHit(me.streak) : g.mode === "tug" ? tugPull(me.streak) : 1;
+    me = (await store.updatePlayer(g.id, me.id, { score: me.score + gain, data: { ...fresh, last: { kind: g.mode, gain, correct: true } } }))!;
+    await checkSkillWin(g, me);
+  } else if (earned && g.mode === "hatchery") {
+    const fresh = dataOf(me);
+    const { dragon, power } = hatch(me.streak);
+    const dragons = fresh.dragons ?? {};
+    me = (await store.updatePlayer(g.id, me.id, {
+      score: me.score + power,
+      data: {
+        ...fresh,
+        dragons: { ...dragons, [dragon.id]: Math.max(dragons[dragon.id] ?? 0, power) },
+        hatched: [{ id: dragon.id, power }, ...(fresh.hatched ?? [])].slice(0, 8),
+        last: { kind: "hatch", dragon: dragon.id, power, first: !dragons[dragon.id] },
+      },
+    }))!;
+  } else if (earned && g.mode === "pinata") {
+    const fresh = dataOf(me);
+    const w = whack(me.streak, tapped);
+    me = (await store.updatePlayer(g.id, me.id, { score: me.score + w.candy, data: { ...fresh, last: { kind: "whack", whack: w.kind, candy: w.candy } } }))!;
   } else if (earned && g.mode === "baseball") {
     // A right answer (or a tap) brings a pitch to swing at.
     const fresh = dataOf(me);

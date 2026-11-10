@@ -7,6 +7,7 @@ import { GameQuestion, type AnswerResult } from "../fx/GameQuestion";
 import { Juice, MuteButton, useCountUp, useJuice } from "../fx/Juice";
 import { sfx } from "../fx/sfx";
 import { BananaBonanza } from "./BananaBonanza";
+import { BossBattle, DragonHatchery, LastStanding, PinataParty, SummitClimb, TugOfWar } from "./MoreModes";
 import { Baseball } from "./Baseball";
 import { CodeBreakers } from "./CodeBreakers";
 import { GadgetFactory } from "./GadgetFactory";
@@ -24,7 +25,7 @@ import { StudioMode } from "./StudioMode";
 import { TowerSiege } from "./TowerSiege";
 
 /** Every self-paced mode plays on this stage. */
-export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom", "banana"];
+export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom", "banana", "summit", "survival", "boss", "tug", "hatchery", "pinata"];
 
 /** Each mode's look: background, accent, and its tap button with questions off. */
 export const THEMES: Record<string, { bg: string; accent: string; tap: [string, string] }> = {
@@ -38,6 +39,12 @@ export const THEMES: Record<string, { bg: string; accent: string; tap: [string, 
   baseball: { bg: "linear-gradient(180deg, #166534 0%, #14532d 70%, #052e16 100%)", accent: "#facc15", tap: ["⚾ PLAY BALL", "Each tap puts you up to bat."] },
   custom: { bg: "linear-gradient(180deg, #4338ca 0%, #1e1b4b 100%)", accent: "#a5f3fc", tap: ["🪙 EARN", "Each tap earns a few coins."] },
   banana: { bg: "radial-gradient(circle at 50% 0%, #fde047 0%, #f59e0b 55%, #b45309 100%)", accent: "#fef08a", tap: ["🍌 PEEL", "Each peel is a random banana event!"] },
+  summit: { bg: "linear-gradient(180deg, #0ea5e9 0%, #0369a1 55%, #1e3a5f 100%)", accent: "#e0f2fe", tap: ["⛰️ CLIMB", ""] },
+  survival: { bg: "linear-gradient(180deg, #7f1d1d 0%, #450a0a 100%)", accent: "#fca5a5", tap: ["❤️ GO", ""] },
+  boss: { bg: "radial-gradient(circle at 50% 20%, #7c3aed 0%, #3b0764 60%, #1e1b4b 100%)", accent: "#fbbf24", tap: ["⚔️ ATTACK", ""] },
+  tug: { bg: "linear-gradient(90deg, #991b1b 0%, #4b5563 50%, #1e40af 100%)", accent: "#fde68a", tap: ["🪢 PULL", ""] },
+  hatchery: { bg: "radial-gradient(circle at 50% 30%, #fb923c 0%, #c2410c 55%, #431407 100%)", accent: "#fde68a", tap: ["🥚 HATCH", "Each tap warms an egg until it hatches."] },
+  pinata: { bg: "linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #06b6d4 100%)", accent: "#fde68a", tap: ["🪅 WHACK", "Each whack might shake out candy!"] },
 };
 
 const REWARD_TEXT: Partial<Record<LiveMode, (v: PlayerView) => string | null>> = {
@@ -254,6 +261,12 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
         {mode === "baseball" && <Baseball {...stageProps} />}
         {mode === "custom" && <StudioMode {...stageProps} />}
         {mode === "banana" && <BananaBonanza {...stageProps} />}
+        {mode === "summit" && <SummitClimb {...stageProps} />}
+        {mode === "survival" && <LastStanding {...stageProps} />}
+        {mode === "boss" && <BossBattle {...stageProps} />}
+        {mode === "tug" && <TugOfWar {...stageProps} />}
+        {mode === "hatchery" && <DragonHatchery {...stageProps} />}
+        {mode === "pinata" && <PinataParty {...stageProps} />}
 
         <RejoinPin code={view.code} small />
         <ol className="flex flex-col gap-1.5 rounded-3xl bg-black/25 p-3 text-sm backdrop-blur">
