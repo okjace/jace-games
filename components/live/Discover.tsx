@@ -14,6 +14,7 @@ export function Discover() {
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState<string | null>(null);
   const [sort, setSort] = useState<"popular" | "new">("popular");
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [page, setPage] = useState(0);
   const [sets, setSets] = useState<SetSummary[] | null>(null);
   const [more, setMore] = useState(false);
@@ -29,6 +30,7 @@ export function Discover() {
     const sp = new URLSearchParams({ sort, page: String(page) });
     if (query) sp.set("q", query);
     if (tag) sp.set("tag", tag);
+    if (verifiedOnly) sp.set("verified", "1");
     fetch(`/api/live/discover?${sp}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
@@ -41,7 +43,7 @@ export function Discover() {
     return () => {
       cancelled = true;
     };
-  }, [query, tag, sort, page]);
+  }, [query, tag, sort, verifiedOnly, page]);
 
   const reset = (fn: () => void) => {
     fn();
@@ -65,6 +67,15 @@ export function Discover() {
       </Link>
       <div className="flex flex-col gap-3 sm:flex-row">
         <input value={q} onChange={(e) => reset(() => setQ(e.target.value))} placeholder="Search sets" aria-label="Search sets" className={input} />
+        <button
+          type="button"
+          aria-pressed={verifiedOnly}
+          onClick={() => reset(() => setVerifiedOnly((v) => !v))}
+          title="Only sets checked by the Jace Games team"
+          className={`h-11 shrink-0 rounded-full border px-4 text-sm font-semibold ${verifiedOnly ? "border-sky-500 bg-sky-500/15 text-sky-600 dark:text-sky-400" : "border-line text-muted hover:text-foreground"}`}
+        >
+          ✓ Verified
+        </button>
         <div className="inline-flex shrink-0 rounded-full border border-line p-1 text-sm" role="group" aria-label="Sort">
           {(["popular", "new"] as const).map((s) => (
             <button

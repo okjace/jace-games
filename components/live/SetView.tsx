@@ -12,7 +12,7 @@ const TYPE_LABEL = { choice: "Multiple choice", truefalse: "True or false", type
 
 /** A set's page: its questions (without answers, unless it's yours) and a Host button. */
 export function SetView({ id }: { id: string }) {
-  const [data, setData] = useState<{ set: Omit<LiveSet, "questions"> & { questions: PlayerQuestion[] }; mine: boolean } | null>(null);
+  const [data, setData] = useState<{ set: Omit<LiveSet, "questions"> & { questions: PlayerQuestion[] }; mine: boolean; siteOwner?: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,12 +37,27 @@ export function SetView({ id }: { id: string }) {
             {set.cover}
           </span>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{set.title}</h1>
+            <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight">
+              {set.title}
+              {set.verified && <VerifiedBadge />}
+            </h1>
             <p className="text-sm text-muted">
               by {set.owner_name} · {set.questions.length} questions · played {set.plays} time{set.plays === 1 ? "" : "s"}
             </p>
             {set.description && <p className="mt-2 max-w-2xl text-sm">{set.description}</p>}
             {!mine && <ReportSet id={id} />}
+            {data.siteOwner && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await fetch(`/api/live/sets/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ verified: !set.verified }) }).catch(() => null);
+                  if (res?.ok) setData({ ...data, set: { ...set, verified: !set.verified } });
+                }}
+                className="ml-3 mt-2 text-xs text-accent hover:underline"
+              >
+                👑 {set.verified ? "Remove verified badge" : "Mark as verified"}
+              </button>
+            )}
             <div className="mt-2 flex flex-wrap gap-1.5">
               {set.tags.map((t) => (
                 <Link key={t} href={`/live/discover`} className="rounded-full bg-foreground/[.06] px-2 py-0.5 text-xs text-muted">
@@ -148,5 +163,17 @@ function ReportSet({ id }: { id: string }) {
         </button>
       </div>
     </form>
+  );
+}
+
+/** The ✓ Verified badge: the site owner checked this set. */
+export function VerifiedBadge({ small = false }: { small?: boolean }) {
+  return (
+    <span
+      title="Verified: checked by the Jace Games team"
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full bg-sky-500/15 font-semibold text-sky-600 dark:text-sky-400 ${small ? "px-1.5 py-0.5 text-[10px]" : "px-2.5 py-0.5 text-xs"}`}
+    >
+      ✓ Verified
+    </span>
   );
 }

@@ -11,6 +11,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       q: (sp.get("q") ?? "").slice(0, 60) || undefined,
       tag: (sp.get("tag") ?? "").toLowerCase().slice(0, 24) || undefined,
       sort: sp.get("sort") === "new" ? "new" : "popular",
+      verified: sp.get("verified") === "1",
       limit: 24,
       offset: page * 24,
     });

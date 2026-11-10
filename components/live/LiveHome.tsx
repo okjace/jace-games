@@ -7,6 +7,7 @@ import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import type { SetSummary } from "@/lib/live/types";
 import { RejoinBanner } from "./RejoinBanner";
+import { VerifiedBadge } from "./SetView";
 import { card, input, primary, secondary } from "./ui";
 
 export function LiveHome() {
@@ -143,7 +144,10 @@ export function SetGrid({ sets, mine = false }: { sets: SetSummary[]; mine?: boo
                 {s.cover}
               </span>
               <div className="min-w-0">
-                <p className="truncate font-semibold">{s.title}</p>
+                <p className="flex items-center gap-1.5 font-semibold">
+                  <span className="truncate">{s.title}</span>
+                  {s.verified && <VerifiedBadge small />}
+                </p>
                 <p className="truncate text-xs text-muted">
                   {s.questionCount} question{s.questionCount === 1 ? "" : "s"} · {mine ? s.visibility : `by ${s.owner_name}`}
                 </p>

@@ -52,7 +52,7 @@ export interface LiveStore {
   updateSet(id: string, patch: Partial<LiveSet>): Promise<LiveSet | null>;
   deleteSet(id: string): Promise<void>;
   mySets(owner: string): Promise<SetSummary[]>;
-  discover(opts: { q?: string; tag?: string; sort: "popular" | "new"; limit: number; offset: number }): Promise<SetSummary[]>;
+  discover(opts: { q?: string; tag?: string; sort: "popular" | "new"; verified?: boolean; limit: number; offset: number }): Promise<SetSummary[]>;
   addPlay(id: string): Promise<void>;
 
   createGame(g: NewGame): Promise<LiveGameRow>;
@@ -85,7 +85,7 @@ function check<T>(res: { data: T; error: { message: string; code?: string } | nu
   return res.data;
 }
 
-const SET_SUMMARY = "id, owner_id, owner_name, title, description, cover, tags, visibility, plays, removed, created_at, updated_at, questions";
+const SET_SUMMARY = "id, owner_id, owner_name, title, description, cover, tags, visibility, plays, removed, verified, created_at, updated_at, questions";
 
 function rowToSummary(r: Record<string, unknown>): SetSummary {
   const { questions, ...rest } = r as LiveSet;
@@ -110,8 +110,9 @@ const supabaseStore: LiveStore = {
     const rows = check(await supabase().from("live_sets").select(SET_SUMMARY).eq("owner_id", owner).order("updated_at", { ascending: false }).limit(200));
     return (rows as Record<string, unknown>[]).map(rowToSummary);
   },
-  async discover({ q, tag, sort, limit, offset }) {
+  async discover({ q, tag, sort, verified, limit, offset }) {
     let query = supabase().from("live_sets").select(SET_SUMMARY).eq("visibility", "public").eq("removed", false);
+    if (verified) query = query.eq("verified", true);
     if (q) {
       const like = `%${q.replace(/[%_\\,()]/g, " ").trim()}%`;
       query = query.or(`title.ilike.${like},description.ilike.${like},owner_name.ilike.${like}`);
@@ -231,10 +232,10 @@ const memoryStore: LiveStore = {
   async mySets(owner) {
     return [...mem().sets.values()].filter((s) => s.owner_id === owner).sort((a, b) => b.updated_at.localeCompare(a.updated_at)).map((s) => clone(summary(s)));
   },
-  async discover({ q, tag, sort, limit, offset }) {
+  async discover({ q, tag, sort, verified, limit, offset }) {
     const needle = q?.toLowerCase().trim();
     return [...mem().sets.values()]
-      .filter((s) => s.visibility === "public" && !s.removed)
+      .filter((s) => s.visibility === "public" && !s.removed && (!verified || s.verified))
       .filter((s) => !needle || `${s.title} ${s.description} ${s.owner_name}`.toLowerCase().includes(needle))
       .filter((s) => !tag || s.tags.includes(tag))
       .sort((a, b) => (sort === "new" ? b.created_at.localeCompare(a.created_at) : b.plays - a.plays))

@@ -49,6 +49,8 @@ export type LiveSet = {
   questions: Question[];
   plays: number;
   removed: boolean;
+  /** Checked by the site owner: shown with a ✓ Verified badge. */
+  verified?: boolean;
   created_at: string;
   updated_at: string;
 };
