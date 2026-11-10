@@ -254,7 +254,55 @@ export function isCorrect(q: Question, answer: unknown): boolean {
   }
   if (typeof answer !== "string") return false;
   const a = normAnswer(answer);
-  return !!a && (q.accepted ?? []).some((x) => normAnswer(x) === a);
+  return !!a && (q.accepted ?? []).some((x) => normAnswer(x) === a || closeEnough(answer, x));
+}
+
+/** For forgiving comparison: no accents, punctuation, extra spaces or a leading "a" / "an" / "the". */
+function looseAnswer(s: string): string {
+  return s
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^(the|a|an) /, "");
+}
+
+/** Edits between two strings, counting a swap of two neighbouring letters as one (Damerau-Levenshtein). */
+function typos(a: string, b: string, limit: number): number {
+  if (Math.abs(a.length - b.length) > limit) return limit + 1;
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length];
+}
+
+/**
+ * Is a typed answer close enough to an accepted one? Small spelling mistakes
+ * are forgiven in proportion to the answer's length (none for 3 letters or
+ * fewer, so "cat" never matches "car"), spaces don't matter ("ice cream" =
+ * "icecream"), and answers with numbers must have exactly the same numbers.
+ */
+export function closeEnough(typed: string, accepted: string): boolean {
+  const a = looseAnswer(typed);
+  const b = looseAnswer(accepted);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const numbers = (s: string) => (s.match(/\d+(\.\d+)?/g) ?? []).map(Number).join(",");
+  if (numbers(a) !== numbers(b)) return false;
+  const x = a.replace(/ /g, "");
+  const y = b.replace(/ /g, "");
+  if (x === y) return true;
+  const len = y.length;
+  const allowed = len <= 3 ? 0 : len <= 7 ? 1 : len <= 14 ? 2 : 3;
+  return allowed > 0 && typos(x, y, allowed) <= allowed;
 }
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
