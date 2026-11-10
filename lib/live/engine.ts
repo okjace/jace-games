@@ -2,11 +2,13 @@ import "server-only";
 import { createHash, randomBytes, randomInt } from "crypto";
 import { liveStore, type LiveGameRow, type LivePlayerRow } from "@/lib/db/live";
 import { grantedOf, lockerStore, lookOf, statsOf } from "@/lib/db/liveLocker";
+import { chatStore, type ChatRow } from "@/lib/db/liveChat";
 import { mapStore } from "@/lib/db/liveMaps";
 import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
 import { addGameToStats, cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar, type XpPart } from "./locker";
 import { GO_BANANAS_MS, bananaBase, boostBananas, rollBanana } from "./banana";
+import { CHAT_GAP_MS, cleanChat, type ChatMessage } from "./chat";
 import { BOSS_HEAL, SUMMIT_STEPS, SURVIVAL_LIVES, bossHit, bossMaxHp, hatch, summitClimb, tugGoal, tugPull, whack, type Team } from "./moreModes";
 import { DEFAULT_MAP, cleanMap, type TowerMap } from "./maps";
 import type { GameReport, ReportAttempt, ReportQuestion } from "./report";
@@ -70,6 +72,8 @@ const ROCKET_GOAL = 100;
 export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean; /** Tower Siege: a copy of the chosen map, taken when the game is made. */ map?: TowerMap; mapTitle?: string;
   /** Studio-game mode: a copy of the game, taken when the Live game is made. */
   custom?: { gameId: string; title: string; icon: string; owner: string; html: string };
+  /** Chat in the game (on unless the host turns it off). */
+  chat?: boolean;
   /** Listed on Discover so anyone can find and join it (never for solo games). */
   public?: boolean;
   /** Solo: one player, no host screen. The player moves the game along. */
@@ -429,6 +433,55 @@ async function playAgain(g: LiveGameRow, rawMode: string) {
   );
 }
 
+// ---------- Chat ----------
+
+/** Who's chatting: a player (by their key) or the host (signed in). */
+async function chatter(g: LiveGameRow, token: unknown, session: Session | null): Promise<{ playerId: string | null; name: string; host: boolean }> {
+  if (typeof token === "string" && token.length >= 20) {
+    const p = await playerFor(g, token);
+    return { playerId: p.id, name: p.name, host: false };
+  }
+  if (session && session.user.id === g.host_id) return { playerId: null, name: session.user.displayName || session.user.username, host: true };
+  throw new LiveError("Join the game to chat.", 401);
+}
+
+const chatOut = (m: ChatRow, me: string | null): ChatMessage => ({ id: m.id, name: m.name, host: m.host, text: m.text, at: m.created_at, mine: !!me && m.player_id === me });
+
+/** The latest chat messages (and whether chat is on). */
+export async function chatList(code: string, token: unknown, session: Session | null, after?: string): Promise<{ on: boolean; messages: ChatMessage[] }> {
+  const g = await getGame(code);
+  const who = await chatter(g, token, session);
+  const on = (g.settings as GameSettings).chat !== false;
+  const rows = await chatStore().list(g.id, after && /^\d{4}-/.test(after) ? after : undefined);
+  return { on, messages: rows.map((m) => chatOut(m, who.playerId)) };
+}
+
+const lastChat = new Map<string, number>();
+
+/** Send a chat message: cleaned, rate-limited, and shown to everyone right away. */
+export async function chatSend(code: string, token: unknown, session: Session | null, rawText: unknown): Promise<ChatMessage> {
+  const g = await getGame(code);
+  const who = await chatter(g, token, session);
+  if ((g.settings as GameSettings).chat === false && !who.host) throw new LiveError("The host turned chat off.", 403);
+  const text = cleanChat(rawText);
+  if (!text) throw new LiveError("Type a message first.");
+  const key = `${g.id}:${who.playerId ?? "host"}`;
+  const now = Date.now();
+  if (now - (lastChat.get(key) ?? 0) < CHAT_GAP_MS) throw new LiveError("Slow down a little!", 429);
+  lastChat.set(key, now);
+  const row = await chatStore().add({ game_id: g.id, player_id: who.playerId, name: who.name, host: who.host, text });
+  await broadcast(topicOf(g), "chat", { message: chatOut(row, null) }).catch(() => {});
+  return chatOut(row, who.playerId);
+}
+
+/** The host deletes a message. */
+export async function chatDelete(code: string, session: Session, id: string): Promise<void> {
+  const g = await getGame(code);
+  if (g.host_id !== session.user.id) throw new LiveError("Only the host can delete messages.", 403);
+  await chatStore().remove(g.id, id);
+  await broadcast(topicOf(g), "chat-deleted", { id }).catch(() => {});
+}
+
 /** A signed-in player's unfinished games (any device), for the Rejoin list. */
 export async function myActiveGames(session: Session): Promise<{ code: string; mode: LiveMode; status: string; name: string; solo: boolean }[]> {
   const list = await liveStore().activeForUser(session.user.id);
@@ -536,6 +589,8 @@ export type PlayerView = {
   mode: LiveMode;
   status: LiveGameRow["status"];
   noSet: boolean;
+  /** Whether chat is on in this game (never in solo games). */
+  chatOn: boolean;
   /** Solo games: what was picked, for "Play again". */
   solo: { setId: string | null; minutes: number; shuffle: boolean; mapId: string | null; gameId: string | null } | null;
   phase: string;
@@ -632,6 +687,7 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
     mode: g.mode,
     status: g.status,
     noSet: !!settings.noSet,
+    chatOn: settings.chat !== false && !settings.solo,
     solo: settings.solo
       ? { setId: settings.setId ?? null, minutes: settings.minutes, shuffle: settings.shuffle, mapId: settings.mapId ?? null, gameId: settings.gameId ?? null }
       : null,
@@ -718,11 +774,16 @@ type HostAction =
   | { action: "kick"; playerId: string }
   | { action: "tick" }
   | { action: "public"; on: boolean }
-  | { action: "again"; mode?: string };
+  | { action: "again"; mode?: string }
+  | { action: "chat"; on: boolean };
 
 export async function hostAction(code: string, session: Session, body: HostAction): Promise<void> {
   const g = await getGame(code);
   if (g.host_id !== session.user.id) throw new LiveError("Only the host can do that.", 403);
+  if (body.action === "chat") {
+    await push(await bump(g, { settings: { ...(g.settings as GameSettings), chat: body.on === true } }), "chat-settings");
+    return;
+  }
   if (body.action === "again") {
     await playAgain(g, typeof body.mode === "string" ? body.mode : g.mode);
     return;

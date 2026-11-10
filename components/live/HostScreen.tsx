@@ -7,6 +7,7 @@ import type { HostView } from "@/lib/live/engine";
 import { MODES, type LiveMode } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
+import { ChatPanel } from "./ChatPanel";
 import { HostReport } from "./HostReport";
 import { HtmlFrame } from "./HtmlFrame";
 import { Celebration, LiveAvatar, LiveName } from "./LiveAvatar";
@@ -164,6 +165,7 @@ export function HostScreen({ code }: { code: string }) {
           </div>
         </div>
         {error && <p className="text-sm text-danger">{error}</p>}
+        {view.status !== "ended" && <ChatPanel code={view.code} topic={view.topic} token={null} host on={view.settings.chat !== false} />}
         {showPlayers && <PlayerList view={view} onKick={(id) => act("kick", { playerId: id })} onClose={() => setShowPlayers(false)} />}
 
         {view.status === "lobby" && <Lobby view={view} busy={busy} onStart={() => act("start")} onKick={(id) => act("kick", { playerId: id })} />}

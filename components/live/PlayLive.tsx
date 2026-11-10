@@ -9,6 +9,7 @@ import { MODES } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
 import type { Avatar } from "@/lib/live/locker";
 import { Answer } from "./Answer";
+import { ChatPanel } from "./ChatPanel";
 import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
@@ -140,12 +141,14 @@ export function PlayLive({ code }: { code: string }) {
       <>
         {error && <p className="fixed inset-x-0 top-20 z-[60] mx-auto w-fit rounded-full bg-red-500 px-4 py-1.5 text-sm font-bold text-white shadow-lg">{error}</p>}
         <PartyPlay view={view} busy={busy} act={act} />
+        {!view.solo && <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} />}
       </>
     );
   }
 
   return (
     <div ref={playRef} className={full.on ? `${FULLSCREEN_CLASS} bg-background p-4` : ""}>
+    {!view.solo && view.status !== "ended" && <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} />}
     <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
       <div className="flex items-center justify-between rounded-2xl border border-line bg-panel px-4 py-3">
         <span className="flex min-w-0 items-center gap-2">
