@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isPlayable, type LiveSet, type Question, type QuestionType } from "@/lib/live/types";
+import { LIMITS, isPlayable, type LiveSet, type Question, type QuestionType } from "@/lib/live/types";
 import { plainText } from "@/lib/live/media";
 import { HTML_TEMPLATE, HtmlFrame } from "./HtmlFrame";
+import { ImportQuestions } from "./ImportQuestions";
 import { PromptEditor } from "./PromptEditor";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, input, primary, secondary } from "./ui";
 
@@ -40,6 +41,7 @@ export function SetEditor({ id }: { id: string }) {
   const [status, setStatus] = useState<"saved" | "saving" | "unsaved" | "error">("saved");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const dirty = useRef(false);
 
   useEffect(() => {
@@ -231,7 +233,21 @@ export function SetEditor({ id }: { id: string }) {
             + {t.label}
           </button>
         ))}
+        <button type="button" disabled={set.questions.length >= LIMITS.questions} onClick={() => setImporting(true)} className={secondary}>
+          ⬆️ Import
+        </button>
       </div>
+      {importing && (
+        <ImportQuestions
+          room={LIMITS.questions - set.questions.length}
+          onClose={() => setImporting(false)}
+          onImport={(qs) => {
+            update({ questions: [...set.questions, ...qs].slice(0, LIMITS.questions) });
+            setImporting(false);
+            if (qs[0]) setOpen(qs[0].id);
+          }}
+        />
+      )}
 
       <div className="mt-6 border-t border-line pt-4">
         <button
