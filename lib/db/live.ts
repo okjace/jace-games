@@ -62,6 +62,8 @@ export interface LiveStore {
   deleteExpiredGames(now: string): Promise<number>;
 
   players(gameId: string): Promise<LivePlayerRow[]>;
+  /** Games their hosts listed on Discover that haven't ended, newest first, with how many are playing. */
+  publicGames(limit: number): Promise<{ game: LiveGameRow; players: number }[]>;
   /** Games this Jace account is playing in that haven't ended yet (newest first), with their player in each. */
   activeForUser(userId: string): Promise<{ game: LiveGameRow; player: LivePlayerRow }[]>;
   player(gameId: string, id: string): Promise<LivePlayerRow | null>;
@@ -145,6 +147,24 @@ const supabaseStore: LiveStore = {
   },
   async players(gameId) {
     return check(await supabase().from("live_players").select().eq("game_id", gameId).order("joined_at")) as LivePlayerRow[];
+  },
+  async publicGames(limit) {
+    const games = check(
+      await supabase()
+        .from("live_games")
+        .select()
+        .in("status", ["lobby", "playing"])
+        .eq("settings->>public", "true")
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(limit),
+    ) as LiveGameRow[];
+    return Promise.all(
+      games.map(async (game) => {
+        const res = await supabase().from("live_players").select("id", { count: "exact", head: true }).eq("game_id", game.id);
+        return { game, players: res.count ?? 0 };
+      }),
+    );
   },
   async activeForUser(userId) {
     const mine = check(await supabase().from("live_players").select().eq("user_id", userId).order("joined_at", { ascending: false }).limit(20)) as LivePlayerRow[];
@@ -267,6 +287,14 @@ const memoryStore: LiveStore = {
   },
   async players(gameId) {
     return clone(mem().players.get(gameId) ?? []);
+  },
+  async publicGames(limit) {
+    const now = new Date().toISOString();
+    return [...mem().games.values()]
+      .filter((gm) => gm.status !== "ended" && gm.expires_at > now && (gm.settings as { public?: boolean }).public === true)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .slice(0, limit)
+      .map((game) => clone({ game, players: (mem().players.get(game.id) ?? []).length }));
   },
   async activeForUser(userId) {
     const now = new Date().toISOString();

@@ -69,6 +69,8 @@ const ROCKET_GOAL = 100;
 export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean; /** Tower Siege: a copy of the chosen map, taken when the game is made. */ map?: TowerMap; mapTitle?: string;
   /** Studio-game mode: a copy of the game, taken when the Live game is made. */
   custom?: { gameId: string; title: string; icon: string; owner: string; html: string };
+  /** Listed on Discover so anyone can find and join it (never for solo games). */
+  public?: boolean;
   /** Solo: one player, no host screen. The player moves the game along. */
   solo?: boolean;
   /** Solo: what was picked, so "Play again" can make the same game. */
@@ -262,6 +264,7 @@ export async function createLiveGame(
     noSet,
     minutes: Math.min(30, Math.max(1, Math.round(Number(opts.settings.minutes) || 5))),
     shuffle: !!opts.settings.shuffle,
+    ...(opts.settings.public === true && opts.settings.solo !== true ? { public: true } : {}),
     ...(solo
       ? {
           solo: true,
@@ -373,6 +376,12 @@ export async function joinLiveGame(
   await store.updatePlayer(g.id, added.id, { data: { avatar, ...(pin ? { pinHash: sha(`${pin}:${added.id}`) } : {}) } });
   await push(g, "players");
   return { token, playerId: added.id, ...(pin ? { pin } : {}) };
+}
+
+/** Games hosts listed on Discover that are still going. */
+export async function publicLiveGames(): Promise<{ code: string; mode: LiveMode; setTitle: string | null; hostName: string; status: string; players: number }[]> {
+  const list = await liveStore().publicGames(24);
+  return list.map(({ game, players }) => ({ code: game.code, mode: game.mode, setTitle: game.set_title, hostName: game.host_name, status: game.status, players }));
 }
 
 /** A signed-in player's unfinished games (any device), for the Rejoin list. */
@@ -619,11 +628,24 @@ function partyView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]): Pla
 
 // ---------- Host actions ----------
 
-type HostAction = { action: "start" } | { action: "next" } | { action: "reveal" } | { action: "end" } | { action: "kick"; playerId: string } | { action: "tick" };
+type HostAction =
+  | { action: "start" }
+  | { action: "next" }
+  | { action: "reveal" }
+  | { action: "end" }
+  | { action: "kick"; playerId: string }
+  | { action: "tick" }
+  | { action: "public"; on: boolean };
 
 export async function hostAction(code: string, session: Session, body: HostAction): Promise<void> {
   const g = await getGame(code);
   if (g.host_id !== session.user.id) throw new LiveError("Only the host can do that.", 403);
+  if (body.action === "public") {
+    // List the game on Discover (or take it off).
+    if (g.status === "ended" || (g.settings as GameSettings).solo) return;
+    await push(await bump(g, { settings: { ...(g.settings as GameSettings), public: body.on === true } }));
+    return;
+  }
   if (body.action === "kick") {
     if (typeof body.playerId !== "string") return;
     await liveStore().removePlayer(g.id, body.playerId);

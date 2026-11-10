@@ -116,6 +116,17 @@ export function HostScreen({ code }: { code: string }) {
                 📋 {showAnswers ? "Hide answers" : "Answers"}
               </button>
             )}
+            {view.status !== "ended" && (
+              <button
+                type="button"
+                aria-pressed={!!view.settings.public}
+                onClick={() => act("public", { on: !view.settings.public })}
+                title={view.settings.public ? "Anyone can find this game on Discover. Click to hide it." : "List this game on Discover so anyone can join"}
+                className={secondary}
+              >
+                {view.settings.public ? "🌍 On Discover" : "🔒 Not listed"}
+              </button>
+            )}
             <FullscreenButton on={full.on} toggle={full.toggle} className="border border-line bg-panel" />
             {view.status !== "ended" && (
               <button type="button" onClick={() => confirm("End the game for everyone?") && act("end")} className={secondary}>
