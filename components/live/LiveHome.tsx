@@ -64,6 +64,9 @@ export function LiveHome() {
             <Link href="/live/host/new?solo=1" className={secondary}>
               🎮 Play solo
             </Link>
+            <Link href="/live/games" className={secondary}>
+              🌍 Join a game
+            </Link>
             <Link href="/live/discover" className={secondary}>
               Discover sets
             </Link>

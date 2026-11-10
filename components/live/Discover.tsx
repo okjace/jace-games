@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import type { SetSummary } from "@/lib/live/types";
 import { SetGrid } from "./LiveHome";
 import Link from "next/link";
-import { MODES, type LiveMode } from "@/lib/live/types";
-import { card, input, primary, secondary } from "./ui";
+import { card, input, secondary } from "./ui";
 
 const TAGS = ["science", "math", "history", "geography", "english", "music", "movies", "games", "sports", "trivia", "minecraft", "fun"];
 
@@ -54,9 +53,16 @@ export function Discover() {
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Discover</h1>
-        <p className="mt-1 text-muted">Question sets made by people on Jace. Pick one and host it, or jump into a game that&apos;s on right now.</p>
+        <p className="mt-1 text-muted">Question sets made by people on Jace. Pick one and host it.</p>
       </div>
-      <OpenGames />
+      <Link href="/live/games" className={`${card} flex items-center gap-3 hover:border-accent/50`}>
+        <span className="text-3xl">🌍</span>
+        <span className="flex-1">
+          <span className="block font-semibold">Join a live game</span>
+          <span className="block text-sm text-muted">See games people are hosting right now and jump in.</span>
+        </span>
+        <span className="text-muted">→</span>
+      </Link>
       <div className="flex flex-col gap-3 sm:flex-row">
         <input value={q} onChange={(e) => reset(() => setQ(e.target.value))} placeholder="Search sets" aria-label="Search sets" className={input} />
         <div className="inline-flex shrink-0 rounded-full border border-line p-1 text-sm" role="group" aria-label="Sort">
@@ -99,44 +105,5 @@ export function Discover() {
         </button>
       )}
     </div>
-  );
-}
-
-type OpenGame = { code: string; mode: LiveMode; setTitle: string | null; hostName: string; status: string; players: number };
-
-/** Live games their hosts listed on Discover: join one right now. Refreshes every 15 seconds. */
-function OpenGames() {
-  const [games, setGames] = useState<OpenGame[] | null>(null);
-  useEffect(() => {
-    const load = () =>
-      fetch("/api/live/public", { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : { games: [] }))
-        .then((d) => setGames(d.games ?? []))
-        .catch(() => setGames((g) => g ?? []));
-    void load();
-    const t = setInterval(() => document.visibilityState === "visible" && void load(), 15_000);
-    return () => clearInterval(t);
-  }, []);
-  if (!games || games.length === 0) return null;
-  return (
-    <section className={`${card} flex flex-col gap-3`}>
-      <h2 className="font-semibold">🌍 Join a live game now</h2>
-      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {games.map((g) => (
-          <li key={g.code} className="flex items-center gap-3 rounded-xl border border-line p-3">
-            <span className="text-3xl">{MODES[g.mode]?.icon ?? "🎮"}</span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-semibold">{g.setTitle ?? MODES[g.mode]?.name ?? "Live game"}</span>
-              <span className="block truncate text-xs text-muted">
-                {MODES[g.mode]?.name} · hosted by {g.hostName} · {g.players} playing{g.status === "lobby" ? " · starting soon" : " · in progress"}
-              </span>
-            </span>
-            <Link href={`/live/play/${g.code}`} className={`${primary} h-9 px-4`}>
-              Join
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }
