@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { HostView } from "@/lib/live/engine";
-import { MODES } from "@/lib/live/types";
+import { MODES, type LiveMode } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { HostReport } from "./HostReport";
 import { HtmlFrame } from "./HtmlFrame";
 import { Celebration, LiveAvatar, LiveName } from "./LiveAvatar";
 import { Markdown, QuestionMediaView } from "./Markdown";
-import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
+import { ANSWER_COLORS, ANSWER_SHAPES, card, getToken, primary, secondary, setPin, setToken } from "./ui";
 
 /**
  * The host's big screen. It refreshes when the server pushes a change (a
@@ -25,6 +26,25 @@ export function HostScreen({ code }: { code: string }) {
   const skew = useRef(0);
   const hostRef = useRef<HTMLDivElement>(null);
   const full = useStageFullscreen(hostRef);
+  const [showPlayers, setShowPlayers] = useState(false);
+  const router = useRouter();
+
+  /** The host joins as a player too, in a new tab (their name comes from their Jace account). */
+  const playToo = async () => {
+    const tab = window.open("about:blank", "_blank");
+    if (!getToken(code)) {
+      const res = await fetch(`/api/live/games/${code}/join`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }).catch(() => null);
+      const body = await res?.json().catch(() => null);
+      if (!res?.ok) {
+        tab?.close();
+        return setError(body?.error ?? "Couldn't join your own game.");
+      }
+      setToken(code, body.token);
+      setPin(code, body.pin ?? null);
+    }
+    if (tab) tab.location.href = `/live/play/${code}`;
+    else router.push(`/live/play/${code}`);
+  };
   const [showAnswers, setShowAnswers] = useState(false);
 
   const load = useCallback(async () => {
@@ -110,7 +130,15 @@ export function HostScreen({ code }: { code: string }) {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" aria-pressed={showPlayers} onClick={() => setShowPlayers((v) => !v)} className={secondary}>
+              👥 Players ({view.players.length})
+            </button>
+            {view.status !== "ended" && (
+              <button type="button" onClick={() => void playToo()} title="Join this game as a player (opens a new tab)" className={secondary}>
+                🎮 Play too
+              </button>
+            )}
             {hasQuestions && view.status === "playing" && (
               <button type="button" aria-pressed={showAnswers} onClick={() => setShowAnswers((v) => !v)} className={secondary}>
                 📋 {showAnswers ? "Hide answers" : "Answers"}
@@ -136,6 +164,7 @@ export function HostScreen({ code }: { code: string }) {
           </div>
         </div>
         {error && <p className="text-sm text-danger">{error}</p>}
+        {showPlayers && <PlayerList view={view} onKick={(id) => act("kick", { playerId: id })} onClose={() => setShowPlayers(false)} />}
 
         {view.status === "lobby" && <Lobby view={view} busy={busy} onStart={() => act("start")} onKick={(id) => act("kick", { playerId: id })} />}
 
@@ -146,6 +175,7 @@ export function HostScreen({ code }: { code: string }) {
         {view.status === "playing" && view.mode !== "classic" && <SelfPaced view={view} secondsLeft={secondsLeft ?? 0} />}
 
         {view.status === "ended" && <Podium view={view} />}
+        {view.status === "ended" && <PlayAgain view={view} busy={busy} onAgain={(m) => act("again", { mode: m })} />}
 
         {hasQuestions && (view.status === "ended" || (view.status === "playing" && showAnswers)) && <HostReport code={view.code} live={view.status === "playing"} />}
       </div>
@@ -351,5 +381,74 @@ function Podium({ view }: { view: HostView }) {
         </Link>
       </div>
     </div>
+  );
+}
+
+/** Everyone in the game: name, look, score, how they're doing, and a remove button. */
+function PlayerList({ view, onKick, onClose }: { view: HostView; onKick: (id: string) => void; onClose: () => void }) {
+  const fmt = MODES[view.mode].unit;
+  return (
+    <section className={`${card} flex flex-col gap-3`}>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold">👥 Everyone in the game ({view.players.length})</h2>
+        <button type="button" onClick={onClose} aria-label="Close" className="text-muted hover:text-foreground">
+          ✕
+        </button>
+      </div>
+      {view.players.length === 0 ? (
+        <p className="text-sm text-muted">Nobody has joined yet.</p>
+      ) : (
+        <ol className="grid gap-1.5 sm:grid-cols-2">
+          {view.players.map((p, i) => (
+            <li key={p.id} className="flex items-center gap-2 rounded-xl bg-foreground/[.04] px-3 py-2 text-sm">
+              <span className="w-6 text-center font-mono text-muted">{i + 1}</span>
+              <LiveAvatar avatar={p.avatar} size={28} />
+              <LiveName name={p.name} avatar={p.avatar} className="min-w-0 flex-1 font-semibold" />
+              <span className="shrink-0 text-xs text-muted">
+                {p.correct}/{p.answered} right
+                {p.finished ? " · done" : ""}
+              </span>
+              <span className="shrink-0 font-mono tabular-nums">{fmt(p.score)}</span>
+              <button
+                type="button"
+                onClick={() => confirm(`Remove ${p.name} from the game?`) && onKick(p.id)}
+                title={`Remove ${p.name}`}
+                aria-label={`Remove ${p.name}`}
+                className="shrink-0 rounded-full px-2 text-muted hover:bg-danger/15 hover:text-danger"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+/** After a game: run it again with the same code and everyone still here, in the same mode or a new one. */
+function PlayAgain({ view, busy, onAgain }: { view: HostView; busy: boolean; onAgain: (mode: LiveMode) => void }) {
+  const [mode, setMode] = useState<LiveMode>(view.mode);
+  const allowed = (Object.keys(MODES) as LiveMode[]).filter((m) => (m !== "custom" || view.mode === "custom") && !(MODES[m].needsSet && view.settings.noSet));
+  return (
+    <section className={`${card} flex flex-wrap items-center gap-3`}>
+      <span className="text-3xl">🔁</span>
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">Play again with everyone</p>
+        <p className="text-sm text-muted">
+          Same game code ({view.code}), the {view.players.length} player{view.players.length === 1 ? "" : "s"} still here, fresh scores.
+        </p>
+      </div>
+      <select value={mode} onChange={(e) => setMode(e.target.value as LiveMode)} aria-label="Mode for the next game" className="h-11 rounded-full border border-line bg-background px-4 text-sm">
+        {allowed.map((m) => (
+          <option key={m} value={m}>
+            {MODES[m].icon} {MODES[m].name}
+          </option>
+        ))}
+      </select>
+      <button type="button" disabled={busy} onClick={() => onAgain(mode)} className={primary}>
+        🔁 Play again
+      </button>
+    </section>
   );
 }

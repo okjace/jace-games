@@ -393,6 +393,42 @@ export async function publicLiveGames(): Promise<{ code: string; mode: LiveMode;
   return list.map(({ game, players }) => ({ code: game.code, mode: game.mode, setTitle: game.set_title, hostName: game.host_name, status: game.status, players }));
 }
 
+/**
+ * Play again: the same game code and everyone still in it, back in the lobby
+ * (optionally in a different mode). Scores and mode data reset; each
+ * player's look and rejoin PIN are kept, and the game gets 12 more hours.
+ */
+async function playAgain(g: LiveGameRow, rawMode: string) {
+  if (g.status !== "ended") throw new LiveError("Finish this game first.", 409);
+  const mode = (rawMode in MODES ? rawMode : g.mode) as LiveMode;
+  const settings = g.settings as GameSettings;
+  if (MODES[mode].needsSet && settings.noSet) throw new LiveError(`${MODES[mode].name} needs a question set.`);
+  if (mode === "custom" && !settings.custom) throw new LiveError("Pick a Studio game from Host a game for that mode.");
+  const store = liveStore();
+  for (const p of await store.players(g.id)) {
+    const d = dataOf(p);
+    await store.updatePlayer(g.id, p.id, {
+      score: 0,
+      streak: 0,
+      correct: 0,
+      answered: 0,
+      finished_at: null,
+      data: { ...(d.avatar ? { avatar: d.avatar } : {}), ...(d.pinHash ? { pinHash: d.pinHash } : {}) },
+    });
+  }
+  const now = Date.now();
+  await push(
+    await bump(g, {
+      mode,
+      status: "lobby",
+      state: { phase: "lobby" },
+      started_at: null,
+      ended_at: null,
+      expires_at: new Date(now + 12 * 3_600_000).toISOString(),
+    }),
+  );
+}
+
 /** A signed-in player's unfinished games (any device), for the Rejoin list. */
 export async function myActiveGames(session: Session): Promise<{ code: string; mode: LiveMode; status: string; name: string; solo: boolean }[]> {
   const list = await liveStore().activeForUser(session.user.id);
@@ -681,11 +717,16 @@ type HostAction =
   | { action: "end" }
   | { action: "kick"; playerId: string }
   | { action: "tick" }
-  | { action: "public"; on: boolean };
+  | { action: "public"; on: boolean }
+  | { action: "again"; mode?: string };
 
 export async function hostAction(code: string, session: Session, body: HostAction): Promise<void> {
   const g = await getGame(code);
   if (g.host_id !== session.user.id) throw new LiveError("Only the host can do that.", 403);
+  if (body.action === "again") {
+    await playAgain(g, typeof body.mode === "string" ? body.mode : g.mode);
+    return;
+  }
   if (body.action === "public") {
     // List the game on Discover (or take it off).
     if (g.status === "ended" || (g.settings as GameSettings).solo) return;
