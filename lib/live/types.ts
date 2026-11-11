@@ -29,13 +29,15 @@ export type Question = {
   correct?: number[];
   /** type / html: accepted answers (compared ignoring case, spaces and punctuation at the ends). */
   accepted?: string[];
+  /** Rare Finds: how rare each accepted answer is (1 common … 5 legendary), keyed by the normalized answer. */
+  rarity?: Record<string, number>;
   /** Seconds to answer in Classic. */
   time: number;
   /** 1 = normal, 2 = double points, 0 = no points (a poll). */
   points: 0 | 1 | 2;
 };
 
-export type PlayerQuestion = Omit<Question, "correct" | "accepted">;
+export type PlayerQuestion = Omit<Question, "correct" | "accepted" | "rarity">;
 
 export type LiveSet = {
   id: string;
@@ -57,7 +59,7 @@ export type LiveSet = {
 
 export type SetSummary = Omit<LiveSet, "questions"> & { questionCount: number };
 
-export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata";
+export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata" | "rare";
 
 export type ModeDef = {
   name: string;
@@ -200,6 +202,14 @@ export const MODES: Record<LiveMode, ModeDef> = {
     selfPaced: true,
     unit: (n) => `🍬 ${num(n)}`,
   },
+  rare: {
+    name: "Rare Finds",
+    icon: "💎",
+    blurb: "Only for Rare Finds sets: name anything that fits each prompt, and rarer answers score more. 7 random prompts, 25 seconds each, guess as often as you like.",
+    needsSet: true,
+    selfPaced: true,
+    unit: (n) => `${num(n)} pts`,
+  },
   custom: {
     name: "Studio game",
     icon: "🧩",
@@ -221,7 +231,7 @@ export const LIMITS = {
   questions: 100,
   prompt: 1000,
   choice: 120,
-  accepted: 10,
+  accepted: 60,
   html: 64 * 1024,
   setBytes: 1024 * 1024,
   name: 20,
@@ -241,9 +251,10 @@ export function normAnswer(s: string): string {
 
 /** What a player's device gets: the question without its answers. */
 export function forPlayers(q: Question): PlayerQuestion {
-  const { correct, accepted, ...rest } = q;
+  const { correct, accepted, rarity, ...rest } = q;
   void correct;
   void accepted;
+  void rarity;
   return rest;
 }
 
@@ -347,7 +358,18 @@ export function cleanQuestions(raw: unknown): { ok: true; questions: Question[] 
         .map((a) => str(a, LIMITS.choice).trim())
         .filter(Boolean)
         .slice(0, LIMITS.accepted);
-      out.push({ ...base, accepted });
+      // Rare Finds: a tier (1–5) per accepted answer.
+      let rarity: Record<string, number> | undefined;
+      if (q.rarity && typeof q.rarity === "object" && !Array.isArray(q.rarity)) {
+        const keys = new Set(accepted.map((x) => normAnswer(x)));
+        rarity = {};
+        for (const [k, v] of Object.entries(q.rarity as Record<string, unknown>).slice(0, 300)) {
+          const key = normAnswer(String(k));
+          if (keys.has(key) && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 5) rarity[key] = v as number;
+        }
+        if (Object.keys(rarity).length === 0) rarity = undefined;
+      }
+      out.push({ ...base, accepted, ...(rarity ? { rarity } : {}) });
     }
   }
   return { ok: true, questions: out };

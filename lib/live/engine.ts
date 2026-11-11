@@ -9,6 +9,7 @@ import { studioStore } from "@/lib/db/studio";
 import { addGameToStats, cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar, type XpPart } from "./locker";
 import { GO_BANANAS_MS, bananaBase, boostBananas, rollBanana } from "./banana";
 import { CHAT_GAP_MS, cleanChat, type ChatMessage } from "./chat";
+import { RARE_ROUNDS, RARE_SECONDS, RARE_TIERS, isRareSet, rareMatch, rarestAnswers } from "./rare";
 import { BOSS_HEAL, SUMMIT_STEPS, SURVIVAL_LIVES, bossHit, bossMaxHp, hatch, summitClimb, tugGoal, tugPull, whack, type Team } from "./moreModes";
 import { DEFAULT_MAP, cleanMap, type TowerMap } from "./maps";
 import type { GameReport, ReportAttempt, ReportQuestion } from "./report";
@@ -111,6 +112,10 @@ type PlayerData = PartyData & {
   /** Locker XP this game gave them (set when it ends), and what earned it. */
   xp?: number;
   xpParts?: XpPart[];
+  /** Rare Finds: how many prompts are done, which they've had, and wrong guesses on this one. */
+  rareDone?: number;
+  rareSeen?: number[];
+  rareGuesses?: string[];
   /** Last One Standing: lives left, and whether they're out. */
   lives?: number;
   out?: boolean;
@@ -273,6 +278,7 @@ export async function createLiveGame(
     if (questions.length === 0) throw new LiveError("That set has no finished questions yet.");
     setTitle = set.title;
   }
+  if (mode === "rare" && !isRareSet(questions)) throw new LiveError("Rare Finds only works with a Rare Finds set (one whose answers have rarities).");
   const settings: GameSettings = {
     noSet,
     minutes: Math.min(30, Math.max(1, Math.round(Number(opts.settings.minutes) || 5))),
@@ -637,6 +643,8 @@ export type PlayerView = {
       red?: number;
       blue?: number;
     };
+    /** Rare Finds: which prompt this is, when its time runs out, and the wrong guesses so far. */
+    rare?: { round: number; rounds: number; endsAt: number | null; guesses: string[]; done: boolean };
     /** Dragon Hatchery: best power of each dragon hatched, and the latest hatches. */
     dragons?: Record<string, number>;
     hatched?: { id: string; power: number }[];
@@ -748,6 +756,17 @@ function partyView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]): Pla
     return { skill: { team: teamOf(me, all), rope: t.red - t.blue, goal: tugGoal(all.length), red: t.red, blue: t.blue } };
   }
   if (g.mode === "hatchery") return { dragons: d.dragons ?? {}, hatched: d.hatched ?? [] };
+  if (g.mode === "rare") {
+    return {
+      rare: {
+        round: Math.min(RARE_ROUNDS, (d.rareDone ?? 0) + (d.cur ? 1 : 0)),
+        rounds: RARE_ROUNDS,
+        endsAt: d.cur ? d.cur.issuedAt + RARE_SECONDS * 1000 : null,
+        guesses: d.rareGuesses ?? [],
+        done: !!me.finished_at,
+      },
+    };
+  }
   if (g.mode === "hack") {
     return {
       password: d.pw ?? null,
@@ -881,6 +900,85 @@ async function endGame(g: LiveGameRow, winner?: string) {
   await giveXp(ended);
   await saveReport(ended);
   await push(ended);
+}
+
+/**
+ * Rare Finds, for one player: RARE_ROUNDS random prompts they haven't had,
+ * RARE_SECONDS each. Wrong guesses cost nothing; keep guessing until the time
+ * runs out. A right answer scores by how rare it is. Time running out (or
+ * "skip") moves on with 0 points. After the last prompt they're done.
+ */
+async function rareAction(g: LiveGameRow, me: LivePlayerRow, body: PlayerAction, now: number): Promise<PlayerView> {
+  const store = liveStore();
+  const qs = questionsOf(g);
+  const d = dataOf(me);
+  const done = d.rareDone ?? 0;
+  const deadline = (issued: number) => issued + RARE_SECONDS * 1000 + GRACE_MS;
+  if (me.finished_at && body.action !== "next") throw new LiveError("You've finished! Wait for the others.", 409);
+
+  if (body.action === "next") {
+    if (d.cur || me.finished_at) return buildPlayerView(g, me, await store.players(g.id));
+    if (done >= RARE_ROUNDS) return buildPlayerView(g, me, await store.players(g.id));
+    // A random prompt they haven't had yet (rare-ready prompts only).
+    const seen = new Set(d.rareSeen ?? []);
+    const pool = qs.map((q, i) => ({ q, i })).filter(({ q, i }) => q.type === "type" && q.rarity && !seen.has(i));
+    const pick = pool.length ? pool[randomInt(pool.length)].i : qs.findIndex((q) => q.type === "type");
+    me = (await store.updatePlayer(g.id, me.id, { data: { ...d, cur: { qi: pick, issuedAt: now }, rareSeen: [...seen, pick], rareGuesses: [] } }))!;
+    return buildPlayerView(g, me, await store.players(g.id));
+  }
+
+  if (body.action !== "answer" && body.action !== "skip") throw new LiveError("Unknown action.");
+  if (!d.cur) throw new LiveError("Get a prompt first.", 409);
+  const q = qs[d.cur.qi];
+  const timeUp = now > deadline(d.cur.issuedAt);
+  const typed = typeof (body as { answer?: unknown }).answer === "string" ? String((body as { answer?: unknown }).answer).slice(0, 120) : "";
+  const hit = body.action === "answer" && !timeUp && typed.trim() ? rareMatch(q, typed) : null;
+
+  // A wrong guess with time left: try again (nothing lost).
+  if (!hit && body.action === "answer" && !timeUp) {
+    const guesses = [...(d.rareGuesses ?? []), typed].slice(-8);
+    me = (await store.updatePlayer(g.id, me.id, { data: { ...d, rareGuesses: guesses, last: { kind: "rare-miss", guess: typed } } }))!;
+    return buildPlayerView(g, me, await store.players(g.id));
+  }
+
+  // Right answer, skipped, or out of time: score it and move on.
+  const tier = hit?.tier ?? 0;
+  const points = hit ? RARE_TIERS[tier].points : 0;
+  const finished = done + 1 >= RARE_ROUNDS;
+  me = (await store.updatePlayer(g.id, me.id, {
+    score: me.score + points,
+    streak: hit ? me.streak + 1 : 0,
+    correct: me.correct + (hit ? 1 : 0),
+    answered: me.answered + 1,
+    ...(finished ? { finished_at: new Date(now).toISOString() } : {}),
+    data: {
+      ...d,
+      cur: null,
+      rareDone: done + 1,
+      rareGuesses: [],
+      log: [...(d.log ?? []), { qi: d.cur.qi, a: hit ? hit.answer : typed || "(no answer)", correct: !!hit }].slice(-MAX_LOG),
+      last: {
+        kind: "rare",
+        answer: hit?.answer ?? null,
+        tier,
+        points,
+        // The player's own clock skips at zero, so a skip that late counts as running out of time.
+        timeUp: !hit && (timeUp || now >= d.cur.issuedAt + RARE_SECONDS * 1000 - 1000),
+        skipped: body.action === "skip" && now < d.cur.issuedAt + RARE_SECONDS * 1000 - 1000,
+        prompt: q.prompt,
+        examples: rarestAnswers(q, 3),
+        round: done + 1,
+        finished,
+      },
+    },
+  }))!;
+  // Everyone finished: the game is over.
+  const all = await store.players(g.id);
+  if (finished && all.every((p) => p.finished_at || p.id === me.id)) {
+    const latest = await store.gameByCode(g.code);
+    if (latest && latest.status === "playing") await endGame(latest);
+  }
+  return buildPlayerView(g, me, all);
 }
 
 /** Tug of War: teams by join order (alternating), so they stay balanced and nothing extra is stored. */
@@ -1021,7 +1119,9 @@ type PlayerAction =
   // Gold Rush and Code Breakers.
   | { action: "buy"; item: ShopItem }
   // Baseball: how many ms off perfect the swing was (negative = early), or null to take the pitch.
-  | { action: "swing" };
+  | { action: "swing" }
+  // Rare Finds: give up on this prompt.
+  | { action: "skip" };
 
 export async function playerAction(code: string, token: unknown, body: PlayerAction): Promise<PlayerView> {
   const store = liveStore();
@@ -1080,6 +1180,7 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
   const settings = g.settings as GameSettings;
   const qs = questionsOf(g);
   const d = dataOf(me);
+  if (g.mode === "rare") return rareAction(g, me, body, now);
   let earned = false;
   let tapped = false;
 

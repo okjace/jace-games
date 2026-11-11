@@ -7,6 +7,7 @@ import { GameQuestion, type AnswerResult } from "../fx/GameQuestion";
 import { Juice, MuteButton, useCountUp, useJuice } from "../fx/Juice";
 import { sfx } from "../fx/sfx";
 import { BananaBonanza } from "./BananaBonanza";
+import { RareFinds } from "./RareFinds";
 import { BossBattle, DragonHatchery, LastStanding, PinataParty, SummitClimb, TugOfWar } from "./MoreModes";
 import { Baseball } from "./Baseball";
 import { CodeBreakers } from "./CodeBreakers";
@@ -25,7 +26,7 @@ import { StudioMode } from "./StudioMode";
 import { TowerSiege } from "./TowerSiege";
 
 /** Every self-paced mode plays on this stage. */
-export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom", "banana", "summit", "survival", "boss", "tug", "hatchery", "pinata"];
+export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom", "banana", "summit", "survival", "boss", "tug", "hatchery", "pinata", "rare"];
 
 /** Each mode's look: background, accent, and its tap button with questions off. */
 export const THEMES: Record<string, { bg: string; accent: string; tap: [string, string] }> = {
@@ -44,6 +45,7 @@ export const THEMES: Record<string, { bg: string; accent: string; tap: [string, 
   boss: { bg: "radial-gradient(circle at 50% 20%, #7c3aed 0%, #3b0764 60%, #1e1b4b 100%)", accent: "#fbbf24", tap: ["⚔️ ATTACK", ""] },
   tug: { bg: "linear-gradient(90deg, #991b1b 0%, #4b5563 50%, #1e40af 100%)", accent: "#fde68a", tap: ["🪢 PULL", ""] },
   hatchery: { bg: "radial-gradient(circle at 50% 30%, #fb923c 0%, #c2410c 55%, #431407 100%)", accent: "#fde68a", tap: ["🥚 HATCH", "Each tap warms an egg until it hatches."] },
+  rare: { bg: "radial-gradient(circle at 50% 0%, #0ea5e9 0%, #1e3a8a 55%, #0f172a 100%)", accent: "#bae6fd", tap: ["💎 FIND", ""] },
   pinata: { bg: "linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #06b6d4 100%)", accent: "#fde68a", tap: ["🪅 WHACK", "Each whack might shake out candy!"] },
 };
 
@@ -124,7 +126,7 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
   const full = useStageFullscreen(stageRef);
 
   // Keep the next question ready (with questions on).
-  const needsQuestion = !view.noSet && !view.selfQuestion && view.status === "playing" && !(mode === "hack" && !view.party.password) && view.chests === null;
+  const needsQuestion = !view.noSet && !view.selfQuestion && view.status === "playing" && !(mode === "hack" && !view.party.password) && view.chests === null && mode !== "rare";
   useEffect(() => {
     if (!needsQuestion || fetching.current) return;
     fetching.current = true;
@@ -267,6 +269,7 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
         {mode === "tug" && <TugOfWar {...stageProps} />}
         {mode === "hatchery" && <DragonHatchery {...stageProps} />}
         {mode === "pinata" && <PinataParty {...stageProps} />}
+        {mode === "rare" && <RareFinds {...stageProps} />}
 
         <RejoinPin code={view.code} small />
         <ol className="flex flex-col gap-1.5 rounded-3xl bg-black/25 p-3 text-sm backdrop-blur">

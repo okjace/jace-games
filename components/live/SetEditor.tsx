@@ -377,7 +377,7 @@ function QuestionForm({
           Accepted answers <span className="text-xs text-muted">One per line. Case, extra spaces and end punctuation don&apos;t matter.</span>
           <textarea
             value={(q.accepted ?? []).join("\n")}
-            onChange={(e) => onChange((x) => ({ ...x, accepted: e.target.value.split("\n").slice(0, 10) }))}
+            onChange={(e) => onChange((x) => ({ ...x, accepted: e.target.value.split("\n").slice(0, LIMITS.accepted) }))}
             rows={3}
             className={`${input} h-auto py-2 font-mono`}
           />

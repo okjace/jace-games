@@ -4,6 +4,7 @@ import { liveError } from "@/lib/live/http";
 import { canSee, publicSet, saveSet } from "@/lib/live/sets";
 import { getSession } from "@/lib/session";
 import { isSiteOwner } from "@/lib/studio/server";
+import { isRareSet } from "@/lib/live/rare";
 
 /** GET a set (answers only for its owner). PUT: save (owner). DELETE: delete (owner). PATCH {removed?, verified?}: site owner. */
 export async function GET(_req: NextRequest, ctx: RouteContext<"/api/live/sets/[id]">): Promise<NextResponse> {
@@ -11,7 +12,12 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/api/live/sets/[
   const session = await getSession();
   const set = /^[0-9a-f-]{36}$/.test(id) ? await liveStore().getSet(id) : null;
   if (!set || !canSee(set, session?.user.id ?? null)) return NextResponse.json({ error: "That set doesn't exist." }, { status: 404 });
-  return NextResponse.json({ set: publicSet(set, session?.user.id ?? null), mine: set.owner_id === session?.user.id, siteOwner: isSiteOwner(session?.user.id) });
+  return NextResponse.json({
+    set: publicSet(set, session?.user.id ?? null),
+    mine: set.owner_id === session?.user.id,
+    siteOwner: isSiteOwner(session?.user.id),
+    rare: isRareSet(set.questions),
+  });
 }
 
 export async function PUT(req: NextRequest, ctx: RouteContext<"/api/live/sets/[id]">): Promise<NextResponse> {

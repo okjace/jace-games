@@ -62,6 +62,7 @@ export const TAP_COOLDOWN_MS: Record<LiveMode, number> = {
   tug: 900,
   hatchery: 1200,
   pinata: 900,
+  rare: 900,
 };
 
 // ---------- Device modes ----------

@@ -22,7 +22,7 @@ export function HostSetup() {
   const router = useRouter();
   const params = useSearchParams();
   const [setId, setSetId] = useState<string | null>(params.get("set"));
-  const [chosen, setChosen] = useState<{ id: string; title: string; cover: string; questionCount: number } | null>(null);
+  const [chosen, setChosen] = useState<{ id: string; title: string; cover: string; questionCount: number; rare?: boolean } | null>(null);
   const [mine, setMine] = useState<SetSummary[]>([]);
   const [noSet, setNoSet] = useState(false);
   const [pickedMode, setMode] = useState<LiveMode>(() => {
@@ -71,12 +71,12 @@ export function HostSetup() {
     if (!setId) return;
     fetch(`/api/live/sets/${setId}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setChosen({ id: setId, title: d.set.title, cover: d.set.cover, questionCount: d.set.questions.length }))
+      .then((d) => d && setChosen({ id: setId, title: d.set.title, cover: d.set.cover, questionCount: d.set.questions.length, rare: !!d.rare }))
       .catch(() => {});
   }, [setId]);
 
   // Classic needs questions, so with them off it becomes Gold Rush.
-  const mode = noSet && MODES[pickedMode].needsSet ? "gold" : pickedMode;
+  const mode = noSet && MODES[pickedMode].needsSet ? "gold" : pickedMode === "rare" && !chosen?.rare ? "classic" : pickedMode;
 
   const picks = () => ({ setId: noSet ? null : setId, mode, settings: { minutes, shuffle, public: listed, mapId: mode === "tower" ? mapId : null, gameId: mode === "custom" ? gameId : null } });
 
@@ -181,7 +181,8 @@ export function HostSetup() {
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {(Object.keys(MODES) as LiveMode[]).map((m) => {
             const def = MODES[m];
-            const off = noSet && def.needsSet;
+            const rareOnly = m === "rare" && !(chosen?.rare && !noSet);
+            const off = (noSet && def.needsSet) || rareOnly;
             return (
               <button
                 key={m}
@@ -193,7 +194,7 @@ export function HostSetup() {
               >
                 <span className="text-3xl">{def.icon}</span>
                 <span className="font-semibold">{def.name}</span>
-                <span className="text-xs text-muted">{off ? "Needs a question set." : def.blurb}</span>
+                <span className="text-xs text-muted">{rareOnly ? "Only for Rare Finds sets (find one on Discover)." : off ? "Needs a question set." : def.blurb}</span>
               </button>
             );
           })}
