@@ -106,7 +106,7 @@ export type StageProps = {
   setEarnHidden?: (hidden: boolean) => void;
 };
 
-export function PartyPlay(props: { view: PlayerView; busy: boolean; act: Act; chat?: React.ReactNode }) {
+export function PartyPlay(props: { view: PlayerView; busy: boolean; act: Act; chat?: React.ReactNode; embedded?: boolean }) {
   return (
     <Juice>
       <Stage {...props} />
@@ -114,7 +114,7 @@ export function PartyPlay(props: { view: PlayerView; busy: boolean; act: Act; ch
   );
 }
 
-function Stage({ view, busy, act, chat }: { view: PlayerView; busy: boolean; act: Act; chat?: React.ReactNode }) {
+function Stage({ view, busy, act, chat, embedded = false }: { view: PlayerView; busy: boolean; act: Act; chat?: React.ReactNode; embedded?: boolean }) {
   const juice = useJuice();
   const mode = view.mode;
   const theme = THEMES[mode] ?? THEMES.gold;
@@ -214,7 +214,7 @@ function Stage({ view, busy, act, chat }: { view: PlayerView; busy: boolean; act
   return (
     <div
       ref={stageRef}
-      className={`relative -mx-4 -mt-6 min-h-[calc(100vh-4rem)] px-4 pb-10 pt-4 text-white sm:-mx-6 sm:-mt-8 sm:px-6 ${full.on ? FULLSCREEN_CLASS : ""}`}
+      className={`relative px-4 pb-10 pt-4 text-white sm:px-6 ${embedded ? "min-h-[calc(100vh-9rem)] rounded-3xl" : "-mx-4 -mt-6 min-h-[calc(100vh-4rem)] sm:-mx-6 sm:-mt-8"} ${full.on ? FULLSCREEN_CLASS : ""}`}
       style={{ background: theme.bg }}
     >
       {/* The game in the middle; chat beside it on wide screens, under it on phones. */}

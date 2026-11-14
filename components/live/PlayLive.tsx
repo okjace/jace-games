@@ -17,7 +17,8 @@ import { PARTY_MODES, PartyPlay } from "./party";
 import { card, getPin, getToken, input, primary, secondary, setPin, setToken } from "./ui";
 
 /** A player's screen for a Live game (usually a phone). */
-export function PlayLive({ code }: { code: string }) {
+/** A player's screen. embedded: inside the host's page (the host playing too). */
+export function PlayLive({ code, embedded = false }: { code: string; embedded?: boolean }) {
   const { user } = useScores();
   const [token, setTok] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -146,6 +147,7 @@ export function PlayLive({ code }: { code: string }) {
           view={view}
           busy={busy}
           act={act}
+          embedded={embedded}
           chat={view.solo || !view.chatOn ? null : <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} tone="stage" className="h-72 lg:h-[calc(100vh-8rem)]" />}
         />
       </>

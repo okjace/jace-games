@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { HostView } from "@/lib/live/engine";
 import { MODES, type LiveMode } from "@/lib/live/types";
@@ -12,7 +11,8 @@ import { HostReport } from "./HostReport";
 import { HtmlFrame } from "./HtmlFrame";
 import { Celebration, LiveAvatar, LiveName } from "./LiveAvatar";
 import { Markdown, QuestionMediaView } from "./Markdown";
-import { ANSWER_COLORS, ANSWER_SHAPES, card, getToken, primary, secondary, setPin, setToken } from "./ui";
+import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
+import { PlayLive } from "./PlayLive";
 
 /**
  * The host's big screen. It refreshes when the server pushes a change (a
@@ -29,23 +29,24 @@ export function HostScreen({ code }: { code: string }) {
   const full = useStageFullscreen(hostRef);
   const [showPlayers, setShowPlayers] = useState(false);
   const chatShown = useChatShown();
-  const router = useRouter();
 
   /** The host joins as a player too, in a new tab (their name comes from their Jace account). */
-  const playToo = async () => {
-    const tab = window.open("about:blank", "_blank");
-    if (!getToken(code)) {
-      const res = await fetch(`/api/live/games/${code}/join`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) }).catch(() => null);
-      const body = await res?.json().catch(() => null);
-      if (!res?.ok) {
-        tab?.close();
-        return setError(body?.error ?? "Couldn't join your own game.");
-      }
-      setToken(code, body.token);
-      setPin(code, body.pin ?? null);
-    }
-    if (tab) tab.location.href = `/live/play/${code}`;
-    else router.push(`/live/play/${code}`);
+  // Playing too: you play in this tab (joining with the usual form, so you pick
+  // your name), with a slim host bar on top that opens the full host controls.
+  const [playing, setPlaying] = useState(false);
+  const [hostOpen, setHostOpen] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (sessionStorage.getItem(`jace-games:live:host-playing:${code}`) === "1") setPlaying(true);
+    } catch {}
+  }, [code]);
+  const playToo = (on: boolean) => {
+    setPlaying(on);
+    setHostOpen(false);
+    try {
+      sessionStorage.setItem(`jace-games:live:host-playing:${code}`, on ? "1" : "0");
+    } catch {}
   };
   const [showAnswers, setShowAnswers] = useState(false);
 
@@ -116,7 +117,7 @@ export function HostScreen({ code }: { code: string }) {
   const secondsLeft = view.state.endsAt ? Math.max(0, Math.ceil((view.state.endsAt - now) / 1000)) : null;
   const joinUrl = typeof window !== "undefined" ? `${window.location.host}/live` : "/live";
 
-  return (
+  const hostScreen = (
     <div ref={hostRef} className={`bg-background ${full.on ? `${FULLSCREEN_CLASS} p-6` : ""}`}>
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -137,8 +138,8 @@ export function HostScreen({ code }: { code: string }) {
               👥 Players ({view.players.length})
             </button>
             {view.status !== "ended" && (
-              <button type="button" onClick={() => void playToo()} title="Join this game as a player (opens a new tab)" className={secondary}>
-                🎮 Play too
+              <button type="button" onClick={() => (playing ? setHostOpen(false) : playToo(true))} title="Play this game yourself, right here" className={secondary}>
+                🎮 {playing ? "Back to playing" : "Play too"}
               </button>
             )}
             {hasQuestions && view.status === "playing" && (
@@ -191,6 +192,83 @@ export function HostScreen({ code }: { code: string }) {
         )}
         </div>
       </div>
+    </div>
+  );
+  if (!playing) return hostScreen;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <HostBar
+        view={view}
+        secondsLeft={secondsLeft}
+        busy={busy}
+        hostOpen={hostOpen}
+        onToggle={() => setHostOpen((o) => !o)}
+        onStart={() => act("start")}
+        onEnd={() => confirm("End the game for everyone?") && act("end")}
+        onStop={() => playToo(false)}
+      />
+      {error && <p className="text-sm text-danger">{error}</p>}
+      {/* Both stay mounted, so the game keeps going while you look at the host controls. */}
+      <div className={hostOpen ? "" : "hidden"}>{hostScreen}</div>
+      <div className={hostOpen ? "hidden" : ""}>
+        <PlayLive code={code} embedded />
+      </div>
+    </div>
+  );
+}
+
+/** The slim bar over the game while the host plays too: the code, who's in, the clock, and the host buttons. */
+function HostBar({
+  view,
+  secondsLeft,
+  busy,
+  hostOpen,
+  onToggle,
+  onStart,
+  onEnd,
+  onStop,
+}: {
+  view: HostView;
+  secondsLeft: number | null;
+  busy: boolean;
+  hostOpen: boolean;
+  onToggle: () => void;
+  onStart: () => void;
+  onEnd: () => void;
+  onStop: () => void;
+}) {
+  const mode = MODES[view.mode];
+  const small = "rounded-full border border-line bg-panel px-3 py-1.5 text-sm font-semibold hover:bg-foreground/[.06] disabled:opacity-50";
+  return (
+    <div className="sticky top-2 z-[65] flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-panel/95 px-3 py-2 shadow-lg backdrop-blur">
+      <span className="text-xl">{mode.icon}</span>
+      <span className="text-sm">
+        <b>Hosting</b> · code <b className="font-mono tracking-widest">{view.code}</b> · 👥 {view.players.length}
+        {view.status === "playing" && secondsLeft !== null && (
+          <span className="ml-1 font-mono tabular-nums">
+            · ⏱ {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}
+          </span>
+        )}
+        {view.status === "ended" && <span className="ml-1 text-muted">· ended</span>}
+      </span>
+      <span className="flex-1" />
+      {view.status === "lobby" && (
+        <button type="button" disabled={busy || view.players.length === 0} onClick={onStart} className="rounded-full bg-accent px-4 py-1.5 text-sm font-bold text-on-accent disabled:opacity-50">
+          Start
+        </button>
+      )}
+      <button type="button" aria-expanded={hostOpen} onClick={onToggle} className={small}>
+        {hostOpen ? "🎮 Back to playing" : "📺 Host controls"}
+      </button>
+      {view.status === "playing" && !hostOpen && (
+        <button type="button" disabled={busy} onClick={onEnd} className={small}>
+          End game
+        </button>
+      )}
+      <button type="button" onClick={onStop} title="Stop playing and go back to just hosting (you stay in the game)" aria-label="Stop playing" className={small}>
+        ✕
+      </button>
     </div>
   );
 }
