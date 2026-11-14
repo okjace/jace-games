@@ -296,7 +296,7 @@ export function KingOfTheHill({ view, act, earn, busy }: StageProps) {
             {king ? `⚔️ Attack ${king.name}${view.me.streak >= 3 ? " (×2 on a streak!)" : ""}` : "👑 Take the throne"}
           </button>
         )}
-        <p className="text-xs text-white/70">Every second as king scores. Wrong answers crack the king&apos;s own shield.</p>
+        <p className="text-xs text-white/70">Every second as king scores. Wrong ansers crack the king&apos;s own shield.</p>
       </div>
       {earn}
     </div>
@@ -349,7 +349,7 @@ export function MemoryMatch({ view, act, earn, busy }: StageProps) {
             );
           })}
         </div>
-        <p className="mt-2 text-center text-xs text-white/70">{midTurn ? "Now flip its partner!" : "Each turn flips two cards. A match keeps your turn going."}</p>
+        <p className="mt-2 text-center text-xs text-white/70">{midTurn ? "Now flip its partner!" : "Each turn flips two cards. A match keeps ur turn going."}</p>
       </div>
       {earn}
     </div>

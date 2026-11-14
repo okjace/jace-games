@@ -52,7 +52,7 @@ export function StudioHome() {
         <h1 className="mt-2 font-display text-2xl font-extrabold">🧩 game studio</h1>
         <p className="mt-1 text-sm text-muted">make ur own live modes w code or blocks, then share em w evryone. sign in w Jace to start.</p>
         <a href={signInHref("/studio")} className={`${primary} mt-4`}>
-          Sign in with Jace
+          Sign in w/ Jace
         </a>
       </div>
     );
@@ -152,7 +152,7 @@ export function StudioHome() {
         </section>
       )}
 
-      <section aria-label="Your games">
+      <section aria-label="Ur games">
         <h2 className="mb-3 text-lg font-semibold">ur games</h2>
         {!games ? (
           <div className="h-32 animate-pulse rounded-2xl bg-foreground/[.04]" aria-busy="true" />

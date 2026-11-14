@@ -41,7 +41,7 @@ export function Answer({ q, disabled, onAnswer }: { q: PlayerQuestion; disabled:
             if (text.trim()) onAnswer(text.trim());
           }}
         >
-          <input value={text} onChange={(e) => setText(e.target.value.slice(0, 120))} placeholder="Type your answer" aria-label="Your answer" disabled={disabled} autoFocus className={`${input} h-12 text-lg`} />
+          <input value={text} onChange={(e) => setText(e.target.value.slice(0, 120))} placeholder="Type ur anser" aria-label="Ur anser" disabled={disabled} autoFocus className={`${input} h-12 text-lg`} />
           <button type="submit" disabled={disabled || !text.trim()} className={primary}>
             Send
           </button>

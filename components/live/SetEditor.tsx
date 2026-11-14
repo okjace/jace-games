@@ -14,7 +14,7 @@ const TIMES = [5, 10, 20, 30, 60, 90, 120];
 const TYPES: { id: QuestionType; label: string }[] = [
   { id: "choice", label: "Multiple choice" },
   { id: "truefalse", label: "True or false" },
-  { id: "type", label: "Type the answer" },
+  { id: "type", label: "Type the anser" },
   { id: "html", label: "Custom HTML" },
 ];
 
@@ -150,7 +150,7 @@ export function SetEditor({ id }: { id: string }) {
           <textarea
             value={set.description}
             onChange={(e) => update({ description: e.target.value.slice(0, 400) })}
-            placeholder="What's this set about?"
+            placeholder="What's this set abt?"
             aria-label="Description"
             rows={2}
             className={`${input} h-auto py-2`}
@@ -164,8 +164,8 @@ export function SetEditor({ id }: { id: string }) {
               className={input}
             />
             <select value={set.visibility} onChange={(e) => update({ visibility: e.target.value as LiveSet["visibility"] })} aria-label="Who can see it" className={input}>
-              <option value="private">Private: only you</option>
-              <option value="unlisted">Unlisted: anyone with the link</option>
+              <option value="private">Private: only u</option>
+              <option value="unlisted">Unlisted: anyone w/ the link</option>
               <option value="public">Public: listed in Discover</option>
             </select>
           </div>
@@ -253,7 +253,7 @@ export function SetEditor({ id }: { id: string }) {
         <button
           type="button"
           onClick={async () => {
-            if (!confirm("Delete this set? This can't be undone.")) return;
+            if (!confirm("Delete this set? This cant be undone.")) return;
             const res = await fetch(`/api/live/sets/${id}`, { method: "DELETE" });
             if (res.ok) {
               dirty.current = false;
@@ -389,7 +389,7 @@ function QuestionForm({
           <label className="flex flex-col gap-1 text-sm">
             Ur HTML
             <span className="text-xs text-muted">
-              Runs sandboxed with no internet access. Call <code>jace.answer(value)</code> to answer; <code>jace.onLock(fn)</code> runs when time&apos;s up.
+              Runs sandboxed with no internet access. Call <code>jace.anser(value)</code> to anser; <code>jace.onLock(fn)</code> runs when time&apos;s up.
             </span>
             <textarea
               value={q.html ?? ""}

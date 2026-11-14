@@ -129,7 +129,7 @@ export function HostScreen({ code }: { code: string }) {
                 {view.setTitle ? ` · ${view.setTitle}` : view.settings.noSet ? " · no questions" : ""}
               </h1>
               <p className="text-sm text-muted">
-                Join at <b className="text-foreground">{joinUrl}</b> with code <b className="font-mono tracking-widest text-foreground">{view.code}</b>
+                Join at <b className="text-foreground">{joinUrl}</b> w/ code <b className="font-mono tracking-widest text-foreground">{view.code}</b>
               </p>
             </div>
           </div>
@@ -138,13 +138,13 @@ export function HostScreen({ code }: { code: string }) {
               👥 Players ({view.players.length})
             </button>
             {view.status !== "ended" && (
-              <button type="button" onClick={() => (playing ? setHostOpen(false) : playToo(true))} title="Play this game yourself, right here" className={secondary}>
-                🎮 {playing ? "Back to playing" : "Play too"}
+              <button type="button" onClick={() => (playing ? setHostOpen(false) : playToo(true))} title="Play this game urself, right here" className={secondary}>
+                🎮 {playing ? "Back to playin" : "Play too"}
               </button>
             )}
             {hasQuestions && view.status === "playing" && (
               <button type="button" aria-pressed={showAnswers} onClick={() => setShowAnswers((v) => !v)} className={secondary}>
-                📋 {showAnswers ? "Hide answers" : "Answers"}
+                📋 {showAnswers ? "Hide ansers" : "Answers"}
               </button>
             )}
             {view.status !== "ended" && (
@@ -161,7 +161,7 @@ export function HostScreen({ code }: { code: string }) {
             {view.status !== "ended" && <ChatButton label className={secondary} />}
             <FullscreenButton on={full.on} toggle={full.toggle} className="border border-line bg-panel" />
             {view.status !== "ended" && (
-              <button type="button" onClick={() => confirm("End the game for everyone?") && act("end")} className={secondary}>
+              <button type="button" onClick={() => confirm("End da game for evryone?") && act("end")} className={secondary}>
                 End game
               </button>
             )}
@@ -205,7 +205,7 @@ export function HostScreen({ code }: { code: string }) {
         hostOpen={hostOpen}
         onToggle={() => setHostOpen((o) => !o)}
         onStart={() => act("start")}
-        onEnd={() => confirm("End the game for everyone?") && act("end")}
+        onEnd={() => confirm("End da game for evryone?") && act("end")}
         onStop={() => playToo(false)}
       />
       {error && <p className="text-sm text-danger">{error}</p>}
@@ -259,14 +259,14 @@ function HostBar({
         </button>
       )}
       <button type="button" aria-expanded={hostOpen} onClick={onToggle} className={small}>
-        {hostOpen ? "🎮 Back to playing" : "📺 Host controls"}
+        {hostOpen ? "🎮 Back to playin" : "📺 Host controls"}
       </button>
       {view.status === "playing" && !hostOpen && (
         <button type="button" disabled={busy} onClick={onEnd} className={small}>
           End game
         </button>
       )}
-      <button type="button" onClick={onStop} title="Stop playing and go back to just hosting (you stay in the game)" aria-label="Stop playing" className={small}>
+      <button type="button" onClick={onStop} title="Stop playin and go back to just hosting (u stay in da game)" aria-label="Stop playin" className={small}>
         ✕
       </button>
     </div>
@@ -279,7 +279,7 @@ function Lobby({ view, busy, onStart, onKick }: { view: HostView; busy: boolean;
       <p className="text-sm text-muted">Game code</p>
       <p className="font-mono text-6xl font-black tracking-[0.25em] sm:text-7xl">{view.code}</p>
       <p className="text-muted">
-        {view.players.length === 0 ? "Waiting for players…" : `${view.players.length} player${view.players.length === 1 ? "" : "s"} in`}
+        {view.players.length === 0 ? "Waitin for playas…" : `${view.players.length} player${view.players.length === 1 ? "" : "s"} in`}
       </p>
       <ul className="flex max-w-3xl flex-wrap justify-center gap-2">
         {view.players.map((p) => (
@@ -361,7 +361,7 @@ function Classic({ view, secondsLeft, busy, onReveal, onNext }: { view: HostView
           </button>
         ) : (
           <button type="button" onClick={onReveal} disabled={busy} className={secondary}>
-            Skip to answer
+            Skip to anser
           </button>
         )}
       </div>
@@ -524,7 +524,7 @@ function PlayAgain({ view, busy, onAgain }: { view: HostView; busy: boolean; onA
     <section className={`${card} flex flex-wrap items-center gap-3`}>
       <span className="text-3xl">🔁</span>
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">Play again with evryone</p>
+        <p className="font-semibold">Play again w/ evryone</p>
         <p className="text-sm text-muted">
           Same game code ({view.code}), the {view.players.length} player{view.players.length === 1 ? "" : "s"} still here, fresh scores.
         </p>

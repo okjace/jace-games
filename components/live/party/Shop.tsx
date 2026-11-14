@@ -8,9 +8,9 @@ import type { Act } from "./shared";
 
 const ITEMS = [
   { id: "earn", icon: "💵", name: "Earnings", desc: "+25% on every reward", max: 5 },
-  { id: "streak", icon: "🔥", name: "Streak Bonus", desc: "Extra for every answer in a row", max: 5 },
-  { id: "multi", icon: "✖️", name: "Multiplier", desc: "×1.5 on everything you earn", max: 3 },
-  { id: "shield", icon: "🛡️", name: "Shield", desc: "Saves your streak from one wrong answer", max: 0 },
+  { id: "streak", icon: "🔥", name: "Streak Bonus", desc: "Extra for every anser in a row", max: 5 },
+  { id: "multi", icon: "✖️", name: "Multiplier", desc: "×1.5 on evrything u earn", max: 3 },
+  { id: "shield", icon: "🛡️", name: "Shield", desc: "Saves ur streak from one wrong anser", max: 0 },
 ] as const;
 
 /**
@@ -81,7 +81,7 @@ export function Shop({ view, act, unit, onClose }: { view: PlayerView; act: Act;
           );
         })}
         <button type="button" onClick={onClose} className="mt-1 h-12 rounded-full bg-white font-black text-[#2a1b4a]">
-          Back to the game
+          Back to da game
         </button>
       </div>
     </div>

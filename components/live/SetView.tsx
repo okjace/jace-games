@@ -8,7 +8,7 @@ import type { LiveSet, PlayerQuestion } from "@/lib/live/types";
 import { Markdown, QuestionMediaView } from "./Markdown";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
 
-const TYPE_LABEL = { choice: "Multiple choice", truefalse: "True or false", type: "Type the answer", html: "Custom HTML" };
+const TYPE_LABEL = { choice: "Multiple choice", truefalse: "True or false", type: "Type the anser", html: "Custom HTML" };
 
 /** A set's page: its questions (without answers, unless it's yours) and a Host button. */
 export function SetView({ id }: { id: string }) {
@@ -125,7 +125,7 @@ function ReportSet({ id }: { id: string }) {
     return (
       <p className="mt-2 text-xs text-muted">
         <a href={signInHref(`/live/sets/${id}`)} className="text-accent hover:underline">
-          Sign in with Jace
+          Sign in w/ Jace
         </a>{" "}
         to report a set.
       </p>
@@ -140,7 +140,7 @@ function ReportSet({ id }: { id: string }) {
         const res = await fetch(`/api/live/sets/${id}/report`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) }).catch(() => null);
         const body = await res?.json().catch(() => null);
         setBusy(false);
-        if (res?.ok) setNote({ text: body.already ? "You already reported this set. Thanks!" : "Thanks. The site owner will take a look.", good: true });
+        if (res?.ok) setNote({ text: body.already ? "U already reported this set. Thanks!" : "Thanks. The site owner will take a look.", good: true });
         else setNote({ text: body?.error ?? "Couldn't send the report.", good: false });
       }}
     >
@@ -148,7 +148,7 @@ function ReportSet({ id }: { id: string }) {
         value={reason}
         onChange={(e) => setReason(e.target.value.slice(0, 500))}
         rows={3}
-        placeholder="What's wrong with it? (rude, wrong answers, copied, spam…)"
+        placeholder="What's wrong w/ it? (rude, wrong ansers, copied, spam…)"
         aria-label="Why are you reporting this set?"
         autoFocus
         className="rounded-xl border border-line bg-background p-2 text-sm outline-none focus:border-accent"

@@ -44,7 +44,7 @@ export function StudioMode({ view, act, earn }: PartyProps) {
         {error ? (
           <p className="rounded-xl bg-panel p-6 text-center text-sm">{error}</p>
         ) : html === null ? (
-          <p className="rounded-xl bg-panel p-6 text-center text-sm text-muted">Loading the game…</p>
+          <p className="rounded-xl bg-panel p-6 text-center text-sm text-muted">Loading da game…</p>
         ) : (
           <GameFrame
             html={html}

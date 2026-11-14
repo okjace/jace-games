@@ -57,12 +57,12 @@ export function Leaderboard({ game, limit = 10, refreshKey = 0 }: { game: GameDe
           {!user ? (
             <>
               <a href={signInHref(pathname)} className="font-medium text-accent hover:underline">
-                Sign in with Jace
+                Sign in w/ Jace
               </a>{" "}
               to see the leaderboard evryone on Jace shares.
             </>
           ) : state.kind === "unavailable" ? (
-            "Sync with Jace is coming soon — until then, here are ur best scores."
+            "Sync w/ Jace is coming soon — until then, here are ur best scores."
           ) : (
             "Couldn't load the leaderboard. Here are ur best scores on this device."
           )}
@@ -135,7 +135,7 @@ function Row({
       <UserAvatar userId={userId} name={name} picture={picture} size={24} />
       <span className="flex min-w-0 flex-1 items-center font-medium">
         <UserName userId={userId} name={name} />
-        {you && <span className="ml-1.5 shrink-0 text-xs font-normal text-muted">(you)</span>}
+        {you && <span className="ml-1.5 shrink-0 text-xs font-normal text-muted">(u)</span>}
       </span>
       <span className={`shrink-0 font-mono font-semibold tabular-nums ${rank === 1 ? "text-accent" : ""}`}>{score}</span>
     </li>

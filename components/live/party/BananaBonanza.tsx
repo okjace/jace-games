@@ -75,15 +75,15 @@ export function BananaBonanza({ view, earn }: StageProps) {
       : event === "split" && last?.target
         ? `You and ${String(last.target)} each got bananas.`
         : event === "rain"
-          ? "Everyone got 10 bananas, you got the most!"
+          ? "Evryone got 10 bananas, u got the most!"
           : event === "mega"
-            ? "Your pile just doubled!"
+            ? "Ur pile just doubled!"
             : event === "go"
               ? `Everything is ×3 for ${GO_BANANAS_MS / 1000} seconds. ANSWER FAST!`
               : event === "rotten"
-                ? "Ew. Some of your bananas went bad."
+                ? "Ew. Some of ur bananas went bad."
                 : event === "slip"
-                  ? "Whoops. You dropped a few."
+                  ? "Whoops. U dropped a few."
                   : last?.going
                     ? "GO BANANAS ×3!"
                     : null;

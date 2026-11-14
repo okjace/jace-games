@@ -127,7 +127,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
     return (
       <Centered>
         <p className="text-4xl">👋</p>
-        <p className="text-lg font-semibold">The host removed you from this game.</p>
+        <p className="text-lg font-semibold">The host removed u from this game.</p>
         <Link href="/live" className={primary}>
           Back to Live
         </Link>
@@ -169,8 +169,8 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
             <button
               type="button"
               disabled={busy}
-              onClick={() => confirm("End this game now? Your score so far counts.") && void act({ action: "solo", op: "end" })}
-              title="End the game now"
+              onClick={() => confirm("End this game now? Ur score so far counts.") && void act({ action: "solo", op: "end" })}
+              title="End da game now"
               className="-my-1 rounded-full border border-line px-2.5 py-1 text-xs font-semibold hover:bg-foreground/[.05]"
             >
               🏁 End
@@ -203,7 +203,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           {view.me.rank === 1 && view.playerCount > 1 && <Celebration effect={view.me.avatar?.effect} />}
           <p className="text-5xl">{view.me.rank === 1 ? "🥇" : view.me.rank === 2 ? "🥈" : view.me.rank === 3 ? "🥉" : "🎮"}</p>
           <p className="text-2xl font-bold">
-            {view.me.rank === 1 ? "You won!" : `You came #${view.me.rank} of ${view.playerCount}`}
+            {view.me.rank === 1 ? "U won!" : `You came #${view.me.rank} of ${view.playerCount}`}
           </p>
           <p className="text-muted">
             {score(view, view.me.score)} · {view.me.correct}/{view.me.answered} right
@@ -272,7 +272,7 @@ function JoinForm({ code, defaultName, note, onJoined }: { code: string; default
           Change ur look
         </Link>
       </p>
-      <input value={name} onChange={(e) => setName(e.target.value.slice(0, 20))} placeholder="Your nickname" aria-label="Nickname" autoFocus maxLength={20} className={`${input} h-12 text-center text-lg`} />
+      <input value={name} onChange={(e) => setName(e.target.value.slice(0, 20))} placeholder="Ur nickname" aria-label="Nickname" autoFocus maxLength={20} className={`${input} h-12 text-center text-lg`} />
       {needsPin && (
         <input
           value={pin}
@@ -289,7 +289,7 @@ function JoinForm({ code, defaultName, note, onJoined }: { code: string; default
       <button type="submit" disabled={!name.trim() || busy || (needsPin && pin.length > 0 && pin.length < 4)} className={primary}>
         {busy ? "Joining…" : needsPin && pin.length === 4 ? "Rejoin" : "Join"}
       </button>
-      <p className="text-center text-xs text-muted">Left by accident? Join with the same name. Signed in, ur back right away; as a guest, enter the PIN you were shown.</p>
+      <p className="text-center text-xs text-muted">Left by accident? Join w/ the same name. Signed in, ur back right away; as a guest, enter the PIN u were shown.</p>
     </form>
   );
 }
@@ -304,7 +304,7 @@ export function RejoinPin({ code, small = false }: { code: string; small?: boole
   if (!pin) return null;
   if (small) {
     return (
-      <p className="text-center text-xs text-muted" title="If you leave by accident, join again with the same name and this PIN.">
+      <p className="text-center text-xs text-muted" title="If u leave by accident, join again w/ the same name and this PIN.">
         🔑 Game <b className="font-mono tracking-widest text-foreground">{code}</b> · Rejoin PIN <b className="font-mono tracking-widest text-foreground">{pin}</b>
       </p>
     );
@@ -368,7 +368,7 @@ function ClassicPlay({ view, busy, skew, act }: { view: PlayerView; busy: boolea
       <Centered>
         <p className="text-4xl">⏳</p>
         <p className="text-xl font-bold">Answer locked in!</p>
-        <p className="text-muted">Waiting for evryone else…</p>
+        <p className="text-muted">Waitin for evryone else…</p>
       </Centered>
     );
   }

@@ -118,7 +118,7 @@ export function CommunityGame({ view }: { view: GameView & { meta: GameSummary }
               </button>
             ) : (
               <a href={signInHref(`/community/${meta.id}`)} className={primary}>
-                Sign in to play with frens
+                Sign in to play w/ frens
               </a>
             ))}
           {isOwn && (
@@ -154,7 +154,7 @@ export function CommunityGame({ view }: { view: GameView & { meta: GameSummary }
               <button type="button" className={small} onClick={() => setRunKey((k) => k + 1)}>
                 ↻ Restart
               </button>
-              <span className="text-xs text-muted">Click the game to use the keyboard.</span>
+              <span className="text-xs text-muted">Click da game to use the keyboard.</span>
               {user && !isOwn && (
                 <button type="button" className={`${small} ml-auto`} onClick={() => setReporting((r) => !r)} aria-expanded={reporting}>
                   ⚑ Report
@@ -187,7 +187,7 @@ export function CommunityGame({ view }: { view: GameView & { meta: GameSummary }
           <aside className="flex flex-col gap-3">
             <div className="rounded-2xl border border-line bg-panel p-4">
               <h2 className="text-sm font-semibold">Leaderboard</h2>
-              <p className="mb-3 text-xs text-muted">Unverified: the game reports its own scores.</p>
+              <p className="mb-3 text-xs text-muted">Unverified: da game reports its own scores.</p>
               {!scores ? (
                 <p className="text-sm text-muted">Loading…</p>
               ) : scores.length === 0 ? (

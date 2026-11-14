@@ -118,7 +118,7 @@ export function Baseball({ view, act, busy, earn }: StageProps) {
       {field}
       {struck && (
         <p className="rounded-2xl bg-red-500/80 px-4 py-2 text-center font-black" style={{ animation: "jg-rise 0.25s ease-out" }}>
-          {lastPlay === "strikeout" ? "Strike three, you're out!" : `Strike ${ball?.strikes ?? 1}! Get the next one right.`}
+          {lastPlay === "strikeout" ? "Strike three, ur out!" : `Strike ${ball?.strikes ?? 1}! Get the next one right.`}
         </p>
       )}
       {earn}

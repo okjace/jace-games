@@ -31,7 +31,7 @@ export function ProfileLook({ user }: { user: SessionUser }) {
               {mine.level >= 99 ? " · max level!" : ` · ${mine.into}/${mine.need} XP to level ${mine.level + 1}`} · {mine.badges.length}/{BADGES.length} badges
             </p>
             {mine.badges.length > 0 && (
-              <p className="flex flex-wrap gap-1 text-xl" aria-label="Your badges">
+              <p className="flex flex-wrap gap-1 text-xl" aria-label="Ur badges">
                 {mine.badges.map((b) => (
                   <span key={b} title={badgeById(b)?.name}>
                     {badgeById(b)?.emoji}
@@ -43,7 +43,7 @@ export function ProfileLook({ user }: { user: SessionUser }) {
         ) : (
           <p className="text-sm text-muted">Loading…</p>
         )}
-        <p className="text-xs text-muted">This is how you show up everywhere on Jace Live: leaderboards, multiplayer and Live.</p>
+        <p className="text-xs text-muted">This is how u show up everywhere on Jace Live: leaderboards, multiplayer and Live.</p>
       </div>
       <Link href="/locker" className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-accent px-5 text-sm font-medium text-on-accent hover:bg-accent-hover">
         🎽 Edit your look

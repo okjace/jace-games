@@ -139,7 +139,7 @@ export function Editor({ id }: { id: string }) {
       await api(`/api/studio/games/${id}/publish`, { method: "POST", body: { published: next } });
       setPublished(next);
       if (next) setPublishedHtml(html);
-      setNotice({ kind: "info", text: next ? "Published! Anyone can play it on Community now." : "Unpublished. It's hidden from Community." });
+      setNotice({ kind: "info", text: next ? "Published! Anyone can play it on Community now." : "Unpublished. Its hidden from Community." });
     } catch (e) {
       setNotice({ kind: "error", text: (e as Error).message });
     } finally {
@@ -148,7 +148,7 @@ export function Editor({ id }: { id: string }) {
   }
 
   async function convertToCode() {
-    if (!confirm("Turn this game into code? You can edit everything as HTML and JavaScript afterwards, but you can't go back to blocks.")) return;
+    if (!confirm("Turn this game into code? U can edit evrything as HTML and JavaScript afterwards, but u cant go back to blocks.")) return;
     setBusy("convert");
     try {
       const code = html;
@@ -185,7 +185,7 @@ export function Editor({ id }: { id: string }) {
   }
 
   async function restore(version: number) {
-    if (dirty && !confirm("Replace your unsaved changes with this version?")) return;
+    if (dirty && !confirm("Replace ur unsaved changes w/ this version?")) return;
     try {
       const v = await api<{ html: string; blocks_json: object | null }>(`/api/studio/games/${id}/versions/${version}`);
       if (kind === "blocks" && v.blocks_json) {
@@ -223,7 +223,7 @@ export function Editor({ id }: { id: string }) {
         <p className="text-4xl">🛠️</p>
         <h1 className="mt-2 text-xl font-bold">Sign in to use the Game Studio</h1>
         <a href={signInHref(`/studio/${id}`)} className={`${primary} mt-4`}>
-          Sign in with Jace
+          Sign in w/ Jace
         </a>
       </div>
     );
@@ -261,7 +261,7 @@ export function Editor({ id }: { id: string }) {
                 <span className="text-danger">Taken down by the site owner</span>
               ) : published ? (
                 changedSincePublish ? (
-                  "Published (with newer changes)"
+                  "Published (w/ newer changes)"
                 ) : (
                   "Published"
                 )
@@ -355,7 +355,7 @@ export function Editor({ id }: { id: string }) {
                 <input type="checkbox" checked={autoRun} onChange={(e) => setAutoRun(e.target.checked)} /> Auto-run
               </label>
             )}
-            <label className="flex items-center gap-1.5 text-xs text-muted" title="Two copies of the game, connected to each other, to try jace.room">
+            <label className="flex items-center gap-1.5 text-xs text-muted" title="Two copies of da game, connected to each other, to try jace.room">
               <input type="checkbox" checked={twoPlayer} onChange={(e) => setTwoPlayer(e.target.checked)} /> 2 players
             </label>
             <button
@@ -399,7 +399,7 @@ export function Editor({ id }: { id: string }) {
               onGameOver={(w) => addLog({ level: "info", text: `jace.gameOver(${w ? `{ winners: [${w.join(", ")}] }` : ""})` })}
             />
           )}
-          <p className="text-xs text-muted">Click the game to give it the keyboard.</p>
+          <p className="text-xs text-muted">Click da game to give it the keyboard.</p>
           <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-line bg-panel">
             <div className="flex items-center justify-between border-b border-line px-3 py-1.5">
               <span className="text-xs font-semibold">Console</span>
@@ -408,7 +408,7 @@ export function Editor({ id }: { id: string }) {
               </button>
             </div>
             <ul className="max-h-48 min-h-20 overflow-auto p-2 font-mono text-xs">
-              {logs.length === 0 && <li className="text-muted">console.log and errors from the game show up here.</li>}
+              {logs.length === 0 && <li className="text-muted">console.log and errors from da game show up here.</li>}
               {logs.map((l) => (
                 <li key={l.n} className={l.level === "error" ? "text-danger" : l.level === "warn" ? "text-warn" : l.level === "info" ? "text-accent" : ""}>
                   {l.who && <span className="text-muted">[{l.who}] </span>}
@@ -464,7 +464,7 @@ function Settings({
         />
       </label>
       <fieldset className="flex flex-col gap-2 text-sm sm:col-span-2">
-        <legend className="mb-1 font-medium">Players</legend>
+        <legend className="mb-1 font-medium">Playas</legend>
         <div className="flex flex-wrap gap-2">
           {(
             [
@@ -504,7 +504,7 @@ function Settings({
               value={mp.max}
               onChange={(e) => setMeta({ ...meta, multiplayer: { ...mp, max: Math.max(2, Math.min(MAX_PLAYERS, Number(e.target.value) || 2)) } })}
             />
-            <span>players</span>
+            <span>playas</span>
           </div>
         )}
       </fieldset>
@@ -514,7 +514,7 @@ function Settings({
           <span className="font-medium">Every Jace Live game is a Live mode</span>
           <span className="block text-muted">
             Players earn coins by answering questions. <code>jace.live.coins</code> is the total they&apos;ve earned (your game keeps track
-            of what it spends), <code>jace.live.onCoins(fn)</code> tells you when it goes up, and <code>jace.live.earn()</code> sends them to
+            of what it spends), <code>jace.live.onCoins(fn)</code> tells u when it goes up, and <code>jace.live.earn()</code> sends them to
             answer questions. Report progress with <code>jace.submitScore(n)</code>; a score counts up to 20× the coins earned. Others can only
             host it once it&apos;s published.
           </span>
@@ -539,7 +539,7 @@ function SdkHelp() {
     <details className={`${card} p-4 text-sm`}>
       <summary className="cursor-pointer font-semibold">The Jace game SDK (window.jace)</summary>
       <div className="mt-3 grid gap-1 font-mono text-xs leading-relaxed text-muted">
-        <p><span className="text-foreground">jace.player.name</span> — who&apos;s playing</p>
+        <p><span className="text-foreground">jace.player.name</span> — who&apos;s playin</p>
         <p><span className="text-foreground">jace.submitScore(n)</span> — saves a whole-number score (higher is better; best per player)</p>
         <p><span className="text-foreground">jace.gameOver()</span> — the round is over (in a race, ur last score is ur result)</p>
         <p><span className="text-foreground">jace.onReady(cb)</span> — runs cb once the page is ready</p>
@@ -547,7 +547,7 @@ function SdkHelp() {
         <p><span className="text-foreground">jace.room</span> — null when playing alone; in a room: mode, isHost, mySeat, players [{"{ seat, name, you, host }"}]</p>
         <p><span className="text-foreground">jace.room.send(event, data)</span> — to evryone else (short event name, JSON data up to 8 KB, 20 a second)</p>
         <p><span className="text-foreground">jace.room.on(event, (data, fromSeat) =&gt; …)</span> — hear the others</p>
-        <p><span className="text-foreground">jace.gameOver({"{ winners: [seat] }"})</span> — live games: the host ends the game and names the winners</p>
+        <p><span className="text-foreground">jace.gameOver({"{ winners: [seat] }"})</span> — live games: the host ends da game and names the winners</p>
       </div>
       <p className="mt-3 text-xs text-muted">
         Games run in a locked-down frame: no network (fetch, WebSocket, images from other sites), no cookies or storage, no popups. Put

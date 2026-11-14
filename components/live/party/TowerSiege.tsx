@@ -50,7 +50,7 @@ const TOWERS: Record<Kind, TowerDef> = {
   tesla: { icon: "⚡", name: "Tesla", blurb: "Lightning that jumps between up to 3 enemies.", cost: 40, range: 2.3, dmg: 1.6, rate: 1.0, chain: 3 },
   sniper: { icon: "🎯", name: "Sniper", blurb: "Huge range and big hits, aimed at the toughest enemy.", cost: 45, range: 5, dmg: 6, rate: 2.4, strong: true },
   vortex: { icon: "🌀", name: "Vortex", blurb: "Knocks enemies back along the road.", cost: 55, range: 2, dmg: 0.5, rate: 2.8, push: 1.2 },
-  mine: { icon: "⛏️", name: "Gold Mine", blurb: "Doesn't fight. Earns 🪙4 per level every wave you clear.", cost: 50, range: 0, dmg: 0, rate: 0, mine: 4 },
+  mine: { icon: "⛏️", name: "Gold Mine", blurb: "Doesn't fight. Earns 🪙4 per level every wave u clear.", cost: 50, range: 0, dmg: 0, rate: 0, mine: 4 },
 };
 type Tower = { x: number; y: number; kind: Kind; level: number };
 type Enemy = {

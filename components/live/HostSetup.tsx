@@ -125,7 +125,7 @@ export function HostSetup() {
           <input type="checkbox" checked={noSet} onChange={(e) => setNoSet(e.target.checked)} className="h-5 w-5" />
           <span>
             <span className="block font-medium">No questons</span>
-            <span className="block text-sm text-muted">Turn sets off: players tap a button instead of answering. Works with Gold Rush and Rocket Race.</span>
+            <span className="block text-sm text-muted">Turn sets off: playas tap a button instead of answering. Works w/ Gold Rush and Rocket Race.</span>
           </span>
         </label>
         {!noSet && (

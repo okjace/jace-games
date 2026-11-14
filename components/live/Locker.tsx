@@ -91,7 +91,7 @@ export function Locker() {
       }) }).catch(() => null);
     const body = await res?.json().catch(() => null);
     if (res?.ok && user) refreshLook(user.id);
-    setStatus(res?.ok ? "Saved. This is how you show up across Jace Live now." : (body?.error ?? "Couldn't save."));
+    setStatus(res?.ok ? "Saved. This is how u show up across Jace Live now." : (body?.error ?? "Couldn't save."));
   };
 
   const tile = (selected: boolean, locked: boolean) =>
@@ -122,13 +122,13 @@ export function Locker() {
               <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-foreground/10">
                 <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${data.level >= 99 ? 100 : Math.round((data.into / data.need) * 100)}%` }} />
               </div>
-              <p className="mt-1 text-xs text-muted">Finish Live games (hosted or solo) to earn XP. Right answers and good placings earn more.</p>
+              <p className="mt-1 text-xs text-muted">Finish Live games (hosted or solo) to earn XP. Right ansers and good placings earn more.</p>
             </>
           ) : (
             <p className="text-sm text-muted">
               Guests get the starter icons.{" "}
               <a href={signInHref("/live/locker")} className="text-accent hover:underline">
-                Sign in with Jace
+                Sign in w/ Jace
               </a>{" "}
               to level up, unlock more, and use ur Jace profile picture.
             </p>
@@ -147,7 +147,7 @@ export function Locker() {
               onClick={() => choose({ ...look, icon: "jace" })}
               aria-pressed={look.icon === "jace"}
               className={tile(look.icon === "jace", !data?.picture)}
-              title={data?.picture ? "Your Jace profile picture" : "Add a profile picture on Jace to use it here"}
+              title={data?.picture ? "Ur Jace profile picture" : "Add a profile picture on Jace to use it here"}
             >
               <LiveAvatar avatar={{ icon: "jace", frame: "none", picture: data?.picture }} size={40} />
               Jace pic
@@ -354,7 +354,7 @@ function OwnerXp({ me, onMine, onBadges }: { me: string; onMine: (xp: number) =>
     <section className={`${card} flex flex-col gap-3 border-amber-500/40`}>
       <div>
         <h2 className="text-sm font-semibold">👑 Give XP (site owner)</h2>
-        <p className="text-xs text-muted">Only you see this. People show up here once they&apos;ve opened their locker or played Live signed in.</p>
+        <p className="text-xs text-muted">Only u see this. People show up here once they&apos;ve opened their locker or played Live signed in.</p>
         <Link href="/live/moderation" className="mt-1 inline-block text-xs text-accent hover:underline">
           🚩 Review reported sets →
         </Link>
@@ -512,7 +512,7 @@ function FrameMaker({
         <LiveAvatar avatar={{ ...look, frame: "custom", custom: { ...draft, colors } }} size={96} />
         <div>
           <p className="font-semibold">🎨 Frame maker</p>
-          <p className="text-xs text-muted">Pick a style and ur colors. More styles unlock as you level up.</p>
+          <p className="text-xs text-muted">Pick a style and ur colors. More styles unlock as u level up.</p>
         </div>
       </div>
       <div>

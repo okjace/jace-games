@@ -23,7 +23,7 @@ export function WinsBoard({ gameId, limit = 10 }: { gameId: string; limit?: numb
 
   if (failed) return <p className="text-sm text-muted">Couldn&apos;t load wins.</p>;
   if (!rows) return <div className="h-20 animate-pulse rounded-xl bg-foreground/[.04]" />;
-  if (rows.length === 0) return <p className="text-sm text-muted">No wins yet. Start a game with a fren!</p>;
+  if (rows.length === 0) return <p className="text-sm text-muted">No wins yet. Start a game w/ a fren!</p>;
   return (
     <ol className="space-y-1">
       {rows.slice(0, limit).map((r, i) => (

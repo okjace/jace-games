@@ -28,7 +28,7 @@ export function MultiplayerRecord() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{g.name}</p>
-                  <p className="text-xs text-muted">{r ? `${r.played} game${r.played === 1 ? "" : "s"} played` : "Not played with friends yet"}</p>
+                  <p className="text-xs text-muted">{r ? `${r.played} game${r.played === 1 ? "" : "s"} played` : "Not played w/ frens yet"}</p>
                 </div>
                 <span className={`font-semibold tabular-nums ${r?.wins ? "text-accent" : "text-muted"}`}>
                   {records === null ? "…" : `${r?.wins ?? 0} win${r?.wins === 1 ? "" : "s"}`}

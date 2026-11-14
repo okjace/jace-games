@@ -33,13 +33,13 @@ export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "fac
 /** Each mode's look: background, accent, and its tap button with questions off. */
 export const THEMES: Record<string, { bg: string; accent: string; tap: [string, string] }> = {
   gold: { bg: "radial-gradient(circle at 50% 0%, #6d3fd1 0%, #2b1462 55%, #160a36 100%)", accent: "#facc15", tap: ["💰 DIG", "Every dig opens a chest."] },
-  rocket: { bg: "radial-gradient(circle at 50% 120%, #1e3a8a 0%, #0b1026 60%, #05060f 100%)", accent: "#38bdf8", tap: ["🔥 BOOST", "Every boost fires your rocket."] },
+  rocket: { bg: "radial-gradient(circle at 50% 120%, #1e3a8a 0%, #0b1026 60%, #05060f 100%)", accent: "#38bdf8", tap: ["🔥 BOOST", "Every boost fires ur rocket."] },
   tower: { bg: "linear-gradient(180deg, #2f6b3a 0%, #1d4527 100%)", accent: "#facc15", tap: ["⛏️ MINE", "Each tap digs up a few coins."] },
   snack: { bg: "linear-gradient(180deg, #ff9a5a 0%, #e8573c 100%)", accent: "#fff3c4", tap: ["🥕 FORAGE", "Each tap brings in a little food."] },
   factory: { bg: "linear-gradient(180deg, #3b4252 0%, #1f242e 100%)", accent: "#fbbf24", tap: ["🔩 CRANK", "Each tap earns a few coins."] },
   fishing: { bg: "linear-gradient(180deg, #38bdf8 0%, #0369a1 60%, #0c4a6e 100%)", accent: "#fde68a", tap: ["🎣 CAST", "Each tap is a cast."] },
   hack: { bg: "linear-gradient(180deg, #04130b 0%, #000 100%)", accent: "#3ddc84", tap: ["💻 MINE", "Each tap mines a few bits."] },
-  baseball: { bg: "linear-gradient(180deg, #166534 0%, #14532d 70%, #052e16 100%)", accent: "#facc15", tap: ["⚾ PLAY BALL", "Each tap puts you up to bat."] },
+  baseball: { bg: "linear-gradient(180deg, #166534 0%, #14532d 70%, #052e16 100%)", accent: "#facc15", tap: ["⚾ PLAY BALL", "Each tap puts u up to bat."] },
   custom: { bg: "linear-gradient(180deg, #4338ca 0%, #1e1b4b 100%)", accent: "#a5f3fc", tap: ["🪙 EARN", "Each tap earns a few coins."] },
   banana: { bg: "radial-gradient(circle at 50% 0%, #fde047 0%, #f59e0b 55%, #b45309 100%)", accent: "#fef08a", tap: ["🍌 PEEL", "Each peel is a random banana event!"] },
   summit: { bg: "linear-gradient(180deg, #0ea5e9 0%, #0369a1 55%, #1e3a5f 100%)", accent: "#e0f2fe", tap: ["⛰️ CLIMB", ""] },
@@ -76,7 +76,7 @@ function FeedbackCard({ f, onDone, accent }: { f: Feedback; onDone: () => void; 
         <span className="text-6xl" style={{ animation: "jg-zoom 0.5s ease-out" }}>
           ✅
         </span>
-        <span className="text-3xl font-black">Correct!</span>
+        <span className="text-3xl font-black">Corect!</span>
       </button>
     );
   }
@@ -249,8 +249,8 @@ function Stage({ view, busy, act, chat, embedded = false }: { view: PlayerView; 
           {view.solo && (
             <button
               type="button"
-              onClick={() => confirm("End this game now? Your score so far counts.") && void act({ action: "solo", op: "end" })}
-              title="End the game now"
+              onClick={() => confirm("End this game now? Ur score so far counts.") && void act({ action: "solo", op: "end" })}
+              title="End da game now"
               className="rounded-full bg-black/25 px-3 py-2 text-sm font-bold backdrop-blur hover:bg-black/40"
             >
               🏁 End

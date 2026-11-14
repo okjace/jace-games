@@ -23,7 +23,7 @@ const FACES = ["🧑", "👩", "👨", "🧒", "👵", "👴", "🧔", "👩‍�
 const UPGRADES = {
   recipe: { icon: "📖", name: "Secret recipes", desc: "+25% on every sale", base: 40, max: 3 },
   chairs: { icon: "🪑", name: "Comfy chairs", desc: "Customers wait 30% longer", base: 30, max: 3 },
-  grill: { icon: "🔥", name: "Speedy grill", desc: "Serves someone by itself every few seconds", base: 80, max: 3 },
+  grill: { icon: "🔥", name: "Speedy grill", desc: "Serves someone by itself every few secs", base: 80, max: 3 },
 } as const;
 type UpgradeId = keyof typeof UPGRADES;
 

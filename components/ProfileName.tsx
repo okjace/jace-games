@@ -27,7 +27,7 @@ export function ProfileName({ user }: { user: SessionUser }) {
     if (!res?.ok) return setNote({ text: body?.error ?? "Couldn't save.", good: false });
     updateUser(body.user);
     setEditing(false);
-    setNote({ text: cleaned.name ? "Display name saved." : "Display name cleared: you'll show as your username.", good: true });
+    setNote({ text: cleaned.name ? "Display name saved." : "Display name cleared: u'll show as ur username.", good: true });
   };
 
   const refresh = async () => {
@@ -41,7 +41,7 @@ export function ProfileName({ user }: { user: SessionUser }) {
     const parts: string[] = [];
     if (body.usernameChanged) parts.push(`Username updated from @${body.usernameChanged.from} to @${body.usernameChanged.to}${body.renamed ? ` (and on ${body.renamed} thing${body.renamed === 1 ? "" : "s"} you made)` : ""}.`);
     if (body.pictureChanged) parts.push("Picture updated.");
-    setNote({ text: parts.length ? parts.join(" ") : "Everything already matches your Jace account.", good: true });
+    setNote({ text: parts.length ? parts.join(" ") : "Evrything already matches ur Jace account.", good: true });
   };
 
   return (
@@ -79,7 +79,7 @@ export function ProfileName({ user }: { user: SessionUser }) {
         </div>
       )}
       <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
-        <span title="Your username comes from Jace and can't be changed here">
+        <span title="Ur username comes from Jace and cant be changed here">
           🔒 @{user.username}
         </span>
         <button type="button" onClick={refresh} disabled={busy} className="rounded-full border border-line px-2.5 py-0.5 text-xs hover:bg-foreground/[.05] disabled:opacity-50">

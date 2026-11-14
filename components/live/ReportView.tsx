@@ -25,7 +25,7 @@ export function ReportView({ report }: { report: GameReport }) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  if (report.questions.length === 0) return <p className="text-sm text-muted">This game had no questons, so there are no answers to show.</p>;
+  if (report.questions.length === 0) return <p className="text-sm text-muted">This game had no questons, so there are no ansers to show.</p>;
 
   const overall = (() => {
     const tries = report.players.flatMap((p) => p.answers.flat());
@@ -157,7 +157,7 @@ export function ReportView({ report }: { report: GameReport }) {
                         Q{i + 1}. <Markdown inline text={q.prompt} />
                       </p>
                       {tries.length === 0 ? (
-                        <p className="text-muted">Didn&apos;t answer</p>
+                        <p className="text-muted">Didn&apos;t anser</p>
                       ) : (
                         tries.map((t, ti) => (
                           <p key={ti}>

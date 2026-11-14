@@ -188,7 +188,7 @@ export function Garland({ season }: { season: SeasonId }) {
   const g = SEASONS[season].garland;
   if (!g) return null;
   return (
-    <div aria-hidden="true" className="pointer-events-none overflow-hidden whitespace-nowrap border-b border-line/60 bg-background/40 py-0.5 text-center text-sm leading-6 tracking-[0.35em]">
+    <div aria-hidden="true" data-egg="garland" className="cursor-pointer select-none overflow-hidden whitespace-nowrap border-b border-line/60 bg-background/40 py-0.5 text-center text-sm leading-6 tracking-[0.35em]">
       <span className="jl-garland inline-block">{g.repeat(4)}</span>
     </div>
   );

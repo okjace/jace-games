@@ -156,7 +156,7 @@ export function PromptEditor({ q, onChange }: { q: Question; onChange: (fn: (q: 
             </button>
           ))}
           <span className="mx-1 h-5 w-px bg-line" />
-          <button type="button" title="Upload a picture or video from your device" disabled={media.length >= MAX_MEDIA || !!upload} onClick={() => fileRef.current?.click()} className={btn}>
+          <button type="button" title="Upload a picture or video from ur device" disabled={media.length >= MAX_MEDIA || !!upload} onClick={() => fileRef.current?.click()} className={btn}>
             ⬆️ <span className="ml-1 text-xs">Upload</span>
           </button>
           <button type="button" title="Add a picture or video by link" disabled={media.length >= MAX_MEDIA} onClick={() => setAdding((v) => !v)} className={btn} aria-expanded={adding}>
@@ -179,7 +179,7 @@ export function PromptEditor({ q, onChange }: { q: Question; onChange: (fn: (q: 
         </div>
         {preview ? (
           <div className="min-h-[88px] bg-background p-4 text-center text-lg font-bold text-foreground">
-            {q.prompt.trim() ? <Markdown text={q.prompt} /> : <p className="font-normal text-muted">Nothing to preview yet.</p>}
+            {q.prompt.trim() ? <Markdown text={q.prompt} /> : <p className="font-normal text-muted">Nuthin to preview yet.</p>}
             <QuestionMediaView media={media} className="mt-3" />
           </div>
         ) : (
@@ -195,7 +195,7 @@ export function PromptEditor({ q, onChange }: { q: Question; onChange: (fn: (q: 
                 apply(t);
               }
             }}
-            placeholder={q.type === "html" ? "Question text (optional; your HTML can show it instead)" : "Type your question. Use the buttons above for **bold**, lists, links and more."}
+            placeholder={q.type === "html" ? "Question text (optional; ur HTML can show it instead)" : "Type ur question. Use the buttons above for **bold**, lists, links and more."}
             aria-label="Question"
             rows={3}
             className="block w-full resize-y bg-background px-3 py-2 text-base outline-none"
@@ -221,7 +221,7 @@ export function PromptEditor({ q, onChange }: { q: Question; onChange: (fn: (q: 
       {adding && (
         <div className="flex flex-col gap-2 rounded-xl border border-line bg-foreground/[.03] p-3">
           <p className="text-sm font-semibold">Add a picture or video</p>
-          <p className="text-xs text-muted">Paste a YouTube or Vimeo link to embed the video, or a link to a picture (it has to start with https://).</p>
+          <p className="text-xs text-muted">Paste a YouTube or Vimeo link to embed the video, or a link to a picture (it has to start w/ https://).</p>
           <input
             value={link}
             autoFocus

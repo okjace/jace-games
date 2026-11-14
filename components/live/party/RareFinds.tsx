@@ -92,7 +92,7 @@ export function RareFinds({ view, act, busy }: StageProps) {
           <p className="text-4xl">🏁</p>
           <p className="mt-1 text-2xl font-black">All {r.rounds} done!</p>
           <p className="text-3xl font-black">{view.me.score} pts</p>
-          <p className="text-sm text-white/80">Waiting for evryone else to finish…</p>
+          <p className="text-sm text-white/80">Waitin for evryone else to finish…</p>
         </div>
       </div>
     );
@@ -107,10 +107,10 @@ export function RareFinds({ view, act, busy }: StageProps) {
         ) : (
           <div className="rounded-3xl bg-black/25 p-6 text-center backdrop-blur">
             <p className="text-5xl">💎</p>
-            <p className="mt-2 text-xl font-black">Find the rare answers</p>
+            <p className="mt-2 text-xl font-black">Find the rare ansers</p>
             <p className="mx-auto mt-1 max-w-sm text-sm text-white/80">
               Each prompt has lots of right answers. Name any of them, but the rarer the answer, the more it&apos;s worth. {r.rounds} prompts, 25
-              seconds each, guess as much as you like.
+              secs each, guess as much as u like.
             </p>
             <TierKey />
           </div>
@@ -143,7 +143,7 @@ export function RareFinds({ view, act, busy }: StageProps) {
       </div>
       <div className="rounded-3xl bg-white p-6 text-center text-neutral-900 shadow-[0_6px_0_rgba(0,0,0,0.18)]">
         <Markdown text={q.prompt} className="text-2xl font-extrabold leading-snug" />
-        <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">Rarer answers score more</p>
+        <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">Rarer ansers score more</p>
       </div>
       <form
         className="flex gap-2"
@@ -156,7 +156,7 @@ export function RareFinds({ view, act, busy }: StageProps) {
           ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, 120))}
-          placeholder="Type an answer…"
+          placeholder="Type an anser…"
           aria-label="Your answer"
           autoComplete="off"
           className="h-14 min-w-0 flex-1 rounded-2xl border-4 border-white/70 bg-white px-4 text-xl font-bold text-neutral-900 outline-none focus:border-white"
@@ -215,7 +215,7 @@ function ResultCard({ last }: { last: Record<string, unknown> }) {
       )}
       {examples.length > 0 && (
         <div className="mt-1 w-full rounded-2xl bg-black/25 p-3 text-left text-sm">
-          <p className="mb-1 text-xs font-bold uppercase tracking-wider text-white/70">Rarest answers</p>
+          <p className="mb-1 text-xs font-bold uppercase tracking-wider text-white/70">Rarest ansers</p>
           <ul className="flex flex-col gap-0.5">
             {examples.map((e) => (
               <li key={e.answer}>

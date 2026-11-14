@@ -202,11 +202,11 @@ export function ChatPanel({
     <section aria-label="Game chat" className={`flex flex-col overflow-hidden rounded-2xl border ${shell} ${className}`}>
       <div className={`flex items-center gap-2 border-b px-3 py-2 ${line}`}>
         <p className="flex-1 font-semibold">
-          💬 Chat {!chatOn && <span className={`text-xs font-normal ${muted}`}>(off for players)</span>}
+          💬 Chat {!chatOn && <span className={`text-xs font-normal ${muted}`}>(off for playas)</span>}
         </p>
         {host && (
           <button type="button" onClick={() => void toggle()} className={`shrink-0 rounded-full border px-2 py-0.5 text-xs ${line}`}>
-            {chatOn ? "Turn off for players" : "Turn on for players"}
+            {chatOn ? "Turn off for playas" : "Turn on for playas"}
           </button>
         )}
         <button type="button" onClick={() => setUi({ shown: false, unread: 0 })} aria-label="Hide chat" title="Hide chat" className={`shrink-0 ${muted} hover:opacity-100`}>
@@ -247,7 +247,7 @@ export function ChatPanel({
               <input
                 value={text}
                 onChange={(e) => setText(e.target.value.slice(0, CHAT_MAX))}
-                placeholder={chatOn ? "Say something nice…" : "Chat is off (only you can send)"}
+                placeholder={chatOn ? "Say somthing nice…" : "Chat is off (only u can send)"}
                 aria-label="Chat message"
                 className={`h-10 min-w-0 flex-1 rounded-full border px-3 text-sm outline-none focus:border-accent ${stage ? "border-white/25 bg-white/10 text-white placeholder:text-white/50" : "border-line bg-background"}`}
               />

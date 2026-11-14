@@ -36,16 +36,16 @@ export function ReportList() {
       </div>
       {!user ? (
         <div className={`${card} text-center`}>
-          <p className="font-semibold">Sign in with Jace to see ur reports.</p>
+          <p className="font-semibold">Sign in w/ Jace to see ur reports.</p>
           <a href={signInHref("/live/reports")} className={`${primary} mt-4`}>
-            Sign in with Jace
+            Sign in w/ Jace
           </a>
         </div>
       ) : reports === null ? (
         <p className="animate-pulse text-muted">Loading…</p>
       ) : reports.length === 0 ? (
         <p className={`${card} text-sm text-muted`}>
-          No reports yet. Host a game or play solo with a question set, and its report shows up here when it ends.
+          No reports yet. Host a game or play solo w/ a question set, and its report shows up here when it ends.
         </p>
       ) : (
         <>
@@ -107,7 +107,7 @@ export function SavedReport({ id }: { id: string }) {
   }, [id]);
 
   const remove = async () => {
-    if (!confirm("Delete this report? This can't be undone.")) return;
+    if (!confirm("Delete this report? This cant be undone.")) return;
     const res = await fetch(`/api/live/reports/${id}`, { method: "DELETE" }).catch(() => null);
     if (res?.ok) router.push("/live/reports");
   };

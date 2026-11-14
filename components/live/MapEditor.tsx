@@ -467,7 +467,7 @@ function RulesPanel({ map, change }: { map: TowerMap; change: (m: TowerMap) => v
   return (
     <section className={card}>
       <h2 className="text-sm font-semibold">Rules</h2>
-      <p className="mb-2 text-xs text-muted">Make things happen: when somthing happens in the game, do somthing.</p>
+      <p className="mb-2 text-xs text-muted">Make things happen: when somthing happens in da game, do somthing.</p>
       <ol className="flex flex-col gap-2">
         {rules.map((r, i) => {
           const w = RULE_WHEN[r.when];

@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import { Notices } from "@/components/site/Notices";
 import { Garland, SeasonalSky } from "@/components/site/Seasonal";
 import { SeasonBackdrop } from "@/components/site/SeasonFx";
+import { EasterEggs } from "@/components/site/EasterEggs";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { ScoresProvider } from "@/components/ScoresProvider";
@@ -48,6 +49,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <SiteFooter />
           <SeasonalSky season={season} />
           <SeasonBackdrop season={season} />
+          <EasterEggs />
         </ScoresProvider>
       </body>
     </html>

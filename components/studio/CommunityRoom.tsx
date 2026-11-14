@@ -119,7 +119,7 @@ export function CommunityRoomPlay({
           onGameOver={onGameOver}
           autoFocus
         />
-        <p className="mt-2 text-xs text-muted">Click the game to use the keyboard. Community games are made by players.</p>
+        <p className="mt-2 text-xs text-muted">Click da game to use the keyboard. Community games are made by playas.</p>
       </section>
       <aside className="flex flex-col gap-3">
         <div className="rounded-2xl border border-line bg-panel p-4">
@@ -130,7 +130,7 @@ export function CommunityRoomPlay({
                 <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: SEAT_COLORS[p.seat % SEAT_COLORS.length] }} />
                 <span className="min-w-0 flex-1 truncate">
                   {p.username}
-                  {p.userId === meId && <span className="text-muted"> (you)</span>}
+                  {p.userId === meId && <span className="text-muted"> (u)</span>}
                   {p.userId === data.room.host && <span className="text-muted"> · host</span>}
                 </span>
                 {mode === "race" && <span className="font-mono font-semibold tabular-nums">{progress[p.userId] ?? "—"}</span>}
@@ -140,7 +140,7 @@ export function CommunityRoomPlay({
           </ul>
           {mode === "race" ? (
             <>
-              <p className="mt-3 text-xs text-muted">Highest score wins. Ur result is sent when the game ends.</p>
+              <p className="mt-3 text-xs text-muted">Highest score wins. Ur result is sent when da game ends.</p>
               {!submitted ? (
                 <button
                   type="button"
@@ -150,11 +150,11 @@ export function CommunityRoomPlay({
                   I&apos;m done{progress[meId] !== undefined ? ` (${progress[meId]})` : ""}
                 </button>
               ) : (
-                <p className="mt-3 text-xs font-medium text-accent">Result sent. Waiting for the others…</p>
+                <p className="mt-3 text-xs font-medium text-accent">Result sent. Waitin for the others…</p>
               )}
             </>
           ) : (
-            <p className="mt-3 text-xs text-muted">{isHost ? "You're the host: the game ends when your game says so." : "The host's game decides who wins."}</p>
+            <p className="mt-3 text-xs text-muted">{isHost ? "Ur the host: da game ends when ur game says so." : "The host's game decides who wins."}</p>
           )}
         </div>
       </aside>

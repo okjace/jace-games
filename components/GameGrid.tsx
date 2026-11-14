@@ -57,7 +57,7 @@ export function GameGrid() {
                 </span>
                 <span className="flex gap-1.5">
                   {game.multiplayer && (
-                    <span title="Play with friends" className="rounded-full border border-line px-2 py-0.5 text-xs font-medium text-muted">
+                    <span title="Play w/ frens" className="rounded-full border border-line px-2 py-0.5 text-xs font-medium text-muted">
                       👥 {game.multiplayer.min === game.multiplayer.max ? game.multiplayer.max : `${game.multiplayer.min}–${game.multiplayer.max}`}
                     </span>
                   )}

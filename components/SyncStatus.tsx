@@ -26,7 +26,7 @@ export function SyncStatus({ className = "" }: { className?: string }) {
       );
     case "coming-soon":
       return (
-        <span className={base} title="Your scores are kept on this device and will upload once Jace turns sync on.">
+        <span className={base} title="Ur scores are kept on this device and will upload once Jace turns sync on.">
           {dot("bg-muted")}Sync with Jace is coming soon
         </span>
       );

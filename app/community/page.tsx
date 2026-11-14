@@ -13,7 +13,7 @@ export default async function CommunityPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-extrabold tracking-tight">💬 Community games</h1>
-          <p className="mt-1 text-muted">live modes made by Jace players in the Studio. host one for ur room!!</p>
+          <p className="mt-1 text-muted">live modes made by Jace playas in the Studio. host one for ur room!!</p>
         </div>
         <Link
           href="/studio"

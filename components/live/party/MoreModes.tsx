@@ -69,8 +69,8 @@ export function SummitClimb({ view, earn }: StageProps) {
           </div>
         )}
       </div>
-      {view.last?.slid ? <p className="text-center text-sm font-bold text-red-200">Wrong answer: you slid back a step.</p> : null}
-      <p className="text-center text-xs font-semibold text-white/80">Right answers climb (2 steps on a streak of 3+). Wrong ones slide you back.</p>
+      {view.last?.slid ? <p className="text-center text-sm font-bold text-red-200">Wrong anser: u slid back a step.</p> : null}
+      <p className="text-center text-xs font-semibold text-white/80">Right ansers climb (2 steps on a streak of 3+). Wrong ones slide u back.</p>
       {earn}
     </div>
   );
@@ -107,7 +107,7 @@ export function LastStanding({ view, earn }: StageProps) {
         </div>
       ) : (
         <>
-          <p className="text-center text-xs font-semibold text-white/80">Every wrong answer costs a life. Most right answers wins.</p>
+          <p className="text-center text-xs font-semibold text-white/80">Every wrong anser costs a life. Most right ansers wins.</p>
           {earn}
         </>
       )}
@@ -151,7 +151,7 @@ export function BossBattle({ view, earn }: StageProps) {
           {(s.healed ?? 0) > 0 && ` · you healed it ${s.healed}`}
         </p>
       </div>
-      <p className="text-center text-xs font-semibold text-white/80">Right answers hit (harder on a streak). Wrong answers heal the boss. Beat it together!</p>
+      <p className="text-center text-xs font-semibold text-white/80">Right ansers hit (harder on a streak). Wrong ansers heal the boss. Beat it together!</p>
       {earn}
     </div>
   );
@@ -194,7 +194,7 @@ export function TugOfWar({ view, earn }: StageProps) {
           <span className="text-blue-300">{s.blue ?? 0} pulls 🔵</span>
         </div>
       </div>
-      <p className="text-center text-xs font-semibold text-white/80">Every right answer pulls the rope ur way (2 on a streak of 3+). Drag it over ur line to win!</p>
+      <p className="text-center text-xs font-semibold text-white/80">Every right anser pulls the rope ur way (2 on a streak of 3+). Drag it over ur line to win!</p>
       {earn}
     </div>
   );

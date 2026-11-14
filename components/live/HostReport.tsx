@@ -32,12 +32,12 @@ export function HostReport({ code, live }: { code: string; live: boolean }) {
   return (
     <section className={`${card} flex flex-col gap-3`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-bold">📋 Answers</h2>
+        <h2 className="text-lg font-bold">📋 Ansers</h2>
         <Link href="/live/reports" className="text-sm text-accent hover:underline">
           All ur reports →
         </Link>
       </div>
-      {error ? <p className="text-sm text-danger">{error}</p> : report ? <ReportView report={report} /> : <p className="animate-pulse text-sm text-muted">Loading answers…</p>}
+      {error ? <p className="text-sm text-danger">{error}</p> : report ? <ReportView report={report} /> : <p className="animate-pulse text-sm text-muted">Loading ansers…</p>}
       {!live && <p className="text-xs text-muted">This report is saved under Reports for 90 days.</p>}
     </section>
   );

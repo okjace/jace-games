@@ -37,9 +37,11 @@ export function SiteHeader({ season }: { season: SeasonId }) {
     <header className="sticky top-0 z-40 border-b border-line bg-panel/85 shadow-[0_1px_0_rgba(0,0,0,0.02),0_8px_24px_-16px_rgba(0,0,0,0.18)] backdrop-blur-md">
       <div className="mx-auto flex min-h-16 w-full max-w-7xl items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6">
         <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="Jace Live home">
-          <Logo />
+          <span data-egg="logo" className="inline-flex">
+            <Logo />
+          </span>
           <span className="hidden font-display text-xl font-extrabold tracking-tight sm:inline">Jace</span>
-          <span className="rounded-lg bg-gradient-to-r from-[var(--accent)] to-[var(--accent2)] px-2 py-0.5 font-display text-sm font-extrabold uppercase tracking-wider text-white shadow-sm">
+          <span data-egg="live" className="rounded-lg bg-gradient-to-r from-[var(--accent)] to-[var(--accent2)] px-2 py-0.5 font-display text-sm font-extrabold uppercase tracking-wider text-white shadow-sm">
             Live
           </span>
         </Link>

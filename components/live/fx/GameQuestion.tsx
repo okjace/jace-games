@@ -132,7 +132,7 @@ export function GameQuestion({
           <input
             value={text}
             onChange={(e) => setText(e.target.value.slice(0, 120))}
-            placeholder="Type your answer"
+            placeholder="Type ur anser"
             aria-label="Your answer"
             disabled={sending || !!result}
             autoFocus
