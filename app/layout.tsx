@@ -4,6 +4,7 @@ import { Notices } from "@/components/site/Notices";
 import { Garland, SeasonalSky } from "@/components/site/Seasonal";
 import { SeasonBackdrop } from "@/components/site/SeasonFx";
 import { EasterEggs } from "@/components/site/EasterEggs";
+import { Music } from "@/components/site/Music";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { ScoresProvider } from "@/components/ScoresProvider";
@@ -50,6 +51,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <SeasonalSky season={season} />
           <SeasonBackdrop season={season} />
           <EasterEggs />
+          <Music season={season} />
         </ScoresProvider>
       </body>
     </html>

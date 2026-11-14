@@ -8,7 +8,7 @@ import { sfx } from "@/components/live/fx/sfx";
  * Jacey (the little blob in the corner) and a pile of easter eggs:
  * - first visit: Jacey says hi (with confetti)
  * - click Jacey: random nonsense
- * - the Konami code (↑↑↓↓←→←→BA): PARTY MODE
+ * - Ctrl + P + Y (hold Ctrl and P, tap Y): PARTY MODE
  * - type "jace" anywhere: JACE MODE
  * - click the logo a bunch: it spins
  * - triple-click the LIVE badge: LIVEEEE
@@ -27,7 +27,7 @@ const NONSENSE = [
   "fun fact: i have no bones 🫠",
   "host a game!! pls!! i get lonley",
   "i ate a quiz once. it was a lil hard to swallow",
-  "try the konami code 👀 (↑↑↓↓←→←→BA)",
+  "hold ctrl n P then hit Y 👀🪩",
   "ur doing amazing sweetie 💖",
   "type j-a-c-e anywhere. nothing will happen. (something will happen)",
   "brb thinking abt pizza 🍕",
@@ -87,10 +87,9 @@ export function EasterEggs() {
     return () => clearTimeout(t);
   }, []);
 
-  // The Konami code, typing "jace", and checking in when it's quiet.
+  // Ctrl+P+Y, typing "jace", and checking in when it's quiet.
   useEffect(() => {
-    const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"];
-    let pos = 0;
+    let pHeld = false;
     let typed = "";
     let idle: ReturnType<typeof setTimeout>;
     const resetIdle = () => {
@@ -101,10 +100,16 @@ export function EasterEggs() {
       resetIdle();
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
-      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-      pos = k === KONAMI[pos] ? pos + 1 : k === KONAMI[0] ? 1 : 0;
-      if (pos === KONAMI.length) {
-        pos = 0;
+      const k = e.key.toLowerCase();
+      // Hold Ctrl and P (that would normally print, so it's caught here), then press Y.
+      if ((e.ctrlKey || e.metaKey) && k === "p") {
+        e.preventDefault();
+        pHeld = true;
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && k === "y" && pHeld) {
+        e.preventDefault();
+        pHeld = false;
         document.documentElement.classList.add("jl-party");
         setTimeout(() => document.documentElement.classList.remove("jl-party"), 9000);
         shout("🪩 PARTY MODE 🪩", true);
@@ -123,12 +128,17 @@ export function EasterEggs() {
         }
       }
     };
+    const keyUp = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "p" || e.key === "Control" || e.key === "Meta") pHeld = false;
+    };
     window.addEventListener("keydown", key);
+    window.addEventListener("keyup", keyUp);
     window.addEventListener("pointermove", resetIdle, { passive: true });
     resetIdle();
     return () => {
       clearTimeout(idle);
       window.removeEventListener("keydown", key);
+      window.removeEventListener("keyup", keyUp);
       window.removeEventListener("pointermove", resetIdle);
     };
   }, []);

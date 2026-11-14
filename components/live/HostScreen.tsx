@@ -7,6 +7,7 @@ import { MODES, type LiveMode } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { ChatButton, ChatPanel, useChatShown } from "./ChatPanel";
+import { SnakeArenaHost } from "./SnakeArenaHost";
 import { HostReport } from "./HostReport";
 import { HtmlFrame } from "./HtmlFrame";
 import { Celebration, LiveAvatar, LiveName } from "./LiveAvatar";
@@ -178,7 +179,10 @@ export function HostScreen({ code }: { code: string }) {
           <Classic view={view} secondsLeft={secondsLeft ?? 0} busy={busy} onReveal={() => act("reveal")} onNext={() => act("next")} />
         )}
 
-        {view.status === "playing" && view.mode !== "classic" && <SelfPaced view={view} secondsLeft={secondsLeft ?? 0} />}
+        {view.status === "playing" && view.mode === "snake" && (
+          <SnakeArenaHost view={view} secondsLeft={secondsLeft ?? 0} onScores={(scores) => void act("snake-scores", { scores })} />
+        )}
+        {view.status === "playing" && view.mode !== "classic" && view.mode !== "snake" && <SelfPaced view={view} secondsLeft={secondsLeft ?? 0} />}
 
         {view.status === "ended" && <Podium view={view} />}
         {view.status === "ended" && <PlayAgain view={view} busy={busy} onAgain={(m) => act("again", { mode: m })} />}

@@ -721,6 +721,17 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
   };
 }
 
+/** Snake Arena: each player's longest snake is their score (it only goes up, and it's capped to stay believable). */
+async function saveSnakeScores(g: LiveGameRow, scores: unknown) {
+  if (!scores || typeof scores !== "object") return;
+  const store = liveStore();
+  const all = await store.players(g.id);
+  for (const p of all) {
+    const v = Math.round(Number((scores as Record<string, unknown>)[p.id]));
+    if (Number.isFinite(v) && v > p.score) await store.updatePlayer(g.id, p.id, { score: Math.min(5000, v) });
+  }
+}
+
 /** Saves skill-mode changes, which can touch other players too (a stolen square, a dethroned king). */
 async function applyPatches(g: LiveGameRow, patches: Patch[], all: LivePlayerRow[]): Promise<LivePlayerRow[]> {
   const out: LivePlayerRow[] = [];
@@ -815,7 +826,9 @@ type HostAction =
   | { action: "tick" }
   | { action: "public"; on: boolean }
   | { action: "again"; mode?: string }
-  | { action: "chat"; on: boolean };
+  | { action: "chat"; on: boolean }
+  // Snake Arena: the host's screen runs the arena and reports everyone's longest snake.
+  | { action: "snake-scores"; scores: Record<string, number> };
 
 export async function hostAction(code: string, session: Session, body: HostAction): Promise<void> {
   const g = await getGame(code);
@@ -826,6 +839,11 @@ export async function hostAction(code: string, session: Session, body: HostActio
   }
   if (body.action === "again") {
     await playAgain(g, typeof body.mode === "string" ? body.mode : g.mode);
+    return;
+  }
+  if (body.action === "snake-scores") {
+    if (g.mode !== "snake" || g.status !== "playing") return;
+    await saveSnakeScores(g, body.scores);
     return;
   }
   if (body.action === "public") {
@@ -1157,7 +1175,8 @@ type PlayerAction =
   // Rare Finds: give up on this prompt.
   | { action: "skip" }
   // The skill modes (see skillModes.ts): a move on your board.
-  | ({ action: "skill" } & SkillOp);
+  | ({ action: "skill" } & SkillOp)
+  | { action: "snake-score"; score: number };
 
 export async function playerAction(code: string, token: unknown, body: PlayerAction): Promise<PlayerView> {
   const store = liveStore();
@@ -1249,6 +1268,13 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
       data: { ...d, ball: state, last: { kind: "play", play: shown, contact: play, runs, inningOver, inning: state.inning, strikes: state.strikes ?? 0, atBatOver: !state.pitch } },
     }))!;
     return buildPlayerView(g, me, await store.players(g.id));
+  }
+
+  // Snake Arena solo: the player's own device runs the arena and reports their longest snake.
+  if (body.action === "snake-score") {
+    if (g.mode !== "snake" || !(g.settings as GameSettings).solo) throw new LiveError("Unknown action.");
+    await saveSnakeScores(g, { [me.id]: Number((body as { score?: unknown }).score) });
+    return buildPlayerView(g, (await store.players(g.id)).find((p) => p.id === me.id) ?? me, await store.players(g.id));
   }
 
   // The skill modes: spend moves on your board.
@@ -1475,6 +1501,12 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
       score: me.score + bits,
       data: { ...fresh, hackCharge: ready ? 0 : charge, hackReady: ready, last: { kind: "bits", amount: bits, correct: true } },
     }))!;
+  } else if (earned && g.mode === "snake") {
+    // Snake Arena: a right answer grows your snake (bigger on a streak), wherever the arena is running.
+    const fresh = dataOf(me);
+    const amount = 10 + Math.min(me.streak, 5) * 3;
+    await broadcast(topicOf(g), "snake-feed", { playerId: me.id, amount }).catch(() => {});
+    me = (await store.updatePlayer(g.id, me.id, { data: { ...fresh, last: { kind: "feed", amount, correct: true } } }))!;
   } else if (earned && isSkillMode(g.mode)) {
     // The skill modes: a right answer earns moves to play with.
     const fresh = dataOf(me);

@@ -81,7 +81,12 @@ export function openRoomChannel(topic: string, me: { userId: string; username: s
     if (shared.members) listener.presence(shared.members);
     let closed = false;
     return {
-      send: (event, payload) => void shared.channel.send({ type: "broadcast", event, payload }),
+      send: (event, payload) => {
+        void shared.channel.send({ type: "broadcast", event, payload });
+        // Supabase doesn't echo messages back to the tab that sent them, so other parts of this
+        // page on the same channel (a host who's also playing) get them straight away.
+        shared.listeners.forEach((l) => l !== listener && l.emit(event, payload));
+      },
       on,
       onPresence,
       close: () => {

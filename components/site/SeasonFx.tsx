@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
+import { getAudio, setAudio, useAudio } from "@/lib/audioSettings";
 import { SEASONS, SEASON_FX, type ClickSound, type SeasonId } from "@/lib/seasons";
 
 /**
@@ -12,35 +13,8 @@ import { SEASONS, SEASON_FX, type ClickSound, type SeasonId } from "@/lib/season
  * bar turns sounds and the tune on or off (remembered on this device).
  */
 
-// ---------- Sound settings: "off", "clicks" (default) or "music" ----------
-
-type SoundMode = "off" | "clicks" | "music";
-const SOUND_KEY = "jace-live:theme-sound";
-const soundSubs = new Set<() => void>();
-function readSound(): SoundMode {
-  try {
-    const v = localStorage.getItem(SOUND_KEY);
-    return v === "off" || v === "music" ? v : "clicks";
-  } catch {
-    return "clicks";
-  }
-}
-function setSound(m: SoundMode) {
-  try {
-    localStorage.setItem(SOUND_KEY, m);
-  } catch {}
-  soundSubs.forEach((f) => f());
-}
-function useSound(): SoundMode {
-  return useSyncExternalStore(
-    (f) => {
-      soundSubs.add(f);
-      return () => void soundSubs.delete(f);
-    },
-    readSound,
-    () => "clicks",
-  );
-}
+// Volume comes from the Sound effects slider (lib/audioSettings).
+const useSound = () => (useAudio().sfx > 0 ? "on" : "off");
 
 // ---------- Synth ----------
 
@@ -65,7 +39,7 @@ function note(f: number, d: number, type: OscillatorType = "triangle", v = 0.08,
   o.frequency.setValueAtTime(f, t);
   if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f * slide), t + d);
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(v, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, v * getAudio().sfx), t + 0.012);
   g.gain.exponentialRampToValueAtTime(0.0001, t + d);
   o.connect(g).connect(a.destination);
   o.start(t);
@@ -83,7 +57,7 @@ function noise(d: number, v: number, freq: number, type: BiquadFilterType = "ban
   src.buffer = buf;
   f.type = type;
   f.frequency.value = freq;
-  g.gain.value = v;
+  g.gain.value = v * getAudio().sfx;
   src.connect(f).connect(g).connect(a.destination);
   src.start(a.currentTime + when);
 }
@@ -156,22 +130,6 @@ export function SeasonBackdrop({ season }: { season: SeasonId }) {
     window.addEventListener("pointerdown", onDown);
     return () => window.removeEventListener("pointerdown", onDown);
   }, [season, sound, fx.click]);
-
-  // The theme tune: soft notes wandering over the theme's scale, with a bass every few beats.
-  useEffect(() => {
-    if (season === "plain" || sound !== "music") return;
-    let step = 0;
-    let last = Math.floor(fx.scale.length / 2);
-    const t = setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      last = Math.max(0, Math.min(fx.scale.length - 1, last + Math.round((Math.random() - 0.5) * 3)));
-      if (Math.random() < 0.8) note(fx.scale[last], (fx.tempo / 1000) * 1.6, fx.click === "jingle" ? "sine" : "triangle", 0.035);
-      if (step % 4 === 0) note(fx.scale[0] / 2, (fx.tempo / 1000) * 3, "sine", 0.03);
-      if (fx.click === "jingle" && step % 2 === 1) noise(0.04, 0.03, 8000, "highpass");
-      step++;
-    }, fx.tempo);
-    return () => clearInterval(t);
-  }, [season, sound, fx]);
 
   // Now and then something big crosses the screen.
   useEffect(() => {
@@ -298,31 +256,72 @@ export function SeasonBackdrop({ season }: { season: SeasonId }) {
   );
 }
 
-/** The menu bar's sound button: clicks → clicks and the theme tune → off. */
+/** The menu bar's sound button: a little panel with volume sliders for sound effects and music. */
 export function SoundToggle({ season }: { season: SeasonId }) {
-  const mode = useSound();
-  if (season === "plain") return null;
-  const next: SoundMode = mode === "clicks" ? "music" : mode === "music" ? "off" : "clicks";
-  const label = mode === "clicks" ? "Theme sounds on (click for the theme tune too)" : mode === "music" ? "Theme tune on (click to turn sounds off)" : "Theme sounds off (click to turn them on)";
+  const { sfx, music } = useAudio();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("pointerdown", away);
+    window.addEventListener("keydown", esc);
+    return () => {
+      window.removeEventListener("pointerdown", away);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  const icon = sfx === 0 && music === 0 ? "🔇" : music > 0 ? "🎵" : "🔉";
+  const slider = (label: string, emoji: string, value: number, onChange: (v: number) => void) => (
+    <label className="flex flex-col gap-1">
+      <span className="flex items-center justify-between text-sm font-semibold">
+        <span>
+          {emoji} {label}
+        </span>
+        <span className="font-mono text-xs text-muted">{value === 0 ? "off" : `${Math.round(value * 100)}%`}</span>
+      </span>
+      <input type="range" min={0} max={100} value={Math.round(value * 100)} onChange={(e) => onChange(Number(e.target.value) / 100)} className="w-full accent-[var(--accent)]" />
+    </label>
+  );
   return (
-    <button
-      type="button"
-      onClick={() => {
-        setSound(next);
-        if (next !== "off") clickSound(SEASON_FX[season].click);
-      }}
-      title={label}
-      aria-label={label}
-      className={`flex h-9 w-9 items-center justify-center rounded-full text-lg transition-[background-color,transform] hover:-rotate-12 hover:bg-foreground/[.06] ${mode === "music" ? "animate-bounce" : ""}`}
-    >
-      {mode === "off" ? "🔇" : mode === "music" ? "🎵" : "🔉"}
-    </button>
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label="Sound and music volume"
+        title="sound n music"
+        className={`flex h-9 w-9 items-center justify-center rounded-full text-lg transition-[background-color,transform] hover:-rotate-12 hover:bg-foreground/[.06] ${music > 0 ? "jl-bob-small" : ""}`}
+      >
+        {icon}
+      </button>
+      {open && (
+        <div className="jl-pop-in absolute right-0 top-11 z-50 flex w-64 flex-col gap-3 rounded-2xl border border-line bg-panel p-4 shadow-xl">
+          <p className="font-display text-lg font-extrabold">🔊 sound stuff</p>
+          {slider("sound effects", "💥", sfx, (v) => {
+            setAudio({ sfx: v });
+            if (v > 0) clickSound(SEASON_FX[season].click);
+          })}
+          {slider("music", "🎶", music, (v) => setAudio({ music: v }))}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setAudio({ sfx: 0, music: 0 })} className="flex-1 rounded-full border border-line px-3 py-1.5 text-xs font-semibold hover:bg-accent/10">
+              🔇 mute all
+            </button>
+            <button type="button" onClick={() => setAudio({ sfx: 0.8, music: 0.35 })} className="flex-1 rounded-full border border-line px-3 py-1.5 text-xs font-semibold hover:bg-accent/10">
+              ↩️ reset
+            </button>
+          </div>
+          <p className="text-[11px] text-muted">music starts when u click somthing (browsers r strict abt that)</p>
+        </div>
+      )}
+    </div>
   );
 }
 
 /** Pops a falling decoration with a burst and the theme's sound (the sky layer calls this). */
 export function popSound(season: SeasonId) {
-  if (readSound() === "off" || season === "plain") return;
+  if (getAudio().sfx === 0 || season === "plain") return;
   clickSound(SEASON_FX[season].click);
   note(880 + Math.random() * 300, 0.1, "sine", 0.05, 0.02, 1.5);
 }

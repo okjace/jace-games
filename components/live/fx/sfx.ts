@@ -1,5 +1,7 @@
 "use client";
 
+import { getAudio } from "@/lib/audioSettings";
+
 /**
  * Little synthesized sound effects for Live games (Web Audio, no files).
  * Every sound is a few oscillator notes with quick envelopes, so they load
@@ -13,6 +15,7 @@ let ctx: AudioContext | null = null;
 let muted: boolean | null = null;
 
 export function isMuted(): boolean {
+  if (getAudio().sfx === 0) return true;
   if (muted === null) {
     try {
       muted = localStorage.getItem(MUTE_KEY) === "1";
@@ -52,7 +55,8 @@ function play(notes: Note[], gain = 0.18) {
     osc.type = n.type ?? "triangle";
     osc.frequency.setValueAtTime(n.f, start + n.t);
     if (n.slide) osc.frequency.exponentialRampToValueAtTime(Math.max(30, n.f * n.slide), start + n.t + n.d);
-    const v = (n.v ?? 1) * gain;
+    // Scaled by the Sound effects slider.
+    const v = Math.max(0.0002, (n.v ?? 1) * gain * getAudio().sfx);
     g.gain.setValueAtTime(0.0001, start + n.t);
     g.gain.exponentialRampToValueAtTime(v, start + n.t + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, start + n.t + n.d);
@@ -75,7 +79,7 @@ function noise(d: number, gain = 0.12, filter = 1200) {
   f.type = "lowpass";
   f.frequency.value = filter;
   const g = ac.createGain();
-  g.gain.value = gain;
+  g.gain.value = gain * getAudio().sfx;
   src.connect(f).connect(g).connect(ac.destination);
   src.start();
 }

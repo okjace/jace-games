@@ -59,7 +59,7 @@ export type LiveSet = {
 
 export type SetSummary = Omit<LiveSet, "questions"> & { questionCount: number };
 
-export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata" | "rare" | "territory" | "vault" | "king" | "memory" | "sweep" | "stack";
+export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata" | "rare" | "territory" | "vault" | "king" | "memory" | "sweep" | "stack" | "snake";
 
 export type ModeDef = {
   name: string;
@@ -201,6 +201,14 @@ export const MODES: Record<LiveMode, ModeDef> = {
     needsSet: false,
     selfPaced: true,
     unit: (n) => `🍬 ${num(n)}`,
+  },
+  snake: {
+    name: "Snake Arena",
+    icon: "🐍",
+    blurb: "Evryone in one big arena: steer ur snake, eat glowy food, boost, n make others bonk into u. Right ansers make u WAY longer. Longest snake wins!",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => `${num(n)} long`,
   },
   territory: {
     name: "Territory Wars",
