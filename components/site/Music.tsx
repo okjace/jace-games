@@ -65,12 +65,35 @@ export function Music({ season }: { season: SeasonId }) {
   }, [music]);
 
   useEffect(() => {
+    // Only one tab plays music: the one you used last tells the others to pause.
+    const me = Math.random().toString(36).slice(2);
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("jace-live-music");
+      bc.onmessage = (m) => {
+        const e = engine.current;
+        if ((m.data as { claim?: string })?.claim !== me && e) void e.ctx.suspend();
+      };
+    } catch {}
+    const claim = () => {
+      bc?.postMessage({ claim: me });
+      const e = engine.current;
+      if (e && e.ctx.state === "suspended" && document.visibilityState === "visible") {
+        void e.ctx.resume();
+        e.next = Math.max(e.next, e.ctx.currentTime + 0.1);
+      }
+    };
     const start = () => {
-      if (engine.current || getAudio().music === 0) return;
+      claim();
+      // One music player per page, even if this component mounts twice (hot reload, strict mode).
+      const g = globalThis as unknown as { __jlMusicOn?: boolean };
+      if (engine.current || g.__jlMusicOn || getAudio().music === 0) return;
+      g.__jlMusicOn = true;
       let ctx: AudioContext;
       try {
         ctx = new AudioContext();
       } catch {
+        g.__jlMusicOn = false;
         return;
       }
       const master = ctx.createGain();
@@ -178,18 +201,19 @@ export function Music({ season }: { season: SeasonId }) {
       const e = engine.current;
       if (!e) return;
       if (document.visibilityState === "hidden") void e.ctx.suspend();
-      else {
-        void e.ctx.resume();
-        e.next = Math.max(e.next, e.ctx.currentTime + 0.1);
-      }
+      else claim();
     };
+    const focus = () => engine.current && claim();
     window.addEventListener("pointerdown", start);
     window.addEventListener("keydown", start);
+    window.addEventListener("focus", focus);
     document.addEventListener("visibilitychange", onVis);
     return () => {
       window.removeEventListener("pointerdown", start);
       window.removeEventListener("keydown", start);
+      window.removeEventListener("focus", focus);
       document.removeEventListener("visibilitychange", onVis);
+      bc?.close();
     };
   }, []);
 
@@ -200,6 +224,7 @@ export function Music({ season }: { season: SeasonId }) {
       if (e?.timer) clearInterval(e.timer);
       void e?.ctx.close();
       engine.current = null;
+      (globalThis as unknown as { __jlMusicOn?: boolean }).__jlMusicOn = false;
     },
     [],
   );
