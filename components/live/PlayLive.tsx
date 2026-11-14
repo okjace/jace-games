@@ -10,6 +10,7 @@ import { openRoomChannel } from "@/lib/realtime/client";
 import type { Avatar } from "@/lib/live/locker";
 import { Answer } from "./Answer";
 import { ChatButton, ChatPanel } from "./ChatPanel";
+import { GlobalBoardOptIn } from "./GlobalBoardOptIn";
 import { VolumeButton } from "@/components/site/SeasonFx";
 import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
@@ -199,7 +200,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
 
       {view.status === "playing" && view.mode === "classic" && <ClassicPlay view={view} busy={busy} skew={skew} act={act} />}
 
-      {view.status === "ended" && view.solo && <SoloResults view={view} />}
+      {view.status === "ended" && view.solo && <SoloResults view={view} code={code} token={token} />}
 
       {view.status === "ended" && !view.solo && (
         <Centered>
@@ -212,6 +213,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
             {score(view, view.me.score)} · {view.me.correct}/{view.me.answered} right
           </p>
           <XpGained view={view} />
+          <GlobalBoardOptIn code={code} token={token} view={view} />
           <Review view={view} />
           <Top view={view} />
           <Link href="/live" className={primary}>
@@ -390,7 +392,7 @@ function ClassicPlay({ view, busy, skew, act }: { view: PlayerView; busy: boolea
 }
 
 /** The end of a solo game: how you did, and the same game again in one tap. */
-function SoloResults({ view }: { view: PlayerView }) {
+function SoloResults({ view, code, token }: { view: PlayerView; code: string; token: string | null }) {
   const router = useRouter();
   const { user } = useScores();
   const [busy, setBusy] = useState(false);
@@ -425,6 +427,7 @@ function SoloResults({ view }: { view: PlayerView }) {
         {view.me.answered > 0 && !view.noSet ? ` · ${view.me.correct}/${view.me.answered} right` : ""}
       </p>
       <XpGained view={view} />
+      <GlobalBoardOptIn code={code} token={token} view={view} />
       <Review view={view} />
       {user && !view.noSet && (view.review?.length ?? 0) > 0 && (
         <Link href="/live/reports" className="text-sm text-accent hover:underline">

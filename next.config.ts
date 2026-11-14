@@ -10,7 +10,6 @@ const nextConfig: NextConfig = {
     return [
       { source: "/live", destination: "/", permanent: false },
       { source: "/play/:game*", destination: "/", permanent: false },
-      { source: "/leaderboards", destination: "/", permanent: false },
     ];
   },
   images: {

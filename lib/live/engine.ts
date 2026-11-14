@@ -4,6 +4,7 @@ import { liveStore, type LiveGameRow, type LivePlayerRow } from "@/lib/db/live";
 import { grantedOf, lockerStore, lookOf, statsOf } from "@/lib/db/liveLocker";
 import { chatStore, type ChatRow } from "@/lib/db/liveChat";
 import { mapStore } from "@/lib/db/liveMaps";
+import { submitBest } from "@/lib/db/liveBoards";
 import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
 import { addGameToStats, cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar, type XpPart } from "./locker";
@@ -725,6 +726,21 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
     party: partyView(g, me, all),
     serverNow: Date.now(),
   };
+}
+
+/**
+ * When a game's over, a signed-in player can put their score on the global
+ * leaderboard for that mode (only their best counts). The score is the one
+ * the server kept, never one sent from the browser.
+ */
+export async function submitToBoard(code: string, token: unknown, session: Session | null): Promise<{ best: boolean; previous: number | null; score: number }> {
+  const g = await getGame(code);
+  const me = await playerFor(g, token);
+  if (g.status !== "ended") throw new LiveError("Finish the game first.", 409);
+  if (!session || !me.user_id || me.user_id !== session.user.id) throw new LiveError("Sign in w/ Jace to go on the leaderboards.", 401);
+  if (g.mode === "custom") throw new LiveError("Studio games don't have a global leaderboard.");
+  const res = await submitBest({ user_id: session.user.id, mode: g.mode, best: me.score, username: session.user.displayName || session.user.username, avatar: avatarOf(me), game_code: g.code });
+  return { ...res, score: me.score };
 }
 
 /** Snake Arena: each player's longest snake is their score (it only goes up, and it's capped to stay believable). */

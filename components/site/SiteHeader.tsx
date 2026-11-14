@@ -17,6 +17,7 @@ const LINKS: { href: string; label: string; icon: string; signedIn?: boolean; ma
   { href: "/join", label: "Join", icon: "🎮", match: (p) => p === "/join" || p.startsWith("/live/play") || p.startsWith("/live/games") },
   { href: "/live/discover", label: "Discover", icon: "🔎", match: (p) => p.startsWith("/live/discover") },
   { href: "/live/sets", label: "My sets", icon: "📚", match: (p) => p.startsWith("/live/sets") },
+  { href: "/leaderboards", label: "Top", icon: "🏆", match: (p) => p.startsWith("/leaderboards") },
   { href: "/live/maps", label: "Maps", icon: "🗺️", match: (p) => p.startsWith("/live/maps") },
   { href: "/live/locker", label: "Locker", icon: "🎽", match: (p) => p.startsWith("/live/locker") || p === "/locker" },
   { href: "/live/reports", label: "Reports", icon: "📋", signedIn: true, match: (p) => p.startsWith("/live/reports") },
