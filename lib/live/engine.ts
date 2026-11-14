@@ -12,6 +12,8 @@ import { CHAT_GAP_MS, cleanChat, type ChatMessage } from "./chat";
 import { RARE_ROUNDS, RARE_SECONDS, RARE_TIERS, isRareSet, rareMatch, rarestAnswers } from "./rare";
 import { BOSS_HEAL, SUMMIT_STEPS, SURVIVAL_LIVES, bossHit, bossMaxHp, hatch, summitClimb, tugGoal, tugPull, whack, type Team } from "./moreModes";
 import { DEFAULT_MAP, cleanMap, type TowerMap } from "./maps";
+import { SkillError, earnMoves, kingFinal, kingWrong, skillMove, skillView, type Patch, type SkillOp } from "./skillModes";
+import { isSkillMode, type SkillView } from "./skillRules";
 import type { GameReport, ReportAttempt, ReportQuestion } from "./report";
 import { broadcast } from "@/lib/realtime/server";
 import type { Session } from "@/lib/session";
@@ -626,6 +628,8 @@ export type PlayerView = {
     catches?: Catch[];
     /** Banana Bonanza: when GO BANANAS ends (0 if it isn't on). */
     goUntil?: number;
+    /** Territory Wars, Vault Cracker, King of the Hill, Memory Match, Minefield and Sky Stacker. */
+    sk?: SkillView;
     /** The skill modes: the summit leader, lives left, the boss's health, or the rope. */
     skill?: {
       goal?: number;
@@ -717,8 +721,25 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
   };
 }
 
+/** Saves skill-mode changes, which can touch other players too (a stolen square, a dethroned king). */
+async function applyPatches(g: LiveGameRow, patches: Patch[], all: LivePlayerRow[]): Promise<LivePlayerRow[]> {
+  const out: LivePlayerRow[] = [];
+  for (const p of patches) {
+    const row = all.find((x) => x.id === p.id);
+    if (!row) continue;
+    const d = dataOf(row);
+    const updated = await liveStore().updatePlayer(g.id, p.id, {
+      ...(p.score !== undefined ? { score: p.score } : {}),
+      data: { ...d, sk: p.sk, last: p.last ?? d.last },
+    });
+    if (updated) out.push(updated);
+  }
+  return out;
+}
+
 function partyView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]): PlayerView["party"] {
   const d = dataOf(me);
+  if (isSkillMode(g.mode)) return { sk: skillView(g.mode, me, all, Date.now()) };
   if (g.mode === "tower") {
     const settings = g.settings as GameSettings;
     return { bank: d.bank ?? 0, map: settings.map ?? DEFAULT_MAP, mapTitle: settings.mapTitle ?? null };
@@ -896,6 +917,12 @@ export async function startSoloGame(
 
 async function endGame(g: LiveGameRow, winner?: string) {
   const s = stateOf(g);
+  // King of the Hill: count the last king's final stretch on the throne.
+  if (g.mode === "king") {
+    const all = await liveStore().players(g.id);
+    const patch = kingFinal(all, Date.now());
+    if (patch) await applyPatches(g, [patch], all);
+  }
   const ended = await bump(g, { status: "ended", ended_at: new Date().toISOString(), state: { ...s, phase: "ended", ...(winner ? { winner } : {}) } });
   await giveXp(ended);
   await saveReport(ended);
@@ -1006,6 +1033,13 @@ function skillTotals(all: LivePlayerRow[]) {
 async function wrongAnswer(g: LiveGameRow, me: LivePlayerRow): Promise<LivePlayerRow> {
   const store = liveStore();
   const d = dataOf(me);
+  if (g.mode === "king") {
+    // A wrong answer cracks the king's own shield.
+    const all = await store.players(g.id);
+    const patch = kingWrong(me, all, Date.now());
+    if (patch) return (await applyPatches(g, [patch], all))[0] ?? me;
+    return me;
+  }
   if (g.mode === "summit") {
     return (await store.updatePlayer(g.id, me.id, { score: Math.max(0, me.score - 1), data: { ...d, last: { ...(d.last ?? {}), slid: me.score > 0 } } }))!;
   }
@@ -1121,7 +1155,9 @@ type PlayerAction =
   // Baseball: how many ms off perfect the swing was (negative = early), or null to take the pitch.
   | { action: "swing" }
   // Rare Finds: give up on this prompt.
-  | { action: "skip" };
+  | { action: "skip" }
+  // The skill modes (see skillModes.ts): a move on your board.
+  | ({ action: "skill" } & SkillOp);
 
 export async function playerAction(code: string, token: unknown, body: PlayerAction): Promise<PlayerView> {
   const store = liveStore();
@@ -1212,6 +1248,21 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
       score: me.score + runs,
       data: { ...d, ball: state, last: { kind: "play", play: shown, contact: play, runs, inningOver, inning: state.inning, strikes: state.strikes ?? 0, atBatOver: !state.pitch } },
     }))!;
+    return buildPlayerView(g, me, await store.players(g.id));
+  }
+
+  // The skill modes: spend moves on your board.
+  if (body.action === "skill") {
+    if (!isSkillMode(g.mode)) throw new LiveError("Unknown action.");
+    const all = await store.players(g.id);
+    let patches: Patch[];
+    try {
+      patches = skillMove(g.mode, me, all, body, now);
+    } catch (e) {
+      if (e instanceof SkillError) throw new LiveError(e.message, e.status);
+      throw e;
+    }
+    me = (await applyPatches(g, patches, all)).find((p) => p.id === me.id) ?? me;
     return buildPlayerView(g, me, await store.players(g.id));
   }
 
@@ -1424,6 +1475,11 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
       score: me.score + bits,
       data: { ...fresh, hackCharge: ready ? 0 : charge, hackReady: ready, last: { kind: "bits", amount: bits, correct: true } },
     }))!;
+  } else if (earned && isSkillMode(g.mode)) {
+    // The skill modes: a right answer earns moves to play with.
+    const fresh = dataOf(me);
+    const { sk, gain } = earnMoves(g.mode, me);
+    me = (await store.updatePlayer(g.id, me.id, { data: { ...fresh, sk, last: { kind: "moves", gain, correct: true } } }))!;
   } else if (earned) {
     const fresh = dataOf(me);
     if (g.mode === "gold") {

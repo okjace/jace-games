@@ -63,6 +63,12 @@ export const TAP_COOLDOWN_MS: Record<LiveMode, number> = {
   hatchery: 1200,
   pinata: 900,
   rare: 900,
+  territory: 1200,
+  vault: 1200,
+  king: 1200,
+  memory: 1200,
+  sweep: 1200,
+  stack: 1200,
 };
 
 // ---------- Device modes ----------

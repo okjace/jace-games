@@ -25,9 +25,10 @@ import { RejoinPin } from "../PlayLive";
 import { StudioMode } from "./StudioMode";
 import { TowerSiege } from "./TowerSiege";
 import { ChatButton, useChatShown } from "../ChatPanel";
+import { KingOfTheHill, MemoryMatch, Minefield, SkyStacker, TerritoryWars, VaultCracker } from "./SkillModes";
 
 /** Every self-paced mode plays on this stage. */
-export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom", "banana", "summit", "survival", "boss", "tug", "hatchery", "pinata", "rare"];
+export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom", "banana", "summit", "survival", "boss", "tug", "hatchery", "pinata", "rare", "territory", "vault", "king", "memory", "sweep", "stack"];
 
 /** Each mode's look: background, accent, and its tap button with questions off. */
 export const THEMES: Record<string, { bg: string; accent: string; tap: [string, string] }> = {
@@ -47,6 +48,12 @@ export const THEMES: Record<string, { bg: string; accent: string; tap: [string, 
   tug: { bg: "linear-gradient(90deg, #991b1b 0%, #4b5563 50%, #1e40af 100%)", accent: "#fde68a", tap: ["🪢 PULL", ""] },
   hatchery: { bg: "radial-gradient(circle at 50% 30%, #fb923c 0%, #c2410c 55%, #431407 100%)", accent: "#fde68a", tap: ["🥚 HATCH", "Each tap warms an egg until it hatches."] },
   rare: { bg: "radial-gradient(circle at 50% 0%, #0ea5e9 0%, #1e3a8a 55%, #0f172a 100%)", accent: "#bae6fd", tap: ["💎 FIND", ""] },
+  territory: { bg: "linear-gradient(160deg, #14532d 0%, #166534 45%, #0f766e 100%)", accent: "#86efac", tap: ["🗺️ SCOUT", "Each scout earns moves to claim land."] },
+  vault: { bg: "linear-gradient(160deg, #0f172a 0%, #1e293b 50%, #334155 100%)", accent: "#fbbf24", tap: ["🔐 LISTEN", "Each listen at the lock earns a guess."] },
+  king: { bg: "linear-gradient(160deg, #7c2d12 0%, #b45309 50%, #ca8a04 100%)", accent: "#fde047", tap: ["⚔️ RALLY", "Each rally earns a move."] },
+  memory: { bg: "linear-gradient(160deg, #312e81 0%, #6d28d9 55%, #db2777 100%)", accent: "#f0abfc", tap: ["🧠 FOCUS", "Each focus earns a turn."] },
+  sweep: { bg: "linear-gradient(160deg, #1f2937 0%, #374151 50%, #4b5563 100%)", accent: "#f87171", tap: ["⛏️ PREP", "Each prep earns 3 digs."] },
+  stack: { bg: "linear-gradient(180deg, #0c4a6e 0%, #0284c7 55%, #7dd3fc 100%)", accent: "#fde68a", tap: ["🧱 HAUL", "Each haul earns a block."] },
   pinata: { bg: "linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #06b6d4 100%)", accent: "#fde68a", tap: ["🪅 WHACK", "Each whack might shake out candy!"] },
 };
 
@@ -275,6 +282,12 @@ function Stage({ view, busy, act, chat, embedded = false }: { view: PlayerView; 
         {mode === "hatchery" && <DragonHatchery {...stageProps} />}
         {mode === "pinata" && <PinataParty {...stageProps} />}
         {mode === "rare" && <RareFinds {...stageProps} />}
+        {mode === "territory" && <TerritoryWars {...stageProps} />}
+        {mode === "vault" && <VaultCracker {...stageProps} />}
+        {mode === "king" && <KingOfTheHill {...stageProps} />}
+        {mode === "memory" && <MemoryMatch {...stageProps} />}
+        {mode === "sweep" && <Minefield {...stageProps} />}
+        {mode === "stack" && <SkyStacker {...stageProps} />}
 
         <RejoinPin code={view.code} small />
         <ol className="flex flex-col gap-1.5 rounded-3xl bg-black/25 p-3 text-sm backdrop-blur">

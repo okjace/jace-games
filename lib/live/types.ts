@@ -59,7 +59,7 @@ export type LiveSet = {
 
 export type SetSummary = Omit<LiveSet, "questions"> & { questionCount: number };
 
-export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata" | "rare";
+export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata" | "rare" | "territory" | "vault" | "king" | "memory" | "sweep" | "stack";
 
 export type ModeDef = {
   name: string;
@@ -201,6 +201,54 @@ export const MODES: Record<LiveMode, ModeDef> = {
     needsSet: false,
     selfPaced: true,
     unit: (n) => `🍬 ${num(n)}`,
+  },
+  territory: {
+    name: "Territory Wars",
+    icon: "🗺️",
+    blurb: "Skill and strategy: every right answer earns moves to claim squares on one shared map, next to your own land. Steal squares from rivals (2 moves), but land boxed in on every side is safe. Most land wins.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => `${num(n)} land`,
+  },
+  vault: {
+    name: "Vault Cracker",
+    icon: "🔐",
+    blurb: "Logic: every right answer is one guess at a secret 4-symbol code. Each guess tells you how many are in the right spot and how many are in the code but elsewhere. Fewer guesses, more points.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => `${num(n)} pts`,
+  },
+  king: {
+    name: "King of the Hill",
+    icon: "👑",
+    blurb: "Skill, everyone vs the king: right answers attack the king's shield (twice as hard on a streak) until the crown falls to you. As king, fortify with right answers, but wrong ones crack your shield. Every second on the throne scores.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => `${num(n)}s 👑`,
+  },
+  memory: {
+    name: "Memory Match",
+    icon: "🧠",
+    blurb: "Memory: every right answer is a turn to flip two cards. Matches score, keep your turn and build a combo. Clear a board for a bonus and a bigger one.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => `${num(n)} pts`,
+  },
+  sweep: {
+    name: "Minefield",
+    icon: "💣",
+    blurb: "Logic: right answers earn reveals on your own minefield. Numbers tell you how many mines touch a square. Flag freely, clear the board for a big bonus, but hit a mine and you lose points and the board.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => `${num(n)} pts`,
+  },
+  stack: {
+    name: "Sky Stacker",
+    icon: "🏗️",
+    blurb: "Timing: every right answer gives you a block swinging over your tower. Tap to drop it; whatever hangs over the edge is cut off. Perfect drops keep your width. It gets faster as you climb.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => `${num(n)} pts`,
   },
   rare: {
     name: "Rare Finds",
