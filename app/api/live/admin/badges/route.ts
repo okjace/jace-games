@@ -18,7 +18,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const store = lockerStore();
   const row = await store.get(userId);
   let granted = grantedOf(row);
-  if (body.all === true) granted = BADGES.map((b) => b.id);
+  // Keep any items they were given (they live in the same list as "item:…").
+  if (body.all === true) granted = [...granted.filter((g) => g.startsWith("item:")), ...BADGES.map((b) => b.id)];
   else {
     const badge = typeof body.badge === "string" && badgeById(body.badge) ? body.badge : null;
     if (!badge) return NextResponse.json({ error: "That badge doesn't exist." }, { status: 400 });

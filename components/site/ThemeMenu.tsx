@@ -1,7 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { SEASONS, SEASON_IDS } from "@/lib/seasons";
+import { SEASONS, SEASON_IDS, type ThemeChoice } from "@/lib/seasons";
 import { EffectsToggle } from "./Seasonal";
 import { SPECIAL_MODES, setMyTheme, toggleMode, useModes, useMyThemeChoice, useSeason, useSiteSeason } from "./ThemeContext";
 
@@ -13,6 +14,27 @@ export function ThemeMenu() {
   const modes = useModes();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  // Admins can switch to setting the theme for everyone (people who left theirs on "the site's").
+  const [admin, setAdmin] = useState<{ choice: ThemeChoice; auto: string } | null>(null);
+  const [scope, setScope] = useState<"me" | "everyone">("me");
+  const [saving, setSaving] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open || admin) return;
+    fetch("/api/site/theme", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.canEdit && setAdmin({ choice: d.choice, auto: d.auto }))
+      .catch(() => {});
+  }, [open, admin]);
+  const setForEveryone = async (choice: ThemeChoice) => {
+    setSaving(choice);
+    const res = await fetch("/api/site/theme", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ choice }) }).catch(() => null);
+    setSaving(null);
+    if (res?.ok) {
+      setAdmin((a) => (a ? { ...a, choice } : a));
+      router.refresh();
+    }
+  };
   useEffect(() => {
     if (!open) return;
     const away = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
@@ -52,11 +74,41 @@ export function ThemeMenu() {
       </button>
       {open && (
         <div className="jl-pop-in absolute right-0 top-11 z-50 flex max-h-[75vh] w-80 flex-col gap-3 overflow-y-auto rounded-2xl border border-line bg-panel p-4 text-foreground shadow-xl">
-          <p className="font-display text-lg font-extrabold">🎨 ur theme</p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {chip("site", "📅", `the site's (${SEASONS[site].name})`, mine === "site", () => setMyTheme("site"))}
-            {SEASON_IDS.map((id) => chip(id, SEASONS[id].icon, SEASONS[id].name, mine === id, () => setMyTheme(id)))}
-          </div>
+          {admin && (
+            <div className="flex rounded-full border border-line p-1 text-sm font-bold" role="radiogroup" aria-label="Whose theme">
+              {(["me", "everyone"] as const).map((sc) => (
+                <button
+                  key={sc}
+                  type="button"
+                  role="radio"
+                  aria-checked={scope === sc}
+                  onClick={() => setScope(sc)}
+                  className={`flex-1 rounded-full px-3 py-1 ${scope === sc ? "bg-accent text-on-accent" : "hover:bg-accent/10"}`}
+                >
+                  {sc === "me" ? "👤 me" : "🌍 everyone"}
+                </button>
+              ))}
+            </div>
+          )}
+          {scope === "everyone" && admin ? (
+            <>
+              <p className="font-display text-lg font-extrabold">🌍 theme for evryone</p>
+              <p className="-mt-2 text-xs text-muted">evryone who left their theme on &ldquo;the site&apos;s&rdquo; sees this. ppl who picked their own keep theirs.</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {chip("auto", saving === "auto" ? "⏳" : "📅", `automatic (${SEASONS[admin.auto as keyof typeof SEASONS]?.name ?? "by date"})`, admin.choice === "auto", () => void setForEveryone("auto"))}
+                {SEASON_IDS.map((id) => chip(id, saving === id ? "⏳" : SEASONS[id].icon, SEASONS[id].name, admin.choice === id, () => void setForEveryone(id)))}
+              </div>
+              {mine !== "site" && <p className="text-xs font-semibold text-warn">heads up: u have ur own theme on, so u wont see this one. switch &ldquo;me&rdquo; to the site&apos;s to see it.</p>}
+            </>
+          ) : (
+            <>
+              <p className="font-display text-lg font-extrabold">🎨 ur theme</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {chip("site", "📅", `the site's (${SEASONS[site].name})`, mine === "site", () => setMyTheme("site"))}
+                {SEASON_IDS.map((id) => chip(id, SEASONS[id].icon, SEASONS[id].name, mine === id, () => setMyTheme(id)))}
+              </div>
+            </>
+          )}
           <div className="flex items-center justify-between rounded-xl bg-foreground/[.04] px-3 py-2 text-sm font-semibold">
             <span>falling stuff</span>
             <EffectsToggle season={season} />

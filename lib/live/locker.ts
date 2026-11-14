@@ -185,7 +185,23 @@ export const EFFECTS: (LockerItem & { emojis: string[] })[] = [
 ];
 
 /** What a player has done in Live (signed in), for badges. */
-export type LiveStats = { games: number; wins: number; perfect: number; right: number; bestStreak: number };
+export type LiveStats = {
+  games: number;
+  wins: number;
+  perfect: number;
+  right: number;
+  bestStreak: number;
+  /** Free picks (from Christmas presents): unlock any one item without the level. */
+  vouchers?: number;
+  /** Presents won today (they're capped per day). */
+  giftDay?: string;
+  giftWins?: number;
+};
+
+/** Kinds of locker items that can be unlocked by a gift or a free pick (kept as "item:<kind>:<id>" with granted badges). */
+export const ITEM_KINDS = ["icon", "frame", "fx", "title", "nameColor", "effect"] as const;
+export type ItemKind = (typeof ITEM_KINDS)[number];
+export const itemGrant = (kind: ItemKind, id: string) => `item:${kind}:${id}`;
 export const EMPTY_STATS: LiveStats = { games: 0, wins: 0, perfect: 0, right: 0, bestStreak: 0 };
 
 /** Badges: earned by doing things (not by level). Show one next to your name. */
@@ -280,20 +296,22 @@ export const hasBadge = (id: string, stats: LiveStats, level: number, granted: s
 
 export function cleanAvatar(raw: unknown, level: number, picture: string | null, stats: LiveStats = EMPTY_STATS, granted: string[] = []): Avatar {
   const r = (raw ?? {}) as Record<string, unknown>;
-  const unlocked = <T extends LockerItem>(find: (id: string) => T | undefined, v: unknown) =>
-    typeof v === "string" && v && (find(v)?.level ?? 999) <= level ? v : undefined;
+  // Unlocked by level, or given (a free pick or a gift from the site owner).
+  const given = (kind: ItemKind, id: string) => granted.includes(itemGrant(kind, id));
+  const unlocked = <T extends LockerItem>(kind: ItemKind, find: (id: string) => T | undefined, v: unknown) =>
+    typeof v === "string" && v && find(v) && ((find(v)?.level ?? 999) <= level || given(kind, v)) ? v : undefined;
   const icon =
-    r.icon === "jace" && picture ? "jace" : typeof r.icon === "string" && (iconById(r.icon)?.level ?? 999) <= level ? r.icon : DEFAULT_AVATAR.icon;
+    r.icon === "jace" && picture ? "jace" : typeof r.icon === "string" && iconById(r.icon) && ((iconById(r.icon)?.level ?? 999) <= level || given("icon", r.icon)) ? r.icon : DEFAULT_AVATAR.icon;
   // Unknown ids count as never unlocked; "custom" needs a valid design.
   const custom = r.frame === "custom" ? cleanCustomFrame(r.custom, level) : null;
-  const frame = custom ? "custom" : typeof r.frame === "string" && (frameById(r.frame)?.level ?? 999) <= level ? r.frame : DEFAULT_AVATAR.frame;
+  const frame = custom ? "custom" : typeof r.frame === "string" && frameById(r.frame) && ((frameById(r.frame)?.level ?? 999) <= level || given("frame", r.frame)) ? r.frame : DEFAULT_AVATAR.frame;
   const badge = typeof r.badge === "string" && badgeById(r.badge) && hasBadge(r.badge, stats, level, granted) ? r.badge : undefined;
   const out: Avatar = { icon, frame };
   if (custom) out.custom = custom;
-  const fx = unlocked(fxById, r.fx);
-  const title = unlocked(titleById, r.title);
-  const nameColor = unlocked(nameColorById, r.nameColor);
-  const effect = unlocked(effectById, r.effect);
+  const fx = unlocked("fx", fxById, r.fx);
+  const title = unlocked("title", titleById, r.title);
+  const nameColor = unlocked("nameColor", nameColorById, r.nameColor);
+  const effect = unlocked("effect", effectById, r.effect);
   if (fx) out.fx = fx;
   if (title) out.title = title;
   if (nameColor) out.nameColor = nameColor;
@@ -306,6 +324,7 @@ export function cleanAvatar(raw: unknown, level: number, picture: string | null,
 /** Folds one finished game into someone's stats. */
 export function addGameToStats(s: LiveStats, g: { won: boolean; perfect: boolean; right: number; bestStreak: number }): LiveStats {
   return {
+    ...s,
     games: s.games + 1,
     wins: s.wins + (g.won ? 1 : 0),
     perfect: s.perfect + (g.perfect ? 1 : 0),
@@ -316,3 +335,9 @@ export function addGameToStats(s: LiveStats, g: { won: boolean; perfect: boolean
 
 /** Only https pictures are shown. */
 export const safePicture = (url: string | null | undefined) => (url && /^https:\/\/[^\s"'<>]+$/.test(url) ? url : null);
+
+/** Finds a locker item by kind and id (for free picks and gifts). */
+export function itemOf(kind: ItemKind, id: string): LockerItem | undefined {
+  const find = { icon: iconById, frame: frameById, fx: fxById, title: titleById, nameColor: nameColorById, effect: effectById }[kind];
+  return find(id);
+}
