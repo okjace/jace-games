@@ -11,17 +11,18 @@ import { openRoomChannel } from "@/lib/realtime/client";
  */
 const CHAT_KEY = "jace-games:live:chat-hidden";
 type ChatUi = { shown: boolean; unread: number };
-const SERVER_UI: ChatUi = { shown: true, unread: 0 };
+const SERVER_UI: ChatUi = { shown: false, unread: 0 };
 let ui: ChatUi | null = null;
 const uiSubs = new Set<() => void>();
 
 function readUi(): ChatUi {
   if (!ui) {
-    let hidden = false;
+    // Hidden until you open it (then remembered on this device).
+    let shown = false;
     try {
-      hidden = localStorage.getItem(CHAT_KEY) === "1";
+      shown = localStorage.getItem(CHAT_KEY) === "0";
     } catch {}
-    ui = { shown: !hidden, unread: 0 };
+    ui = { shown, unread: 0 };
   }
   return ui;
 }
@@ -45,6 +46,11 @@ function useChatUi(): ChatUi {
     readUi,
     () => SERVER_UI,
   );
+}
+
+/** Whether the chat is showing, so a page can give the game the full width while it's hidden. */
+export function useChatShown(): boolean {
+  return useChatUi().shown;
 }
 
 /** Shows or hides the game chat, like the sound button. Shows how many messages you missed while it was hidden. */

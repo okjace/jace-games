@@ -65,6 +65,8 @@ export function PlayLive({ code }: { code: string }) {
     const ch = openRoomChannel(topic, null);
     const offs = [
       ch.on("phase", () => void load()),
+      // The host turned chat on or off.
+      ch.on("chat-settings", () => void load()),
       ch.on("kicked", (p) => {
         if ((p as { playerId?: string }).playerId === myId) {
           setToken(code, null);
@@ -144,7 +146,7 @@ export function PlayLive({ code }: { code: string }) {
           view={view}
           busy={busy}
           act={act}
-          chat={view.solo ? null : <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} tone="stage" className="h-72 lg:h-[calc(100vh-8rem)]" />}
+          chat={view.solo || !view.chatOn ? null : <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} tone="stage" className="h-72 lg:h-[calc(100vh-8rem)]" />}
         />
       </>
     );
@@ -159,7 +161,7 @@ export function PlayLive({ code }: { code: string }) {
           <LiveName name={view.me.name} avatar={view.me.avatar} className="font-semibold" />
         </span>
         <span className="flex items-center gap-3 text-sm">
-          {!view.solo && view.status !== "ended" && <ChatButton className="-my-2 text-lg text-muted hover:text-foreground" />}
+          {!view.solo && view.chatOn && view.status !== "ended" && <ChatButton className="-my-2 text-lg text-muted hover:text-foreground" />}
           <FullscreenButton on={full.on} toggle={full.toggle} className="-my-2 text-muted hover:text-foreground" />
           {view.solo && view.status === "playing" && (
             <button
@@ -212,7 +214,7 @@ export function PlayLive({ code }: { code: string }) {
           </Link>
         </Centered>
       )}
-      {!view.solo && view.status !== "ended" && <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} className="h-72" />}
+      {!view.solo && view.chatOn && view.status !== "ended" && <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} className="h-72" />}
     </div>
     </div>
   );

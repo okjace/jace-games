@@ -24,7 +24,7 @@ import { Markdown } from "../Markdown";
 import { RejoinPin } from "../PlayLive";
 import { StudioMode } from "./StudioMode";
 import { TowerSiege } from "./TowerSiege";
-import { ChatButton } from "../ChatPanel";
+import { ChatButton, useChatShown } from "../ChatPanel";
 
 /** Every self-paced mode plays on this stage. */
 export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom", "banana", "summit", "survival", "boss", "tug", "hatchery", "pinata", "rare"];
@@ -125,6 +125,7 @@ function Stage({ view, busy, act, chat }: { view: PlayerView; busy: boolean; act
   const fetching = useRef(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const full = useStageFullscreen(stageRef);
+  const chatShown = useChatShown() && !!chat;
 
   // Keep the next question ready (with questions on).
   const needsQuestion = !view.noSet && !view.selfQuestion && view.status === "playing" && !(mode === "hack" && !view.party.password) && view.chests === null && mode !== "rare";
@@ -217,7 +218,7 @@ function Stage({ view, busy, act, chat }: { view: PlayerView; busy: boolean; act
       style={{ background: theme.bg }}
     >
       {/* The game in the middle; chat beside it on wide screens, under it on phones. */}
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 lg:max-w-[60rem] lg:flex-row lg:items-start lg:justify-center">
+      <div className={`mx-auto flex w-full max-w-xl flex-col gap-4 ${chatShown ? "lg:max-w-[60rem] lg:flex-row lg:items-start lg:justify-center" : ""}`}>
       <div className="flex w-full min-w-0 max-w-xl flex-col gap-4">
         {/* HUD */}
         <div className="flex items-center gap-2">
@@ -289,7 +290,8 @@ function Stage({ view, busy, act, chat }: { view: PlayerView; busy: boolean; act
           ))}
         </ol>
       </div>
-      {chat && <aside className="lg:sticky lg:top-4 lg:w-80 lg:shrink-0">{chat}</aside>}
+      {/* Kept mounted while hidden so the 💬 button can count new messages. */}
+      {chat && <aside className={chatShown ? "lg:sticky lg:top-4 lg:w-80 lg:shrink-0" : "hidden"}>{chat}</aside>}
       </div>
       {shopOpen && <Shop view={view} act={act} unit={def.unit} onClose={() => setShopOpen(false)} />}
     </div>

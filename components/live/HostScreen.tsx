@@ -7,7 +7,7 @@ import type { HostView } from "@/lib/live/engine";
 import { MODES, type LiveMode } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
-import { ChatButton, ChatPanel } from "./ChatPanel";
+import { ChatButton, ChatPanel, useChatShown } from "./ChatPanel";
 import { HostReport } from "./HostReport";
 import { HtmlFrame } from "./HtmlFrame";
 import { Celebration, LiveAvatar, LiveName } from "./LiveAvatar";
@@ -28,6 +28,7 @@ export function HostScreen({ code }: { code: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const full = useStageFullscreen(hostRef);
   const [showPlayers, setShowPlayers] = useState(false);
+  const chatShown = useChatShown();
   const router = useRouter();
 
   /** The host joins as a player too, in a new tab (their name comes from their Jace account). */
@@ -184,7 +185,7 @@ export function HostScreen({ code }: { code: string }) {
         {hasQuestions && (view.status === "ended" || (view.status === "playing" && showAnswers)) && <HostReport code={view.code} live={view.status === "playing"} />}
         </div>
         {view.status !== "ended" && (
-          <aside className="lg:sticky lg:top-4 lg:w-80 lg:shrink-0">
+          <aside className={chatShown ? "lg:sticky lg:top-4 lg:w-80 lg:shrink-0" : "hidden"}>
             <ChatPanel code={view.code} topic={view.topic} token={null} host on={view.settings.chat !== false} className="h-80 lg:h-[calc(100vh-11rem)]" />
           </aside>
         )}
