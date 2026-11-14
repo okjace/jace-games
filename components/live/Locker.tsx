@@ -130,7 +130,7 @@ export function Locker() {
               <a href={signInHref("/live/locker")} className="text-accent hover:underline">
                 Sign in with Jace
               </a>{" "}
-              to level up, unlock more, and use your Jace profile picture.
+              to level up, unlock more, and use ur Jace profile picture.
             </p>
           )}
         </div>
@@ -512,7 +512,7 @@ function FrameMaker({
         <LiveAvatar avatar={{ ...look, frame: "custom", custom: { ...draft, colors } }} size={96} />
         <div>
           <p className="font-semibold">🎨 Frame maker</p>
-          <p className="text-xs text-muted">Pick a style and your colors. More styles unlock as you level up.</p>
+          <p className="text-xs text-muted">Pick a style and ur colors. More styles unlock as you level up.</p>
         </div>
       </div>
       <div>

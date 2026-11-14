@@ -187,7 +187,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
       {view.status === "lobby" && (
         <Centered>
           <p className="text-4xl">🎉</p>
-          <p className="text-xl font-bold">You&apos;re in!</p>
+          <p className="text-xl font-bold">Ur in!</p>
           <p className="text-muted">Watch the big screen. The game starts soon.</p>
           <p className="text-sm text-muted">{view.playerCount} playing</p>
           <RejoinPin code={view.code} />
@@ -269,7 +269,7 @@ function JoinForm({ code, defaultName, note, onJoined }: { code: string; default
       <p className="flex items-center justify-center gap-2 text-sm text-muted">
         <LiveAvatar avatar={look} size={36} />
         <Link href="/live/locker" className="text-accent hover:underline">
-          Change your look
+          Change ur look
         </Link>
       </p>
       <input value={name} onChange={(e) => setName(e.target.value.slice(0, 20))} placeholder="Your nickname" aria-label="Nickname" autoFocus maxLength={20} className={`${input} h-12 text-center text-lg`} />
@@ -289,7 +289,7 @@ function JoinForm({ code, defaultName, note, onJoined }: { code: string; default
       <button type="submit" disabled={!name.trim() || busy || (needsPin && pin.length > 0 && pin.length < 4)} className={primary}>
         {busy ? "Joining…" : needsPin && pin.length === 4 ? "Rejoin" : "Join"}
       </button>
-      <p className="text-center text-xs text-muted">Left by accident? Join with the same name. Signed in, you&apos;re back right away; as a guest, enter the PIN you were shown.</p>
+      <p className="text-center text-xs text-muted">Left by accident? Join with the same name. Signed in, ur back right away; as a guest, enter the PIN you were shown.</p>
     </form>
   );
 }
@@ -368,7 +368,7 @@ function ClassicPlay({ view, busy, skew, act }: { view: PlayerView; busy: boolea
       <Centered>
         <p className="text-4xl">⏳</p>
         <p className="text-xl font-bold">Answer locked in!</p>
-        <p className="text-muted">Waiting for everyone else…</p>
+        <p className="text-muted">Waiting for evryone else…</p>
       </Centered>
     );
   }

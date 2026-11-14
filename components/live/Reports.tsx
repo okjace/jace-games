@@ -36,7 +36,7 @@ export function ReportList() {
       </div>
       {!user ? (
         <div className={`${card} text-center`}>
-          <p className="font-semibold">Sign in with Jace to see your reports.</p>
+          <p className="font-semibold">Sign in with Jace to see ur reports.</p>
           <a href={signInHref("/live/reports")} className={`${primary} mt-4`}>
             Sign in with Jace
           </a>

@@ -59,12 +59,12 @@ export function Leaderboard({ game, limit = 10, refreshKey = 0 }: { game: GameDe
               <a href={signInHref(pathname)} className="font-medium text-accent hover:underline">
                 Sign in with Jace
               </a>{" "}
-              to see the leaderboard everyone on Jace shares.
+              to see the leaderboard evryone on Jace shares.
             </>
           ) : state.kind === "unavailable" ? (
-            "Sync with Jace is coming soon — until then, here are your best scores."
+            "Sync with Jace is coming soon — until then, here are ur best scores."
           ) : (
-            "Couldn't load the leaderboard. Here are your best scores on this device."
+            "Couldn't load the leaderboard. Here are ur best scores on this device."
           )}
         </p>
         {deviceTop.length > 0 && (

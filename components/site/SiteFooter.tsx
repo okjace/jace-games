@@ -1,3 +1,4 @@
+import { CopyrightEgg } from "./CopyrightEgg";
 import { Logo } from "./Logo";
 
 const JACE = "https://jaceo.vercel.app";
@@ -31,7 +32,9 @@ export function SiteFooter() {
           </a>
         </nav>
       </div>
-      <p className="pb-8 text-center text-xs text-muted">© {new Date().getFullYear()} Jace</p>
+      <div className="pb-8 text-center">
+        <CopyrightEgg />
+      </div>
     </footer>
   );
 }

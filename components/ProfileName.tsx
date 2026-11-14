@@ -86,7 +86,7 @@ export function ProfileName({ user }: { user: SessionUser }) {
           🔄 Update from Jace
         </button>
       </p>
-      <p className="text-xs text-muted">Your username always matches your Jace account. Changed it on Jace? Press Update from Jace.</p>
+      <p className="text-xs text-muted">Ur username always matches ur Jace account. Changed it on Jace? Press Update from Jace.</p>
       {note && (
         <p className={`text-sm ${note.good ? "text-accent" : "text-danger"}`} role="status">
           {note.text}

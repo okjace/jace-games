@@ -61,7 +61,7 @@ export function PlayView({ gameId }: { gameId: string }) {
           <section className="rounded-2xl border border-line bg-panel/40 p-3 sm:p-6" aria-label={`${game.name} game`}>
             {multiOnly && game.multiplayer?.mode === "turns" ? (
               <>
-                <p className="mb-4 text-center text-sm text-muted">Pass and play on this device, or play online with friends.</p>
+                <p className="mb-4 text-center text-sm text-muted">Pass and play on this device, or play online with frens.</p>
                 <LocalPlay gameId={game.id} multiplayer={game.multiplayer!} />
               </>
             ) : multiOnly ? (
@@ -71,7 +71,7 @@ export function PlayView({ gameId }: { gameId: string }) {
                   {game.icon}
                 </span>
                 <p className="font-semibold">{game.name} is played online with a friend.</p>
-                <p className="text-sm text-muted">Use “Play with friends” to make a room, then send them the link.</p>
+                <p className="text-sm text-muted">Use “Play with frens” to make a room, then send them the link.</p>
               </div>
             ) : Game ? (
               <Juice>

@@ -45,7 +45,7 @@ export function Moderation() {
           ← Live
         </Link>
         <h1 className="text-3xl font-bold tracking-tight">🚩 Moderation</h1>
-        <p className="text-muted">Question sets people reported. Taking one down hides it from Discover and stops it being hosted.</p>
+        <p className="text-muted">Question sets ppl reported. Taking one down hides it from Discover and stops it being hosted.</p>
       </div>
       {error ? (
         <p className={`${card} text-sm text-muted`}>{error}</p>

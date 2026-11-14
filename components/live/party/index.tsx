@@ -84,7 +84,7 @@ function FeedbackCard({ f, onDone, accent }: { f: Feedback; onDone: () => void; 
     <div className="flex flex-col gap-3 rounded-3xl bg-red-500/90 p-5 text-center shadow-[0_6px_0_rgba(0,0,0,0.25)]" role="alert" style={{ animation: "jg-rise 0.2s ease-out" }}>
       <span className="text-5xl">❌</span>
       <p className="text-3xl font-black">Not quite!</p>
-      {f.shielded && <p className="font-bold">🛡️ Your shield saved your streak.</p>}
+      {f.shielded && <p className="font-bold">🛡️ Ur shield saved ur streak.</p>}
       <div className="rounded-2xl bg-black/25 p-3 text-left">
         <Markdown text={f.prompt} className="text-sm font-semibold text-white/80" />
         <p className="mt-2 text-sm">

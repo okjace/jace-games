@@ -120,11 +120,11 @@ export function HostSetup() {
       <RejoinBanner />
 
       <section className={card}>
-        <h2 className="text-sm font-semibold">1. questions</h2>
+        <h2 className="text-sm font-semibold">1. questons</h2>
         <label className="mt-3 flex items-center gap-3 rounded-xl border border-line p-3">
           <input type="checkbox" checked={noSet} onChange={(e) => setNoSet(e.target.checked)} className="h-5 w-5" />
           <span>
-            <span className="block font-medium">No questions</span>
+            <span className="block font-medium">No questons</span>
             <span className="block text-sm text-muted">Turn sets off: players tap a button instead of answering. Works with Gold Rush and Rocket Race.</span>
           </span>
         </label>
@@ -240,7 +240,7 @@ export function HostSetup() {
             <div className="mb-2 flex items-center justify-between text-sm">
               <span className="font-semibold">Map</span>
               <Link href="/live/maps" className="text-accent hover:underline">
-                Make your own map →
+                Make ur own map →
               </Link>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

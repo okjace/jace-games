@@ -95,7 +95,7 @@ export function Baseball({ view, act, busy, earn }: StageProps) {
       <div className="flex flex-col gap-3">
         {field}
         <div className="flex flex-col items-center gap-3 py-4">
-          <p className="text-lg font-black uppercase tracking-widest text-white/90">You&apos;re up to bat!</p>
+          <p className="text-lg font-black uppercase tracking-widest text-white/90">Ur up to bat!</p>
           <button
             type="button"
             autoFocus

@@ -34,7 +34,7 @@ export function HostReport({ code, live }: { code: string; live: boolean }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-bold">📋 Answers</h2>
         <Link href="/live/reports" className="text-sm text-accent hover:underline">
-          All your reports →
+          All ur reports →
         </Link>
       </div>
       {error ? <p className="text-sm text-danger">{error}</p> : report ? <ReportView report={report} /> : <p className="animate-pulse text-sm text-muted">Loading answers…</p>}

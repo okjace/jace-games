@@ -118,7 +118,7 @@ export function CommunityGame({ view }: { view: GameView & { meta: GameSummary }
               </button>
             ) : (
               <a href={signInHref(`/community/${meta.id}`)} className={primary}>
-                Sign in to play with friends
+                Sign in to play with frens
               </a>
             ))}
           {isOwn && (
@@ -134,7 +134,7 @@ export function CommunityGame({ view }: { view: GameView & { meta: GameSummary }
           This game was taken down by the site owner. Only {view.isSiteOwner ? "you and its maker" : "its maker"} can see it.
         </p>
       )}
-      {!game && <p className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm text-muted">This game isn&apos;t published.</p>}
+      {!game && <p className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm text-muted">This game isnt published.</p>}
       {notice && (
         <p
           role={notice.kind === "error" ? "alert" : "status"}

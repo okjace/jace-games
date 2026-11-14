@@ -187,7 +187,7 @@ export function VaultCracker({ view, act, earn, busy }: StageProps) {
               </span>
             </li>
           ))}
-          {v.guesses.length === 0 && <li className="text-center text-sm text-white/80">A new vault. 4 different symbols, in some order. Make your first guess!</li>}
+          {v.guesses.length === 0 && <li className="text-center text-sm text-white/80">A new vault. 4 different symbols, in some order. Make ur first guess!</li>}
         </ol>
         <div className="mt-3 flex items-center justify-center gap-2">
           {Array.from({ length: v.length }, (_, i) => (
@@ -420,7 +420,7 @@ export function Minefield({ view, act, earn, busy }: StageProps) {
             🚩 Flag (free)
           </button>
         </div>
-        <p className="mt-2 text-center text-xs text-white/70">Numbers count the mines touching a square. Your first dig is always safe. Right-click flags too.</p>
+        <p className="mt-2 text-center text-xs text-white/70">Numbers count the mines touching a square. Ur first dig is always safe. Right-click flags too.</p>
       </div>
       {earn}
     </div>
@@ -512,7 +512,7 @@ export function SkyStacker({ view, act, earn, busy }: StageProps) {
             {s.moves < 1 ? "Answer a question for a block" : "🧱 Get a block (1 move)"}
           </button>
         )}
-        <p className="mt-2 text-center text-xs text-white/70">Overhang gets cut off. A perfect drop keeps your width (+10).</p>
+        <p className="mt-2 text-center text-xs text-white/70">Overhang gets cut off. A perfect drop keeps ur width (+10).</p>
       </div>
       {earn}
     </div>

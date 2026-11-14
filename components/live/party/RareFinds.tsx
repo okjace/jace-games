@@ -92,7 +92,7 @@ export function RareFinds({ view, act, busy }: StageProps) {
           <p className="text-4xl">🏁</p>
           <p className="mt-1 text-2xl font-black">All {r.rounds} done!</p>
           <p className="text-3xl font-black">{view.me.score} pts</p>
-          <p className="text-sm text-white/80">Waiting for everyone else to finish…</p>
+          <p className="text-sm text-white/80">Waiting for evryone else to finish…</p>
         </div>
       </div>
     );

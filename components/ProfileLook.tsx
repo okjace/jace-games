@@ -22,7 +22,7 @@ export function ProfileLook({ user }: { user: SessionUser }) {
     <section className="flex flex-col gap-4 rounded-2xl border border-line bg-panel p-6 sm:flex-row sm:items-center">
       <LiveAvatar avatar={mine ? { ...mine.avatar, picture: mine.picture } : null} size={84} />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted">Your look</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted">Ur look</p>
         <LiveName name={name} avatar={mine?.avatar} className="text-xl font-bold" />
         {mine ? (
           <>

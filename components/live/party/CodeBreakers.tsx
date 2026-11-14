@@ -15,8 +15,8 @@ export function CodeBreakers({ view, act, busy, earn }: PartyProps) {
     return (
       <div className="flex flex-col items-center gap-4 py-4 text-center">
         <p className="text-4xl">🔐</p>
-        <p className="text-xl font-bold">Pick your secret password</p>
-        <p className="max-w-sm text-sm text-muted">Hackers will try to guess it. Don&apos;t say it out loud!</p>
+        <p className="text-xl font-bold">Pick ur secret password</p>
+        <p className="max-w-sm text-sm text-muted">Hackers will try to guess it. Dont say it out loud!</p>
         <div className="grid w-full max-w-sm gap-2">
           {(p.passwordChoices ?? []).map((w, i) => (
             <button key={w} type="button" disabled={busy} onClick={() => void act({ action: "password", choice: i })} className="h-12 rounded-xl border border-line bg-panel font-mono text-lg font-bold hover:border-accent">
@@ -69,7 +69,7 @@ export function CodeBreakers({ view, act, busy, earn }: PartyProps) {
               <span>{t.score.toLocaleString()} bits</span>
             </button>
           ))}
-          <p className="text-center text-xs opacity-70">Or keep answering; your hack stays ready.</p>
+          <p className="text-center text-xs opacity-70">Or keep answering; ur hack stays ready.</p>
         </div>
       ) : null}
 

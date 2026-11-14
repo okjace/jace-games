@@ -419,7 +419,7 @@ export function Editor({ id }: { id: string }) {
           </div>
           {kind === "blocks" && blocksCode && (
             <details className="rounded-xl border border-line bg-panel p-3 text-xs">
-              <summary className="cursor-pointer font-semibold">The JavaScript your blocks make</summary>
+              <summary className="cursor-pointer font-semibold">The JavaScript ur blocks make</summary>
               <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono text-muted">{blocksCode}</pre>
             </details>
           )}
@@ -541,11 +541,11 @@ function SdkHelp() {
       <div className="mt-3 grid gap-1 font-mono text-xs leading-relaxed text-muted">
         <p><span className="text-foreground">jace.player.name</span> — who&apos;s playing</p>
         <p><span className="text-foreground">jace.submitScore(n)</span> — saves a whole-number score (higher is better; best per player)</p>
-        <p><span className="text-foreground">jace.gameOver()</span> — the round is over (in a race, your last score is your result)</p>
+        <p><span className="text-foreground">jace.gameOver()</span> — the round is over (in a race, ur last score is ur result)</p>
         <p><span className="text-foreground">jace.onReady(cb)</span> — runs cb once the page is ready</p>
         <p><span className="text-foreground">jace.random()</span> / <span className="text-foreground">jace.seed</span> — the same random numbers for every player in a room</p>
         <p><span className="text-foreground">jace.room</span> — null when playing alone; in a room: mode, isHost, mySeat, players [{"{ seat, name, you, host }"}]</p>
-        <p><span className="text-foreground">jace.room.send(event, data)</span> — to everyone else (short event name, JSON data up to 8 KB, 20 a second)</p>
+        <p><span className="text-foreground">jace.room.send(event, data)</span> — to evryone else (short event name, JSON data up to 8 KB, 20 a second)</p>
         <p><span className="text-foreground">jace.room.on(event, (data, fromSeat) =&gt; …)</span> — hear the others</p>
         <p><span className="text-foreground">jace.gameOver({"{ winners: [seat] }"})</span> — live games: the host ends the game and names the winners</p>
       </div>

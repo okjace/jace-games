@@ -374,7 +374,7 @@ function QuestionForm({
 
       {(q.type === "type" || q.type === "html") && (
         <label className="flex flex-col gap-1 text-sm">
-          Accepted answers <span className="text-xs text-muted">One per line. Case, extra spaces and end punctuation don&apos;t matter.</span>
+          Accepted answers <span className="text-xs text-muted">One per line. Case, extra spaces and end punctuation dont matter.</span>
           <textarea
             value={(q.accepted ?? []).join("\n")}
             onChange={(e) => onChange((x) => ({ ...x, accepted: e.target.value.split("\n").slice(0, LIMITS.accepted) }))}
@@ -387,7 +387,7 @@ function QuestionForm({
       {q.type === "html" ? (
         <div className="grid gap-3 lg:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
-            Your HTML
+            Ur HTML
             <span className="text-xs text-muted">
               Runs sandboxed with no internet access. Call <code>jace.answer(value)</code> to answer; <code>jace.onLock(fn)</code> runs when time&apos;s up.
             </span>

@@ -140,7 +140,7 @@ export function CommunityRoomPlay({
           </ul>
           {mode === "race" ? (
             <>
-              <p className="mt-3 text-xs text-muted">Highest score wins. Your result is sent when the game ends.</p>
+              <p className="mt-3 text-xs text-muted">Highest score wins. Ur result is sent when the game ends.</p>
               {!submitted ? (
                 <button
                   type="button"

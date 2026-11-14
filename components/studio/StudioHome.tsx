@@ -157,7 +157,7 @@ export function StudioHome() {
         {!games ? (
           <div className="h-32 animate-pulse rounded-2xl bg-foreground/[.04]" aria-busy="true" />
         ) : games.length === 0 ? (
-          <div className={`${card} text-center text-sm text-muted`}>No games yet. Press “New game” to make your first one.</div>
+          <div className={`${card} text-center text-sm text-muted`}>No games yet. Press “New game” to make ur first one.</div>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {games.map((g) => (

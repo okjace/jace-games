@@ -152,7 +152,7 @@ export function LakeFrenzy({ view, earn }: StageProps) {
         <canvas ref={canvasRef} className="block aspect-[24/11] w-full" aria-label="The lake" />
         {(p.frenzy ?? 0) > 0 && <span className="absolute right-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-sky-700 shadow">🫧 Frenzy ×2 · {p.frenzy} left</span>}
         {p.stormed && <span className="absolute left-3 top-3 rounded-full bg-neutral-800/90 px-3 py-1 text-xs font-black text-white shadow">⛈️ Stormy: next catch halved</span>}
-        {casting && <span className="absolute inset-x-0 bottom-3 text-center text-lg font-black text-white drop-shadow">Something&apos;s biting…</span>}
+        {casting && <span className="absolute inset-x-0 bottom-3 text-center text-lg font-black text-white drop-shadow">Somthing&apos;s biting…</span>}
         <button type="button" onClick={() => setDexOpen(true)} className="absolute bottom-3 right-3 rounded-full bg-black/40 px-3 py-1.5 text-xs font-black text-white backdrop-blur">
           📖 Fishdex {caughtCount}/{FISH.length}
         </button>
@@ -160,7 +160,7 @@ export function LakeFrenzy({ view, earn }: StageProps) {
 
       {reveal ? (
         <div className="flex flex-col items-center gap-2 rounded-3xl bg-white p-6 text-center text-neutral-900 shadow-[0_6px_0_rgba(0,0,0,0.2)]" style={{ animation: "jg-rise 0.3s ease-out", boxShadow: reveal.rarity && BIG.includes(reveal.rarity) ? `0 0 30px 6px ${color}` : undefined }}>
-          {last?.firstCatch === true && <span className="rounded-full bg-[#facc15] px-3 py-0.5 text-xs font-black">NEW! Added to your Fishdex</span>}
+          {last?.firstCatch === true && <span className="rounded-full bg-[#facc15] px-3 py-0.5 text-xs font-black">NEW! Added to ur Fishdex</span>}
           <span className="text-7xl" style={{ animation: "jg-wiggle 0.6s ease-in-out 2" }}>
             {reveal.icon}
           </span>

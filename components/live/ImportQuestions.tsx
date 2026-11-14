@@ -34,7 +34,7 @@ export function ImportQuestions({ room, onImport, onClose }: { room: number; onI
     <section className={`${card} flex flex-col gap-3 border-accent/40`}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="font-semibold">⬆️ Import questions</h2>
+          <h2 className="font-semibold">⬆️ Import questons</h2>
           <p className="text-sm text-muted">Upload a CSV file or paste one below.</p>
         </div>
         <button type="button" onClick={onClose} aria-label="Close" className="text-muted hover:text-foreground">
@@ -49,7 +49,7 @@ export function ImportQuestions({ room, onImport, onClose }: { room: number; onI
             <b className="text-foreground">Blooket:</b> fill in Blooket&apos;s CSV import template (or a set you made with it) and upload the .csv here.
           </li>
           <li>
-            <b className="text-foreground">Kahoot:</b> use Kahoot&apos;s spreadsheet import template, then in your spreadsheet app choose <i>File → Download / Save as → CSV</i>.
+            <b className="text-foreground">Kahoot:</b> use Kahoot&apos;s spreadsheet import template, then in ur spreadsheet app choose <i>File → Download / Save as → CSV</i>.
           </li>
           <li>
             <b className="text-foreground">Gimkit:</b> use a kit spreadsheet with the columns <i>Question, Correct Answer, Incorrect Answer 1–3</i>, saved as CSV.
@@ -58,7 +58,7 @@ export function ImportQuestions({ room, onImport, onClose }: { room: number; onI
             <b className="text-foreground">Flashcards:</b> paste <i>term, definition</i> pairs (one per line, comma or tab between). They become multiple choice.
           </li>
           <li>
-            <b className="text-foreground">Make your own:</b>{" "}
+            <b className="text-foreground">Make ur own:</b>{" "}
             <button type="button" onClick={download} className="text-accent underline">
               download our template
             </button>{" "}

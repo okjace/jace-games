@@ -524,7 +524,7 @@ function PlayAgain({ view, busy, onAgain }: { view: HostView; busy: boolean; onA
     <section className={`${card} flex flex-wrap items-center gap-3`}>
       <span className="text-3xl">🔁</span>
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">Play again with everyone</p>
+        <p className="font-semibold">Play again with evryone</p>
         <p className="text-sm text-muted">
           Same game code ({view.code}), the {view.players.length} player{view.players.length === 1 ? "" : "s"} still here, fresh scores.
         </p>

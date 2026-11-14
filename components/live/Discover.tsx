@@ -61,7 +61,7 @@ export function Discover() {
         <span className="text-3xl">🌍</span>
         <span className="flex-1">
           <span className="block font-semibold">Join a live game</span>
-          <span className="block text-sm text-muted">See games people are hosting right now and jump in.</span>
+          <span className="block text-sm text-muted">See games ppl are hosting right now and jump in.</span>
         </span>
         <span className="text-muted">→</span>
       </Link>

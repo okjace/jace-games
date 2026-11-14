@@ -72,7 +72,7 @@ export function MySets() {
         <div className={`${card} flex flex-col items-center gap-3 py-12 text-center`}>
           <p className="text-5xl">✏️</p>
           <p className="text-lg font-semibold">no sets yet 😢</p>
-          <p className="max-w-sm text-sm text-muted">rite ur own questions, import em from a spredsheet, or host somthing from Discover.</p>
+          <p className="max-w-sm text-sm text-muted">rite ur own questons, import em from a spredsheet, or host somthing from Discover.</p>
           <button type="button" onClick={newSet} disabled={busy} className={primary}>
             make ur first set!!
           </button>

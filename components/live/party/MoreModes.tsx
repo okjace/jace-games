@@ -102,7 +102,7 @@ export function LastStanding({ view, earn }: StageProps) {
       {s.out ? (
         <div className={`${panel} py-8 text-center`}>
           <p className="text-5xl">💀</p>
-          <p className="mt-2 text-2xl font-black">You&apos;re out!</p>
+          <p className="mt-2 text-2xl font-black">Ur out!</p>
           <p className="text-sm text-white/80">You got {view.me.score} right. Watch the others finish.</p>
         </div>
       ) : (
@@ -194,7 +194,7 @@ export function TugOfWar({ view, earn }: StageProps) {
           <span className="text-blue-300">{s.blue ?? 0} pulls 🔵</span>
         </div>
       </div>
-      <p className="text-center text-xs font-semibold text-white/80">Every right answer pulls the rope your way (2 on a streak of 3+). Drag it over your line to win!</p>
+      <p className="text-center text-xs font-semibold text-white/80">Every right answer pulls the rope ur way (2 on a streak of 3+). Drag it over ur line to win!</p>
       {earn}
     </div>
   );
@@ -235,7 +235,7 @@ export function DragonHatchery({ view, earn }: StageProps) {
           <span className="inline-block text-7xl" style={{ animation: "jg-wiggle 1.2s ease-in-out infinite" }}>
             🥚
           </span>
-          <p className="mt-1 font-bold">Answer right to hatch your first egg!</p>
+          <p className="mt-1 font-bold">Answer right to hatch ur first egg!</p>
         </div>
       )}
       <button type="button" onClick={() => setBook((b) => !b)} className="rounded-full bg-black/25 px-4 py-2 text-sm font-bold backdrop-blur">

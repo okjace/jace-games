@@ -105,7 +105,7 @@ export function GadgetFactory({ view, act, earn }: PartyProps) {
                   {m.icon}
                 </span>
               )))}
-              {baseRate === 0 && <p className="text-sm text-muted">Your factory floor is empty. Buy a machine!</p>}
+              {baseRate === 0 && <p className="text-sm text-muted">Ur factory floor is empty. Buy a machine!</p>}
             </div>
             {event?.kind === "glitch" && (
               <button type="button" onClick={() => (setEvent(null), say("Fixed! Back to full speed."))} className="mt-3 w-full rounded-full bg-danger py-2 font-bold text-white">

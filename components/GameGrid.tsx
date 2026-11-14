@@ -78,7 +78,7 @@ export function GameGrid() {
                   </>
                 ) : (
                   <>
-                    <span className="text-muted">Your best</span>
+                    <span className="text-muted">Ur best</span>
                     <span className={`font-semibold tabular-nums ${best ? "text-accent" : "text-muted"}`}>
                       {best ? game.format(best.score) : "Not played yet"}
                     </span>
