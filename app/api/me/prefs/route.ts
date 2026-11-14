@@ -20,7 +20,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   const body = ((await req.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   const cur = (await getPrefs(session.user.id)) ?? {};
   const next: Prefs = { ...cur };
-  if (typeof body.theme === "string" && (body.theme === "site" || isSeasonId(body.theme))) next.theme = body.theme;
+  if (typeof body.theme === "string" && (body.theme === "site" || isSeasonId(body.theme) || /^custom:[0-9a-f-]{36}$/i.test(body.theme))) next.theme = body.theme;
   if (Array.isArray(body.modes)) next.modes = body.modes.filter((m): m is string => typeof m === "string" && MODES.includes(m)).slice(0, MODES.length);
   if (typeof body.effectsOff === "boolean") next.effectsOff = body.effectsOff;
   await savePrefs(session.user.id, next);

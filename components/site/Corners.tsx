@@ -1,5 +1,6 @@
 "use client";
 
+import { currentCustom } from "@/lib/customThemes";
 import type { SeasonId } from "@/lib/seasons";
 
 /**
@@ -189,7 +190,10 @@ function TreeSvg({ t, flip }: { t: Tree; flip: boolean }) {
 }
 
 export function Corners({ season }: { season: SeasonId }) {
-  const pair = TREES[season];
+  // A custom theme brings its own tree.
+  const custom = (season as string) === "custom" ? currentCustom() : null;
+  const customTree: Tree | null = custom && custom.tree.kind !== "none" ? { kind: custom.tree.kind, leaves: custom.tree.leaves, trunk: custom.tree.trunk, lights: custom.tree.lights, snow: custom.tree.snow, star: custom.tree.lights, extra: custom.props[0] } : null;
+  const pair = customTree ? ([customTree, { ...customTree, extra: custom?.props[1] }] as [Tree, Tree]) : custom ? undefined : TREES[season];
   if (!pair) return null;
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 bottom-0 -z-[5] hidden h-[34vh] max-h-[340px] min-h-48 justify-between sm:flex">

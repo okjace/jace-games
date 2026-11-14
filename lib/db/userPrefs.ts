@@ -3,7 +3,7 @@ import { supabase, usingSupabase } from "./rooms";
 
 /** Each person's own settings (supabase/migrations/024_user_prefs.sql); in memory during development without Supabase. */
 
-export type Prefs = { theme?: string; modes?: string[]; effectsOff?: boolean };
+export type Prefs = { theme?: string; modes?: string[]; effectsOff?: boolean; /** Theme market themes they installed. */ installed?: string[] };
 
 const mem = globalThis as unknown as { __jlPrefs?: Map<string, Prefs> };
 const memory = () => (mem.__jlPrefs ??= new Map());

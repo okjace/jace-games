@@ -6,7 +6,7 @@ import { EGGS } from "./MoreEggs";
 import { Music } from "./Music";
 import { SeasonBackdrop } from "./SeasonFx";
 import { Garland, SeasonalSky } from "./Seasonal";
-import { loadPrefs, useModes, useSeason } from "./ThemeContext";
+import { loadPrefs, useCustomKey, useModes, useSeason } from "./ThemeContext";
 
 /** Everything the viewer's theme draws: falling things, the background, corner trees and the music. */
 export function ThemeLayer() {
@@ -14,6 +14,8 @@ export function ThemeLayer() {
   const modes = useModes();
   const chaos = modes.includes("chaos");
   const chill = modes.includes("chill");
+  // Restart the decorations when a custom theme (or its preview) changes.
+  const key = `${season}-${useCustomKey()}`;
 
   // Ur theme settings from ur account (when signed in), once per page load.
   useEffect(() => {
@@ -33,9 +35,9 @@ export function ThemeLayer() {
 
   return (
     <>
-      {!chill && <SeasonalSky season={season} boost={chaos ? 3 : 1} />}
-      <SeasonBackdrop season={season} />
-      <Corners season={season} />
+      {!chill && <SeasonalSky key={`sky-${key}`} season={season} boost={chaos ? 3 : 1} />}
+      <SeasonBackdrop key={`bg-${key}`} season={season} />
+      <Corners key={`trees-${key}`} season={season} />
       <Music season={season} />
     </>
   );
@@ -43,5 +45,6 @@ export function ThemeLayer() {
 
 /** The garland under the menu bar, for the viewer's theme. */
 export function ThemedGarland() {
-  return <Garland season={useSeason()} />;
+  const season = useSeason();
+  return <Garland key={`${season}-${useCustomKey()}`} season={season} />;
 }

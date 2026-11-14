@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { getAudio, useAudio } from "@/lib/audioSettings";
 import type { SeasonId } from "@/lib/seasons";
+import { MOOD_MUSIC, currentCustom } from "@/lib/customThemes";
 
 /**
  * Background music for all of Jace Live, made on the fly with Web Audio (no
@@ -161,7 +162,8 @@ export function Music({ season }: { season: SeasonId }) {
       let melody = 4;
       const tick = () => {
         const { season: s, game: g } = settings.current;
-        const mood = MOODS[s] ?? DEFAULT_MOOD;
+        const custom = (s as string) === "custom" ? currentCustom() : null;
+        const mood = custom ? MOOD_MUSIC[custom.mood] : (MOODS[s] ?? DEFAULT_MOOD);
         const bpm = g ? mood.bpm + 26 : mood.bpm;
         const eighth = 60 / bpm / 2;
         const loop = mood.minor ? MINOR_LOOP : MAJOR_LOOP;

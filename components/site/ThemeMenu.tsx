@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { SEASONS, SEASON_IDS, type ThemeChoice } from "@/lib/seasons";
 import { EffectsToggle } from "./Seasonal";
+import { MyThemeChips } from "./MyThemeChips";
 import { SPECIAL_MODES, setMyTheme, toggleMode, useModes, useMyThemeChoice, useSeason, useSiteSeason } from "./ThemeContext";
 
 /** The menu bar's theme button: pick ur own theme (or follow the site's), moving decorations, and special modes. */
@@ -70,7 +71,7 @@ export function ThemeMenu() {
         title="ur theme"
         className="flex h-9 w-9 items-center justify-center rounded-full text-lg transition-[background-color,transform] hover:rotate-12 hover:bg-foreground/[.06]"
       >
-        {SEASONS[season].icon === "⚪" ? "🎨" : SEASONS[season].icon}
+        {SEASONS[season]?.icon === "⚪" || !SEASONS[season] ? "🎨" : SEASONS[season].icon}
       </button>
       {open && (
         <div className="jl-pop-in absolute right-0 top-11 z-50 flex max-h-[75vh] w-80 flex-col gap-3 overflow-y-auto rounded-2xl border border-line bg-panel p-4 text-foreground shadow-xl">
@@ -106,6 +107,7 @@ export function ThemeMenu() {
               <div className="grid grid-cols-2 gap-1.5">
                 {chip("site", "📅", `the site's (${SEASONS[site].name})`, mine === "site", () => setMyTheme("site"))}
                 {SEASON_IDS.map((id) => chip(id, SEASONS[id].icon, SEASONS[id].name, mine === id, () => setMyTheme(id)))}
+                <MyThemeChips compact />
               </div>
             </>
           )}

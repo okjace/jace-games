@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SEASONS, SEASON_IDS, type SeasonId, type ThemeChoice } from "@/lib/seasons";
 import { setMyTheme, useMyThemeChoice } from "./ThemeContext";
+import { MyThemeChips } from "./MyThemeChips";
 
 type State = { choice: ThemeChoice; active: SeasonId; auto: SeasonId; canEdit: boolean };
 
@@ -108,6 +109,7 @@ export function SiteThemePicker() {
           <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {mineOption("site", "📅", "the site's", `right now: ${SEASONS[state.active].name}`)}
             {SEASON_IDS.map((id) => mineOption(id, SEASONS[id].icon, SEASONS[id].name, id === "plain" ? "no decorations, no extra colour" : SEASONS[id].when))}
+            <MyThemeChips />
           </ul>
         </>
       ) : (
