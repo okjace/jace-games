@@ -162,7 +162,7 @@ export const EGGS: Egg[] = [
   },
   { id: "spin", name: "🔄 spin", how: "type spin", run: () => (mode("jl-spin-cards", 1600), sfx.whoosh()) },
   { id: "uwu", name: "🥺 uwu", how: "type uwu", run: () => (walker("💕", "rise", 30), egg({ say: "uwu 🥺👉👈" })) },
-  { id: "konami", name: "🕹️ old school", how: "↑ ↑ ↓ ↓ ← → ← → B A", run: () => egg({ shout: "🕹️ +30 LIVES (not rly)", big: true, party: ["🕹️", "👾", "⭐"] }) },
+  { id: "konami", name: "🕹️ old school", how: "type retro", run: () => egg({ shout: "🕹️ +30 LIVES (not rly)", big: true, party: ["🕹️", "👾", "⭐"] }) },
   { id: "escape", name: "😈 no escape", how: "press Escape 5 times fast", run: () => (mode("jl-boo", 900), egg({ say: "there is no escape 😈" })) },
   { id: "squish", name: "🫠 stop squishing", how: "resize the window a bunch", run: () => egg({ say: "stop squishing me 🫠" }) },
   { id: "realone", name: "💎 ur a real one", how: "stay on the site for 10 minutes", run: () => egg({ shout: "💎 achievement: ur a real one", party: ["💎", "✨"] }) },
@@ -170,7 +170,7 @@ export const EGGS: Egg[] = [
   { id: "makeup", name: "😂 make up ur mind", how: "click the theme effects button 10 times fast", run: () => egg({ say: "make up ur mind 😂" }) },
   { id: "mad", name: "😤 mad jacey", how: "click Jacey 10 times fast", run: () => (mode("jl-mad", 2500), egg({ say: "STOP POKING ME 😤😤" })) },
   { id: "dizzy", name: "😵‍💫 dizzy", how: "shake ur mouse left n right like crazy", run: () => (mode("jl-dizzy", 2000), egg({ say: "whoa whoa im dizzy 😵‍💫" })) },
-  { id: "help", name: "🤫 hints", how: "type help", run: () => egg({ say: "psst 🤫 try typing: barrel roll, flip, gravity, rainbow, dance, pizza, snow, boo, cat, disco, matrix, lava, ufo, uwu… or hold ctrl+p n hit y" }) },
+  { id: "help", name: "🤫 hints", how: "type help", run: () => egg({ say: "psst 🤫 try typing: barrel roll, flip, gravity, rainbow, dance, pizza, snow, boo, cat, disco, matrix, lava, ufo, uwu, retro… or hold ctrl+p n hit y" }) },
 ];
 
 /** Typed words that set off an egg (the egg's id, unless it's different). */
@@ -200,27 +200,20 @@ const WORDS: Record<string, string> = {
   ufo: "ufo",
   spin: "spin",
   uwu: "uwu",
+  retro: "konami",
   help: "help",
 };
 const run = (id: string) => EGGS.find((e) => e.id === id)?.run();
 
 export function MoreEggs() {
   useEffect(() => {
-    // Magic words, the Konami code and mashing Escape.
+    // Magic words and mashing Escape.
     let typed = "";
-    const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"];
-    let kpos = 0;
     let escapes: number[] = [];
     const key = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-      kpos = k === KONAMI[kpos] ? kpos + 1 : k === KONAMI[0] ? 1 : 0;
-      if (kpos === KONAMI.length) {
-        kpos = 0;
-        run("konami");
-      }
       if (e.key === "Escape") {
         const now = Date.now();
         escapes = [...escapes.filter((x) => now - x < 2000), now];
