@@ -11,7 +11,7 @@
  * their steering back. Bots join so the arena never feels empty.
  */
 
-export const ARENA = 2400;
+export const ARENA = 1800;
 const SPACING = 6;
 const BASE_SPEED = 150;
 const BOOST_SPEED = 290;
@@ -293,7 +293,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, w: number, h: number, s
     const x = snap.f[i];
     const y = snap.f[i + 1];
     if (x < cx - w / 2 / zoom - 20 || x > cx + w / 2 / zoom + 20 || y < cy - h / 2 / zoom - 20 || y > cy + h / 2 / zoom + 20) continue;
-    const r = 3 + snap.f[i + 2] * 1.4 + Math.sin(now / 200 + i) * 0.8;
+    const r = (3 + snap.f[i + 2] * 1.4 + Math.sin(now / 200 + i) * 0.8) * (camera ? 1 : 1.6);
     ctx.fillStyle = foodColor(snap.f[i + 3]);
     ctx.globalAlpha = 0.35;
     ctx.beginPath();
@@ -306,9 +306,11 @@ export function drawArena(ctx: CanvasRenderingContext2D, w: number, h: number, s
   }
   // Snakes: you on top.
   const order = [...snap.s].sort((a, b) => (a[0] === me ? 1 : 0) - (b[0] === me ? 1 : 0));
+  // On the big overview, snakes are drawn fatter so they read from across the room.
+  const thick = camera ? 1 : 1.9;
   for (const [id, name, color, alive, len, , body] of order) {
     if (!alive || body.length < 4) continue;
-    const r = radiusOf(len);
+    const r = radiusOf(len) * thick;
     // Body: alternating stripes, tail to head.
     for (let i = body.length - 2; i >= 0; i -= 2) {
       ctx.fillStyle = (i / 2) % 4 < 2 ? color : shadeHex(color, -0.18);
@@ -333,7 +335,7 @@ export function drawArena(ctx: CanvasRenderingContext2D, w: number, h: number, s
       ctx.fill();
     }
     // Name tag.
-    ctx.font = `bold ${Math.max(12, 13 / zoom)}px sans-serif`;
+    ctx.font = `bold ${camera ? Math.max(12, 13 / zoom) : 15 / zoom}px sans-serif`;
     ctx.textAlign = "center";
     ctx.fillStyle = id === me ? "#fde047" : "rgba(255,255,255,0.85)";
     ctx.fillText(id === me ? `${name} (u)` : name, hx, hy - r - 8 / zoom);

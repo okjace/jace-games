@@ -48,28 +48,26 @@ export function SnakeArenaHost({ view, secondsLeft, onScores }: { view: HostView
     ];
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
-    let raf = 0;
-    let last = performance.now();
+    let latest: Snapshot | null = null;
+    let lastTick = performance.now();
     let lastSent = 0;
     let lastSaved = performance.now();
     let lastBoard = 0;
-    const frame = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      a.step(dt, Date.now());
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = canvas.clientWidth;
-      const h = canvas.clientHeight;
-      if (canvas.width !== Math.round(w * dpr)) {
-        canvas.width = Math.round(w * dpr);
-        canvas.height = Math.round(h * dpr);
+    // The arena runs on a timer, so it keeps going even if the host's tab isn't in front
+    // (animation frames stop in background tabs). Drawing uses animation frames.
+    const sim = setInterval(() => {
+      const now = performance.now();
+      let pending = Math.min(1, (now - lastTick) / 1000);
+      lastTick = now;
+      while (pending > 0) {
+        const dt = Math.min(0.04, pending);
+        pending -= dt;
+        a.step(dt, Date.now());
       }
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const snap: Snapshot = a.snapshot(Date.now());
-      drawArena(ctx, w, h, snap, null, null, now);
+      latest = a.snapshot(Date.now());
       if (now - lastSent > 90) {
         lastSent = now;
-        ch.send("snake-state", snap);
+        ch.send("snake-state", latest);
       }
       if (now - lastBoard > 500) {
         lastBoard = now;
@@ -87,10 +85,23 @@ export function SnakeArenaHost({ view, secondsLeft, onScores }: { view: HostView
         for (const s of a.snakes.values()) if (!s.bot) scores[s.id] = s.best;
         scoresRef.current(scores);
       }
+    }, 33);
+    let raf = 0;
+    const frame = (now: number) => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (canvas.width !== Math.round(w * dpr)) {
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawArena(ctx, w, h, latest, null, null, now);
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
     return () => {
+      clearInterval(sim);
       cancelAnimationFrame(raf);
       offs.forEach((off) => off());
       ch.close();

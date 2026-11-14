@@ -60,6 +60,28 @@ function sharedChannel(topic: string, me: { userId: string; username: string } |
   return shared;
 }
 
+type DevShared = { source: EventSource; key: string | undefined; listeners: Set<Listener> };
+const devStreams = new Map<string, DevShared>();
+
+function devShared(topic: string, me: { userId: string; username: string } | null): DevShared {
+  const existing = devStreams.get(topic);
+  if (existing) return existing;
+  const q = new URLSearchParams({ topic });
+  if (me) {
+    q.set("key", me.userId);
+    q.set("meta", JSON.stringify(me));
+  }
+  const source = new EventSource(`/api/dev/realtime?${q}`);
+  const shared: DevShared = { source, key: me?.userId, listeners: new Set() };
+  source.onmessage = (e) => {
+    const msg = JSON.parse(e.data) as { event: string; payload: unknown };
+    if (msg.event === "__presence") shared.listeners.forEach((l) => l.presence(msg.payload as PresenceMember[]));
+    else if ((msg.payload as { __from?: string } | null)?.__from !== shared.key || !shared.key) shared.listeners.forEach((l) => l.emit(msg.event, unwrap(msg.payload)));
+  };
+  devStreams.set(topic, shared);
+  return shared;
+}
+
 export function openRoomChannel(topic: string, me: { userId: string; username: string } | null): RoomChannel {
   const handlers = new Map<string, Set<(p: unknown) => void>>();
   const presenceHandlers = new Set<(m: PresenceMember[]) => void>();
@@ -102,29 +124,30 @@ export function openRoomChannel(topic: string, me: { userId: string; username: s
     };
   }
 
-  // Development relay.
-  const q = new URLSearchParams({ topic });
-  if (me) {
-    q.set("key", me.userId);
-    q.set("meta", JSON.stringify(me));
-  }
-  const source = new EventSource(`/api/dev/realtime?${q}`);
-  const myKey = me?.userId;
-  source.onmessage = (e) => {
-    const msg = JSON.parse(e.data) as { event: string; payload: unknown };
-    if (msg.event === "__presence") presenceHandlers.forEach((fn) => fn(msg.payload as PresenceMember[]));
-    else if ((msg.payload as { __from?: string } | null)?.__from !== myKey || !myKey) emit(msg.event, unwrap(msg.payload));
-  };
+  // Development relay: one stream per topic shared by every part of the page (browsers only
+  // allow a few open connections per site, and each stream holds one open).
+  const shared = devShared(topic, me);
+  const listener = { emit, presence: (m: PresenceMember[]) => presenceHandlers.forEach((fn) => fn(m)) };
+  shared.listeners.add(listener);
+  let closed = false;
   return {
     send: (event, payload) =>
       void fetch("/api/dev/realtime", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, event, payload: { __from: myKey, __p: payload } }),
+        body: JSON.stringify({ topic, event, payload: { __from: shared.key, __p: payload } }),
       }),
     on,
     onPresence,
-    close: () => source.close(),
+    close: () => {
+      if (closed) return;
+      closed = true;
+      shared.listeners.delete(listener);
+      if (shared.listeners.size === 0) {
+        shared.source.close();
+        devStreams.delete(topic);
+      }
+    },
   };
 }
 
