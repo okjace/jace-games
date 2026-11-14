@@ -7,7 +7,7 @@ import type { HostView } from "@/lib/live/engine";
 import { MODES, type LiveMode } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
-import { ChatPanel } from "./ChatPanel";
+import { ChatButton, ChatPanel } from "./ChatPanel";
 import { HostReport } from "./HostReport";
 import { HtmlFrame } from "./HtmlFrame";
 import { Celebration, LiveAvatar, LiveName } from "./LiveAvatar";
@@ -156,6 +156,7 @@ export function HostScreen({ code }: { code: string }) {
                 {view.settings.public ? "🌍 On Discover" : "🔒 Not listed"}
               </button>
             )}
+            {view.status !== "ended" && <ChatButton label className={secondary} />}
             <FullscreenButton on={full.on} toggle={full.toggle} className="border border-line bg-panel" />
             {view.status !== "ended" && (
               <button type="button" onClick={() => confirm("End the game for everyone?") && act("end")} className={secondary}>

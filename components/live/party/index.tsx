@@ -24,6 +24,7 @@ import { Markdown } from "../Markdown";
 import { RejoinPin } from "../PlayLive";
 import { StudioMode } from "./StudioMode";
 import { TowerSiege } from "./TowerSiege";
+import { ChatButton } from "../ChatPanel";
 
 /** Every self-paced mode plays on this stage. */
 export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom", "banana", "summit", "survival", "boss", "tug", "hatchery", "pinata", "rare"];
@@ -234,6 +235,7 @@ function Stage({ view, busy, act, chat }: { view: PlayerView; busy: boolean; act
               🛒
             </button>
           )}
+          {chat && <ChatButton className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 text-lg text-white backdrop-blur" />}
           <MuteButton />
           <FullscreenButton on={full.on} toggle={full.toggle} className="bg-black/25 backdrop-blur" />
           {view.solo && (

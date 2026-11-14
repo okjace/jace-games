@@ -1,19 +1,82 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CHAT_MAX, type ChatMessage } from "@/lib/live/chat";
 import { openRoomChannel } from "@/lib/realtime/client";
 
 /**
+ * Whether the game chat is shown (remembered on this device, like the sound
+ * button) and how many messages came in while it was hidden. Shared by the
+ * chat panel and its 💬 button.
+ */
+const CHAT_KEY = "jace-games:live:chat-hidden";
+type ChatUi = { shown: boolean; unread: number };
+const SERVER_UI: ChatUi = { shown: true, unread: 0 };
+let ui: ChatUi | null = null;
+const uiSubs = new Set<() => void>();
+
+function readUi(): ChatUi {
+  if (!ui) {
+    let hidden = false;
+    try {
+      hidden = localStorage.getItem(CHAT_KEY) === "1";
+    } catch {}
+    ui = { shown: !hidden, unread: 0 };
+  }
+  return ui;
+}
+
+function setUi(patch: Partial<ChatUi>) {
+  ui = { ...readUi(), ...patch };
+  if (patch.shown !== undefined) {
+    try {
+      localStorage.setItem(CHAT_KEY, patch.shown ? "0" : "1");
+    } catch {}
+  }
+  uiSubs.forEach((fn) => fn());
+}
+
+function useChatUi(): ChatUi {
+  return useSyncExternalStore(
+    (fn) => {
+      uiSubs.add(fn);
+      return () => void uiSubs.delete(fn);
+    },
+    readUi,
+    () => SERVER_UI,
+  );
+}
+
+/** Shows or hides the game chat, like the sound button. Shows how many messages you missed while it was hidden. */
+export function ChatButton({ className = "", label = false }: { className?: string; label?: boolean }) {
+  const { shown, unread } = useChatUi();
+  return (
+    <button
+      type="button"
+      aria-pressed={shown}
+      onClick={() => setUi({ shown: !shown, unread: 0 })}
+      aria-label={shown ? "Hide chat" : `Show chat${unread ? ` (${unread} new)` : ""}`}
+      title={shown ? "Hide chat" : "Show chat"}
+      className={`relative ${className}`}
+    >
+      <span className={shown ? "" : "opacity-60"}>💬</span>
+      {label && <span className="ml-1">{shown ? "Hide chat" : "Chat"}</span>}
+      {!shown && unread > 0 && (
+        <span className="absolute -right-1.5 -top-1.5 rounded-full bg-danger px-1.5 text-[10px] font-bold leading-4 text-white">{unread > 9 ? "9+" : unread}</span>
+      )}
+    </button>
+  );
+}
+
+/**
  * Game chat, built into the game page: a column beside the game on wide
- * screens, a box under it on phones. It folds down to one line showing the
- * newest message. New messages arrive through the game's live channel (with
+ * screens, a box under it on phones; ChatButton shows or hides it. New messages arrive through the game's live channel (with
  * a slow poll as a backup). Players send with their key; the host sends with
  * their sign-in, can delete messages and turn chat off.
  *
  * tone "stage" is for the colourful game stages (glass on the stage colour);
  * "panel" matches the site's cards. Give a height with className (the
- * message list fills it while open).
+ * message list fills it).
  */
 export function ChatPanel({
   code,
@@ -32,18 +95,28 @@ export function ChatPanel({
   tone?: "panel" | "stage";
   className?: string;
 }) {
-  // Open from the start on wide screens (there's room beside the game), folded on phones.
-  const [open, setOpen] = useState(() => host || (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches));
+  const { shown } = useChatUi();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [unread, setUnread] = useState(0);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [chatOn, setChatOn] = useState(on);
-  const openRef = useRef(open);
+  const shownRef = useRef(shown);
+  const seen = useRef<Set<string> | null>(null);
   const listRef = useRef<HTMLOListElement>(null);
   useEffect(() => {
-    openRef.current = open;
-  }, [open]);
+    shownRef.current = shown;
+  }, [shown]);
+
+  // Count messages that arrive while the chat is hidden (not the ones already there).
+  const arrived = useCallback((ids: string[]) => {
+    if (!seen.current) {
+      seen.current = new Set(ids);
+      return;
+    }
+    const fresh = ids.filter((id) => !seen.current!.has(id));
+    fresh.forEach((id) => seen.current!.add(id));
+    if (fresh.length && !shownRef.current) setUi({ unread: readUi().unread + fresh.length });
+  }, []);
 
   const headers = useCallback((): HeadersInit => ({ "Content-Type": "application/json", ...(token ? { "X-Live-Token": token } : {}) }), [token]);
 
@@ -52,13 +125,10 @@ export function ChatPanel({
     const body = await res?.json().catch(() => null);
     if (!res?.ok || !body) return;
     setChatOn(body.on);
-    setMessages((cur) => {
-      const fresh = body.messages as ChatMessage[];
-      const newOnes = fresh.filter((m) => !cur.some((c) => c.id === m.id)).length;
-      if (newOnes && !openRef.current && cur.length) setUnread((n) => n + newOnes);
-      return fresh;
-    });
-  }, [code, headers]);
+    const fresh = body.messages as ChatMessage[];
+    arrived(fresh.map((m) => m.id));
+    setMessages(fresh);
+  }, [code, headers, arrived]);
 
   useEffect(() => {
     // The first load sets state only after the request returns.
@@ -76,7 +146,7 @@ export function ChatPanel({
         const m = (p as { message?: ChatMessage }).message;
         if (!m) return;
         setMessages((cur) => (cur.some((c) => c.id === m.id) ? cur : [...cur, m].slice(-80)));
-        if (!openRef.current) setUnread((n) => n + 1);
+        arrived([m.id]);
       }),
       ch.on("chat-deleted", (p) => {
         const id = (p as { id?: string }).id;
@@ -88,11 +158,11 @@ export function ChatPanel({
       offs.forEach((off) => off());
       ch.close();
     };
-  }, [topic, load]);
+  }, [topic, load, arrived]);
 
   useEffect(() => {
-    if (open) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-  }, [open, messages.length]);
+    if (shown) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+  }, [shown, messages.length]);
 
   const send = async () => {
     if (!text.trim()) return;
@@ -101,6 +171,7 @@ export function ChatPanel({
     const body = await res?.json().catch(() => null);
     if (!res?.ok) return setError(body?.error ?? "Couldn't send.");
     setText("");
+    seen.current?.add(body.message.id);
     setMessages((cur) => (cur.some((c) => c.id === body.message.id) ? cur.map((c) => (c.id === body.message.id ? { ...c, mine: true } : c)) : [...cur, body.message]));
   };
 
@@ -114,54 +185,28 @@ export function ChatPanel({
     if (res?.ok) setChatOn(!chatOn);
   };
 
-  if (!chatOn && !host) return null;
+  if ((!chatOn && !host) || !shown) return null;
 
   const stage = tone === "stage";
-  const last = messages[messages.length - 1];
   const muted = stage ? "text-white/70" : "text-muted";
   const shell = stage ? "border-white/15 bg-black/30 text-white backdrop-blur" : "border-line bg-panel text-foreground";
   const line = stage ? "border-white/15" : "border-line";
 
   return (
-    <section aria-label="Game chat" className={`flex flex-col overflow-hidden rounded-2xl border ${shell} ${open ? className : ""}`}>
-      <div className={`flex items-center gap-2 px-3 py-2 ${open ? `border-b ${line}` : ""}`}>
-        <button
-          type="button"
-          onClick={() => {
-            setOpen((o) => !o);
-            setUnread(0);
-          }}
-          aria-expanded={open}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
-        >
-          <span className="font-semibold">💬 Chat</span>
-          {!chatOn && <span className={`text-xs ${muted}`}>(off)</span>}
-          {unread > 0 && !open && <span className="rounded-full bg-danger px-1.5 text-xs font-bold text-white">{unread > 9 ? "9+" : unread}</span>}
-          {!open && last && (
-            <span className={`min-w-0 flex-1 truncate text-sm ${muted}`}>
-              <b>{last.name}:</b> {last.text}
-            </span>
-          )}
-        </button>
-        {host && open && (
+    <section aria-label="Game chat" className={`flex flex-col overflow-hidden rounded-2xl border ${shell} ${className}`}>
+      <div className={`flex items-center gap-2 border-b px-3 py-2 ${line}`}>
+        <p className="flex-1 font-semibold">
+          💬 Chat {!chatOn && <span className={`text-xs font-normal ${muted}`}>(off for players)</span>}
+        </p>
+        {host && (
           <button type="button" onClick={() => void toggle()} className={`shrink-0 rounded-full border px-2 py-0.5 text-xs ${line}`}>
-            {chatOn ? "Turn off" : "Turn on"}
+            {chatOn ? "Turn off for players" : "Turn on for players"}
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => {
-            setOpen((o) => !o);
-            setUnread(0);
-          }}
-          aria-label={open ? "Fold chat" : "Open chat"}
-          className={`shrink-0 text-sm ${muted} hover:opacity-100`}
-        >
-          {open ? "▾" : "▸"}
+        <button type="button" onClick={() => setUi({ shown: false, unread: 0 })} aria-label="Hide chat" title="Hide chat" className={`shrink-0 ${muted} hover:opacity-100`}>
+          ✕
         </button>
       </div>
-      {open && (
-        <>
           <ol ref={listRef} className="flex min-h-40 flex-1 flex-col gap-1.5 overflow-y-auto p-3 text-sm" aria-live="polite">
             {messages.length === 0 && <li className={`m-auto text-center text-xs ${muted}`}>No messages yet. Say hi! 👋</li>}
             {messages.map((m) => (
@@ -208,8 +253,6 @@ export function ChatPanel({
             <p className={`border-t p-3 text-center text-xs ${line} ${muted}`}>The host turned chat off.</p>
           )}
           {error && <p className="px-3 pb-2 text-xs text-danger">{error}</p>}
-        </>
-      )}
     </section>
   );
 }

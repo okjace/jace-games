@@ -9,7 +9,7 @@ import { MODES } from "@/lib/live/types";
 import { openRoomChannel } from "@/lib/realtime/client";
 import type { Avatar } from "@/lib/live/locker";
 import { Answer } from "./Answer";
-import { ChatPanel } from "./ChatPanel";
+import { ChatButton, ChatPanel } from "./ChatPanel";
 import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
@@ -159,6 +159,7 @@ export function PlayLive({ code }: { code: string }) {
           <LiveName name={view.me.name} avatar={view.me.avatar} className="font-semibold" />
         </span>
         <span className="flex items-center gap-3 text-sm">
+          {!view.solo && view.status !== "ended" && <ChatButton className="-my-2 text-lg text-muted hover:text-foreground" />}
           <FullscreenButton on={full.on} toggle={full.toggle} className="-my-2 text-muted hover:text-foreground" />
           {view.solo && view.status === "playing" && (
             <button
