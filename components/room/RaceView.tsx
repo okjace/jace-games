@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GAME_COMPONENTS } from "@/components/games";
+import { Juice } from "@/components/live/fx/Juice";
 import { RaceContext } from "@/components/games/shared";
 import { SEAT_COLORS } from "@/components/multi/types";
 import { getGame } from "@/lib/games";
@@ -149,6 +150,7 @@ export function RaceView({
           </div>
         )}
         <RaceContext.Provider value={true}>
+          <Juice>
           {Game && (
             <Game
               key={data.room.seed}
@@ -160,6 +162,7 @@ export function RaceView({
               versus={versus}
             />
           )}
+        </Juice>
         </RaceContext.Provider>
       </section>
       <aside className="flex flex-col gap-3">

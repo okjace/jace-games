@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GameOver, Overlay, Stats, beats, primaryButton, setupCanvas, themeColors, useGameRandom, useKeys, type GameProps } from "./shared";
+import { GameOver, Overlay, Stats, beats, primaryButton, setupCanvas, useGameRandom, useKeys, type GameProps } from "./shared";
+import { Fx, sfx } from "./fx";
 
 const W = 360;
 const H = 540;
@@ -23,51 +24,126 @@ export default function Flappy({ onFinish, best, seed, onProgress }: GameProps) 
   const [phase, setPhase] = useState<"idle" | "running" | "over">("idle");
   const [score, setScore] = useState(0);
   const [wasBest, setWasBest] = useState(false);
-  const g = useRef({ y: H / 2, vy: 0, pipes: [] as Pipe[], score: 0, spawnIn: 0, startedAt: 0, t: 0, overAt: 0 });
+  const g = useRef({ y: H / 2, vy: 0, pipes: [] as Pipe[], score: 0, spawnIn: 0, startedAt: 0, t: 0, overAt: 0, scroll: 0, flapAt: 0 });
+  const fx = useRef(new Fx());
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
-    const c = themeColors();
     const s = g.current;
-    ctx.fillStyle = c.panel;
-    ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = c.accent;
+    const now = performance.now();
+    const f = fx.current;
+    f.begin(ctx);
+    // Sky, sun, and clouds and hills that drift by at different speeds.
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "#38bdf8");
+    sky.addColorStop(0.7, "#bae6fd");
+    sky.addColorStop(1, "#fef3c7");
+    ctx.fillStyle = sky;
+    ctx.fillRect(-10, -10, W + 20, H + 20);
+    ctx.fillStyle = "rgba(254,240,138,0.9)";
+    ctx.beginPath();
+    ctx.arc(W - 70, 90, 34, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    for (let i = 0; i < 4; i++) {
+      const x = ((i * 130 - s.scroll * 0.15) % (W + 120) + W + 120) % (W + 120) - 60;
+      const y = 60 + (i % 2) * 70;
+      for (const [dx, dy, r] of [
+        [0, 0, 20],
+        [18, -8, 16],
+        [34, 0, 18],
+        [16, 6, 16],
+      ]) {
+        ctx.beginPath();
+        ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.fillStyle = "#86efac";
+    ctx.beginPath();
+    ctx.moveTo(0, H - GROUND);
+    for (let x = 0; x <= W; x += 8) ctx.lineTo(x, H - GROUND - 40 - Math.sin((x + s.scroll * 0.4) / 50) * 18 - Math.sin((x + s.scroll * 0.4) / 23) * 6);
+    ctx.lineTo(W, H - GROUND);
+    ctx.fill();
+    // Pipes: shaded tubes with rims.
     for (const p of s.pipes) {
-      ctx.globalAlpha = 0.9;
+      const tube = ctx.createLinearGradient(p.x, 0, p.x + PIPE_W, 0);
+      tube.addColorStop(0, "#15803d");
+      tube.addColorStop(0.35, "#4ade80");
+      tube.addColorStop(1, "#166534");
+      ctx.fillStyle = tube;
+      const topH = p.gapY - GAP / 2;
+      const botY = p.gapY + GAP / 2;
+      ctx.fillRect(p.x + 4, -10, PIPE_W - 8, topH + 10);
+      ctx.fillRect(p.x + 4, botY, PIPE_W - 8, H - GROUND - botY);
       ctx.beginPath();
-      ctx.roundRect(p.x, -10, PIPE_W, p.gapY - GAP / 2 + 10, 8);
-      ctx.roundRect(p.x, p.gapY + GAP / 2, PIPE_W, H - GROUND - (p.gapY + GAP / 2) + 10, 8);
+      ctx.roundRect(p.x, topH - 22, PIPE_W, 22, 5);
+      ctx.roundRect(p.x, botY, PIPE_W, 22, 5);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    // Ground with scrolling stripes.
+    ctx.fillStyle = "#a16207";
+    ctx.fillRect(0, H - GROUND, W, GROUND);
+    ctx.fillStyle = "#65a30d";
+    ctx.fillRect(0, H - GROUND, W, 8);
+    ctx.fillStyle = "rgba(0,0,0,0.12)";
+    for (let x = -((s.scroll % 24) + 24); x < W; x += 24) {
+      ctx.beginPath();
+      ctx.moveTo(x, H - GROUND + 8);
+      ctx.lineTo(x + 12, H - GROUND + 8);
+      ctx.lineTo(x + 2, H);
+      ctx.lineTo(x - 10, H);
       ctx.fill();
     }
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = c.line;
-    ctx.fillRect(0, H - GROUND, W, GROUND);
-    // Bird.
+    // The bird, with a wing that flaps.
     ctx.save();
     ctx.translate(BIRD_X, s.y);
     ctx.rotate(Math.max(-0.5, Math.min(1.2, s.vy / 600)));
-    ctx.fillStyle = c.warn;
+    ctx.fillStyle = "#facc15";
     ctx.beginPath();
-    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, R + 2, R, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = c.foreground;
+    ctx.fillStyle = "#fef9c3";
     ctx.beginPath();
-    ctx.arc(5, -4, 2.6, 0, Math.PI * 2);
+    ctx.ellipse(-2, 4, R - 4, R - 7, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = c.danger;
+    const wing = Math.sin((now - s.flapAt) / 40) * (now - s.flapAt < 300 ? 1 : 0.3);
+    ctx.fillStyle = "#f59e0b";
     ctx.beginPath();
-    ctx.moveTo(R - 2, 0);
-    ctx.lineTo(R + 7, 3);
-    ctx.lineTo(R - 2, 6);
+    ctx.ellipse(-6, 1 + wing * 5, 8, 5, -0.4 + wing * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(6, -4, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#0f172a";
+    ctx.beginPath();
+    ctx.arc(7.5, -4, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f97316";
+    ctx.beginPath();
+    ctx.moveTo(R - 1, 0);
+    ctx.lineTo(R + 9, 3);
+    ctx.lineTo(R - 1, 7);
     ctx.fill();
     ctx.restore();
+    f.draw(ctx);
     // Score.
-    ctx.fillStyle = c.foreground;
-    ctx.font = "bold 40px var(--font-geist-sans), sans-serif";
-    ctx.textAlign = "center";
-    if (s.pipes.length || s.score) ctx.fillText(String(s.score), W / 2, 70);
+    if (s.pipes.length || s.score) {
+      ctx.font = "900 46px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = "rgba(0,0,0,0.35)";
+      ctx.strokeText(String(s.score), W / 2, 74);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(String(s.score), W / 2, 74);
+    }
   }, []);
 
   useEffect(() => {
@@ -80,13 +156,19 @@ export default function Flappy({ onFinish, best, seed, onProgress }: GameProps) 
 
   const start = useCallback(() => {
     rand.reset();
-    Object.assign(g.current, { y: H / 2, vy: FLAP, pipes: [], score: 0, spawnIn: 0.6, startedAt: performance.now() });
+    Object.assign(g.current, { y: H / 2, vy: FLAP, pipes: [], score: 0, spawnIn: 0.6, startedAt: performance.now(), flapAt: performance.now() });
+    fx.current.clear();
     setScore(0);
     setPhase("running");
   }, [rand]);
 
   const flap = useCallback(() => {
-    if (phase === "running") g.current.vy = FLAP;
+    if (phase === "running") {
+      g.current.vy = FLAP;
+      g.current.flapAt = performance.now();
+      sfx.tap();
+      fx.current.burst(BIRD_X - 8, g.current.y + 6, "rgba(255,255,255,0.8)", 4, 60, 0, 2);
+    }
     else if (phase === "idle") start();
     else if (phase === "over" && seed === undefined && performance.now() - g.current.overAt > 500) start();
   }, [phase, start, seed]);
@@ -100,6 +182,8 @@ export default function Flappy({ onFinish, best, seed, onProgress }: GameProps) 
       const dt = Math.min(0.033, (now - last) / 1000);
       last = now;
       s.vy += GRAVITY * dt;
+      s.scroll += SPEED * dt;
+      fx.current.update(dt);
       s.y += s.vy * dt;
       s.spawnIn -= dt;
       if (s.spawnIn <= 0) {
@@ -113,6 +197,9 @@ export default function Flappy({ onFinish, best, seed, onProgress }: GameProps) 
           p.passed = true;
           s.score += 1;
           setScore(s.score);
+          sfx.coin();
+          fx.current.float(BIRD_X + 20, s.y - 24, "+1", "#fff", 20);
+          if (s.score % 10 === 0) fx.current.burst(BIRD_X, s.y, ["#facc15", "#f472b6", "#38bdf8"], 24, 200, 200);
           onProgress?.(s.score);
         }
       }
@@ -124,7 +211,18 @@ export default function Flappy({ onFinish, best, seed, onProgress }: GameProps) 
           (s.y - R + 3 < p.gapY - GAP / 2 || s.y + R - 3 > p.gapY + GAP / 2),
       );
       if (hitPipe || s.y + R >= H - GROUND || s.y < -40) {
-        draw();
+        // Crash: feathers, a jolt and a thud, and the effects play out.
+        fx.current.shake(9, 0.35);
+        fx.current.burst(BIRD_X, s.y, ["#facc15", "#f59e0b", "#fff"], 22, 220, 400, 3.5);
+        sfx.boom();
+        let last = now;
+        const after = (t: number) => {
+          fx.current.update(Math.min(0.05, (t - last) / 1000));
+          last = t;
+          draw();
+          if (fx.current.busy) requestAnimationFrame(after);
+        };
+        requestAnimationFrame(after);
         s.overAt = now;
         setWasBest(s.score > 0 && beats(s.score, best, "higher"));
         setPhase("over");

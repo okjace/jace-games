@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isMuted } from "@/components/live/fx/sfx";
-import { MuteButton } from "@/components/live/fx/Juice";
 import { GameOver, Overlay, Stats, beats, keyToDir, primaryButton, setupCanvas, useGameRandom, useKeys, type Dir, type GameProps } from "./shared";
 
 /**
@@ -569,7 +568,6 @@ export default function SynchroSplash({ onFinish, best, seed, onProgress }: Game
             { label: "Splashes", value: "💧".repeat(hud.lives) || "—" },
           ]}
         />
-        <MuteButton className="!bg-panel !text-foreground border border-line" />
       </div>
       <div className="relative w-full" style={{ aspectRatio: `${W} / ${H}`, maxWidth: `min(${W}px, calc(64vh * ${W / H}))` }}>
         <canvas ref={canvasRef} className="h-full w-full rounded-2xl border border-line shadow-xl" aria-label="Synchro Splash pool. Watch the leader's moves, then repeat them on the beat with the arrow keys." />

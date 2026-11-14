@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { Fullscreen } from "@/components/Fullscreen";
 import { GAME_COMPONENTS } from "@/components/games";
+import { Juice, MuteButton } from "@/components/live/fx/Juice";
 import { Leaderboard } from "@/components/Leaderboard";
 import { LocalPlay } from "@/components/room/LocalPlay";
 import { PlayWithFriends } from "@/components/room/PlayWithFriends";
@@ -73,7 +74,12 @@ export function PlayView({ gameId }: { gameId: string }) {
                 <p className="text-sm text-muted">Use “Play with friends” to make a room, then send them the link.</p>
               </div>
             ) : Game ? (
-              <Game onFinish={onFinish} best={best?.score ?? null} />
+              <Juice>
+                <div className="mb-2 flex justify-end">
+                  <MuteButton className="!h-8 !w-8 border border-line !bg-panel !text-base !text-foreground" />
+                </div>
+                <Game onFinish={onFinish} best={best?.score ?? null} />
+              </Juice>
             ) : (
               <p>This game is missing its component.</p>
             )}

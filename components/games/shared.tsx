@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { seededRandom } from "@/lib/multiplayer/rng";
+import { useJuice } from "@/components/live/fx/Juice";
+import { sfx } from "@/components/live/fx/sfx";
 
 /** Every game component takes these props. Call `onFinish` once when a game ends. */
 export type GameProps = {
@@ -192,6 +194,13 @@ export function GameOver({
 }) {
   const ref = useRef<HTMLButtonElement>(null);
   const race = useContext(RaceContext);
+  const juice = useJuice();
+  // A new best gets a party.
+  useEffect(() => {
+    if (!isBest || race) return;
+    sfx.levelUp();
+    juice.confetti(140);
+  }, [isBest, race, juice]);
   useEffect(() => {
     // Short delay so the key that ended the game doesn't also press the button.
     const t = setTimeout(() => ref.current?.focus({ preventScroll: true }), 250);

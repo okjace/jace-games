@@ -16,6 +16,7 @@ import {
   type Dir,
   type GameProps,
 } from "./shared";
+import { Fx, sfx, shade } from "./fx";
 
 const GRID = 20;
 const SIZE = 400; // logical px
@@ -40,8 +41,15 @@ export default function Snake({ onFinish, best }: GameProps) {
   const [score, setScore] = useState(0);
   const [finalBest, setFinalBest] = useState(false);
 
+  const fx = useRef(new Fx());
   const g = useRef({
     snake: [{ x: 10, y: 10 }] as P[],
+    /** Where each segment was before the last step, for smooth movement between steps. */
+    prev: [{ x: 10, y: 10 }] as P[],
+    /** How far through the current step we are (0–1). */
+    k: 1,
+    ateAt: 0,
+    deadAt: 0,
     dir: "right" as Dir,
     queue: [] as Dir[],
     food: { x: 15, y: 10 } as P,
@@ -56,24 +64,88 @@ export default function Snake({ onFinish, best }: GameProps) {
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
     const c = themeColors();
+    const now = performance.now();
+    const f = fx.current;
+    f.begin(ctx);
+    // The board: a soft checkerboard with a glow in the middle.
     ctx.fillStyle = c.panel;
-    ctx.fillRect(0, 0, SIZE, SIZE);
+    ctx.fillRect(-10, -10, SIZE + 20, SIZE + 20);
     ctx.fillStyle = c.line;
-    for (let x = 0; x < GRID; x++)
-      for (let y = 0; y < GRID; y++) if ((x + y) % 2 === 0) ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
-    const { snake, food } = g.current;
+    ctx.globalAlpha = 0.55;
+    for (let x = 0; x < GRID; x++) for (let y = 0; y < GRID; y++) if ((x + y) % 2 === 0) ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+    ctx.globalAlpha = 1;
+    const glow = ctx.createRadialGradient(SIZE / 2, SIZE / 2, 20, SIZE / 2, SIZE / 2, SIZE * 0.75);
+    glow.addColorStop(0, "rgba(61,220,132,0.08)");
+    glow.addColorStop(1, "rgba(0,0,0,0.18)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    const { snake, prev, food, k, dir } = g.current;
+    // Food: a glowing apple that pulses.
+    const fx0 = food.x * CELL + CELL / 2;
+    const fy0 = food.y * CELL + CELL / 2;
+    const pulse = 1 + Math.sin(now / 180) * 0.08;
+    ctx.shadowColor = c.danger;
+    ctx.shadowBlur = 14;
     ctx.fillStyle = c.danger;
     ctx.beginPath();
-    ctx.arc(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, CELL / 2.6, 0, Math.PI * 2);
+    ctx.arc(fx0, fy0 + 1, (CELL / 2.5) * pulse, 0, Math.PI * 2);
     ctx.fill();
-    snake.forEach((s, i) => {
-      ctx.fillStyle = c.accent;
-      ctx.globalAlpha = i === 0 ? 1 : Math.max(0.45, 1 - i / (snake.length + 8));
-      ctx.beginPath();
-      ctx.roundRect(s.x * CELL + 1, s.y * CELL + 1, CELL - 2, CELL - 2, 5);
-      ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.beginPath();
+    ctx.arc(fx0 - 3, fy0 - 2, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#4ade80";
+    ctx.beginPath();
+    ctx.ellipse(fx0 + 3, fy0 - CELL / 2.6, 4, 2, -0.6, 0, Math.PI * 2);
+    ctx.fill();
+    // The snake, gliding between steps: a gradient body, fattest at the head.
+    const pos = snake.map((p, i) => {
+      const q = prev[i] ?? prev[prev.length - 1] ?? p;
+      return { x: (q.x + (p.x - q.x) * k) * CELL + CELL / 2, y: (q.y + (p.y - q.y) * k) * CELL + CELL / 2 };
     });
-    ctx.globalAlpha = 1;
+    const dead = g.current.deadAt && now - g.current.deadAt < 600;
+    for (let i = pos.length - 1; i >= 0; i--) {
+      const t = i / Math.max(1, pos.length - 1);
+      const r = CELL * (0.46 - t * 0.14);
+      ctx.fillStyle = dead ? shade(c.danger, -0.1 * t) : shade(c.accent, 0.15 - t * 0.45);
+      ctx.beginPath();
+      ctx.arc(pos[i].x, pos[i].y, r, 0, Math.PI * 2);
+      ctx.fill();
+      // Fill the gap to the next segment so the body is one smooth tube.
+      if (i > 0) {
+        const a = pos[i - 1];
+        ctx.beginPath();
+        ctx.arc((a.x + pos[i].x) / 2, (a.y + pos[i].y) / 2, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Head: eyes looking where it's going, and a happy gulp after eating.
+    if (pos[0]) {
+      const v = VEC[dir];
+      const h = pos[0];
+      const px = -v.y;
+      const py = v.x;
+      for (const side of [-1, 1]) {
+        const ex = h.x + v.x * 4 + px * side * 5;
+        const ey = h.y + v.y * 4 + py * side * 5;
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(ex, ey, 3.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#0f172a";
+        ctx.beginPath();
+        ctx.arc(ex + v.x * 1.4, ey + v.y * 1.4, dead ? 1 : 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (now - g.current.ateAt < 220) {
+        ctx.fillStyle = "#7f1d1d";
+        ctx.beginPath();
+        ctx.arc(h.x + v.x * 8, h.y + v.y * 8, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    f.draw(ctx);
   }, []);
 
   useEffect(() => {
@@ -91,6 +163,10 @@ export default function Snake({ onFinish, best }: GameProps) {
       { x: 9, y: 10 },
       { x: 8, y: 10 },
     ];
+    s.prev = s.snake.map((p) => ({ ...p }));
+    s.k = 1;
+    s.deadAt = 0;
+    fx.current.clear();
     s.dir = "right";
     s.queue = [];
     s.food = randomFood(s.snake);
@@ -132,23 +208,50 @@ export default function Snake({ onFinish, best }: GameProps) {
       ) {
         return false;
       }
+      s.prev = s.snake.map((p) => ({ ...p }));
+      if (eating) s.prev.push({ ...s.prev[s.prev.length - 1] });
       s.snake = [head, ...body];
       if (eating) {
         s.score += 1;
         setScore(s.score);
+        s.ateAt = performance.now();
+        const fxc = themeColors();
+        fx.current.burst(head.x * CELL + CELL / 2, head.y * CELL + CELL / 2, [fxc.danger, fxc.warn, fxc.accent], 16, 150, 120);
+        fx.current.float(head.x * CELL + CELL / 2, head.y * CELL - 4, "+1", fxc.accent);
+        // Every 10 the snake speeds up.
+        if (s.score % 10 === 0) {
+          sfx.levelUp();
+          fx.current.float(SIZE / 2, SIZE / 2, "Speed up!", fxc.warn, 30);
+        } else sfx.coin();
         if (s.snake.length >= GRID * GRID) return false;
         s.food = randomFood(s.snake);
       }
       return true;
     };
     const frame = (now: number) => {
+      const dt = Math.min(0.05, (now - s.last) / 1000);
       s.acc += now - s.last;
       s.last = now;
+      fx.current.update(dt);
       const tick = Math.max(MIN_TICK, START_TICK - s.score * 2);
       while (s.acc >= tick) {
         s.acc -= tick;
         if (!step()) {
-          draw();
+          // Crash: a jolt, a burst and a sad sound, and the effects play out.
+          s.k = 1;
+          s.deadAt = performance.now();
+          const fxc = themeColors();
+          fx.current.shake(8, 0.35);
+          fx.current.burst(s.snake[0].x * CELL + CELL / 2, s.snake[0].y * CELL + CELL / 2, [fxc.danger, fxc.accent], 26, 220, 200, 4);
+          sfx.wrong();
+          let last = performance.now();
+          const after = (t: number) => {
+            fx.current.update(Math.min(0.05, (t - last) / 1000));
+            last = t;
+            draw();
+            if (fx.current.busy || t - s.deadAt < 600) requestAnimationFrame(after);
+          };
+          requestAnimationFrame(after);
           const duration = performance.now() - s.startedAt;
           setFinalBest(beats(s.score, best, "higher") && s.score > 0);
           setPhase("over");
@@ -156,6 +259,7 @@ export default function Snake({ onFinish, best }: GameProps) {
           return;
         }
       }
+      s.k = Math.min(1, s.acc / tick);
       draw();
       raf = requestAnimationFrame(frame);
     };
