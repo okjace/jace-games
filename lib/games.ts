@@ -193,6 +193,19 @@ export const GAMES: GameDef[] = [
     limits: { min: 0, max: 250, minDurationMs: () => 29_000 },
   },
   {
+    id: "splash",
+    name: "Synchro Splash",
+    description: "A rhythm show in the pool: watch the leader's routine, then repeat it on the beat.",
+    icon: "🏊",
+    better: "higher",
+    scoreLabel: "Points",
+    format: (s) => n(s),
+    addedAt: "2026-11-14",
+    multiplayer: { mode: "race", min: 2, max: 8, timeLimitSec: 300 },
+    // At most ~550 points a second (perfect hits at top tempo with a 4× combo, plus phrase bonuses).
+    limits: { min: 0, max: 2_000_000, minDurationMs: (s) => s * 1.5 },
+  },
+  {
     id: "chess",
     name: "Chess",
     description: "The classic. Full rules: castling, en passant, promotion and every kind of draw.",

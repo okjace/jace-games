@@ -16,4 +16,5 @@ export const GAME_COMPONENTS: Record<string, ComponentType<GameProps>> = {
   wordle: dynamic(() => import("./Wordle"), { ssr: false }),
   reaction: dynamic(() => import("./Reaction"), { ssr: false }),
   typing: dynamic(() => import("./Typing"), { ssr: false }),
+  splash: dynamic(() => import("./SynchroSplash"), { ssr: false }),
 };
