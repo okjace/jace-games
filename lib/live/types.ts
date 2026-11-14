@@ -59,7 +59,7 @@ export type LiveSet = {
 
 export type SetSummary = Omit<LiveSet, "questions"> & { questionCount: number };
 
-export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata" | "rare" | "territory" | "vault" | "king" | "memory" | "sweep" | "stack" | "snake";
+export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata" | "rare" | "territory" | "vault" | "king" | "memory" | "sweep" | "stack" | "snake" | "mparty";
 
 export type ModeDef = {
   name: string;
@@ -201,6 +201,14 @@ export const MODES: Record<LiveMode, ModeDef> = {
     needsSet: false,
     selfPaced: true,
     unit: (n) => `🍬 ${num(n)}`,
+  },
+  mparty: {
+    name: "Memory Party",
+    icon: "🎴",
+    blurb: "One big memory board for the hole room! Each right anser = flip 2 cards. EVRYONE sees every flip, so watch close. Matches r urs (n keep ur turn going). Most pairs wins.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => `${num(n)} pts`,
   },
   snake: {
     name: "Snake Arena",

@@ -14,6 +14,7 @@ import { BOSS_HEAL, SUMMIT_STEPS, SURVIVAL_LIVES, bossHit, bossMaxHp, hatch, sum
 import { DEFAULT_MAP, cleanMap, type TowerMap } from "./maps";
 import { SkillError, earnMoves, kingFinal, kingWrong, skillMove, skillView, type Patch, type SkillOp } from "./skillModes";
 import { isSkillMode, type SkillView } from "./skillRules";
+import { MpError, mpEarn, mpFlip, mpView, type MpView } from "./memoryParty";
 import type { GameReport, ReportAttempt, ReportQuestion } from "./report";
 import { broadcast } from "@/lib/realtime/server";
 import type { Session } from "@/lib/session";
@@ -548,6 +549,8 @@ export type HostView = {
   counts: number[] | null;
   answeredCount: number;
   players: { id: string; name: string; score: number; correct: number; answered: number; streak: number; finished: boolean; avatar: Avatar | null }[];
+  /** Memory Party: the shared board for the big screen. */
+  mp?: MpView;
   serverNow: number;
 };
 
@@ -588,6 +591,7 @@ export async function hostView(code: string, session: Session): Promise<HostView
     counts,
     answeredCount,
     players: players.map((p) => ({ id: p.id, name: p.name, score: p.score, correct: p.correct, answered: p.answered, streak: p.streak, finished: !!p.finished_at, avatar: avatarOf(p) })),
+    ...(g.mode === "mparty" ? { mp: mpView(g.id, null, players, Date.now()) } : {}),
     serverNow: Date.now(),
   };
 }
@@ -628,6 +632,8 @@ export type PlayerView = {
     catches?: Catch[];
     /** Banana Bonanza: when GO BANANAS ends (0 if it isn't on). */
     goUntil?: number;
+    /** Memory Party: the shared board. */
+    mp?: MpView;
     /** Territory Wars, Vault Cracker, King of the Hill, Memory Match, Minefield and Sky Stacker. */
     sk?: SkillView;
     /** The skill modes: the summit leader, lives left, the boss's health, or the rope. */
@@ -751,6 +757,7 @@ async function applyPatches(g: LiveGameRow, patches: Patch[], all: LivePlayerRow
 function partyView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]): PlayerView["party"] {
   const d = dataOf(me);
   if (isSkillMode(g.mode)) return { sk: skillView(g.mode, me, all, Date.now()) };
+  if (g.mode === "mparty") return { mp: mpView(g.id, me, all, Date.now()) };
   if (g.mode === "tower") {
     const settings = g.settings as GameSettings;
     return { bank: d.bank ?? 0, map: settings.map ?? DEFAULT_MAP, mapTitle: settings.mapTitle ?? null };
@@ -1176,7 +1183,10 @@ type PlayerAction =
   | { action: "skip" }
   // The skill modes (see skillModes.ts): a move on your board.
   | ({ action: "skill" } & SkillOp)
-  | { action: "snake-score"; score: number };
+  | { action: "snake-score"; score: number }
+  // Memory Party: flip a card on the shared board, or just get the latest board.
+  | { action: "mparty-flip"; cell: number }
+  | { action: "mparty-view" };
 
 export async function playerAction(code: string, token: unknown, body: PlayerAction): Promise<PlayerView> {
   const store = liveStore();
@@ -1267,6 +1277,26 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
       score: me.score + runs,
       data: { ...d, ball: state, last: { kind: "play", play: shown, contact: play, runs, inningOver, inning: state.inning, strikes: state.strikes ?? 0, atBatOver: !state.pitch } },
     }))!;
+    return buildPlayerView(g, me, await store.players(g.id));
+  }
+
+  // Memory Party.
+  if (body.action === "mparty-view" || body.action === "mparty-flip") {
+    if (g.mode !== "mparty") throw new LiveError("Unknown action.");
+    if (body.action === "mparty-flip") {
+      const all = await store.players(g.id);
+      let res: ReturnType<typeof mpFlip>;
+      try {
+        res = mpFlip(g.id, me, all, (body as { cell?: unknown }).cell, now);
+      } catch (e) {
+        if (e instanceof MpError) throw new LiveError(e.message, e.status);
+        throw e;
+      }
+      const fresh = dataOf(me);
+      me = (await store.updatePlayer(g.id, me.id, { score: me.score + res.points, data: { ...fresh, mp: res.mp, last: res.last } }))!;
+      // Everyone's board updates right away.
+      await broadcast(topicOf(g), "mp", { by: me.name }).catch(() => {});
+    }
     return buildPlayerView(g, me, await store.players(g.id));
   }
 
@@ -1501,6 +1531,10 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
       score: me.score + bits,
       data: { ...fresh, hackCharge: ready ? 0 : charge, hackReady: ready, last: { kind: "bits", amount: bits, correct: true } },
     }))!;
+  } else if (earned && g.mode === "mparty") {
+    // Memory Party: a right answer is a turn (flip two cards).
+    const fresh = dataOf(me);
+    me = (await store.updatePlayer(g.id, me.id, { data: { ...fresh, mp: mpEarn(me), last: { kind: "mp-turn", correct: true } } }))!;
   } else if (earned && g.mode === "snake") {
     // Snake Arena: a right answer grows your snake (bigger on a streak), wherever the arena is running.
     const fresh = dataOf(me);

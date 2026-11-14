@@ -8,6 +8,7 @@ import { openRoomChannel } from "@/lib/realtime/client";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { ChatButton, ChatPanel, useChatShown } from "./ChatPanel";
 import { SnakeArenaHost } from "./SnakeArenaHost";
+import { MpBoard } from "./party/MemoryParty";
 import { HostReport } from "./HostReport";
 import { HtmlFrame } from "./HtmlFrame";
 import { Celebration, LiveAvatar, LiveName } from "./LiveAvatar";
@@ -70,7 +71,8 @@ export function HostScreen({ code }: { code: string }) {
   useEffect(() => {
     if (!topic) return;
     const ch = openRoomChannel(topic, null);
-    const offs = ["phase", "players", "answered"].map((ev) => ch.on(ev, () => void load()));
+    // "mp": someone flipped a card in Memory Party.
+    const offs = ["phase", "players", "answered", "mp"].map((ev) => ch.on(ev, () => void load()));
     return () => {
       offs.forEach((off) => off());
       ch.close();
@@ -182,7 +184,30 @@ export function HostScreen({ code }: { code: string }) {
         {view.status === "playing" && view.mode === "snake" && (
           <SnakeArenaHost view={view} secondsLeft={secondsLeft ?? 0} onScores={(scores) => void act("snake-scores", { scores })} />
         )}
-        {view.status === "playing" && view.mode !== "classic" && view.mode !== "snake" && <SelfPaced view={view} secondsLeft={secondsLeft ?? 0} />}
+        {view.status === "playing" && view.mode === "mparty" && view.mp && (
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+            <div className="rounded-3xl bg-gradient-to-br from-violet-900 via-purple-700 to-pink-600 p-4 shadow-xl">
+              <MpBoard mp={view.mp} big />
+            </div>
+            <div className={`${card} flex flex-col gap-2`}>
+              <p className="font-mono text-4xl font-black tabular-nums">
+                {Math.floor((secondsLeft ?? 0) / 60)}:{String((secondsLeft ?? 0) % 60).padStart(2, "0")}
+              </p>
+              <p className="font-display text-xl font-extrabold">🎴 most pairs</p>
+              <ol className="flex flex-col gap-1.5">
+                {[...view.mp.players].sort((a, b) => b.pairs - a.pairs).map((p, i) => (
+                  <li key={`${p.name}-${i}`} className="flex items-center gap-2 text-sm">
+                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: p.color }} />
+                    <span className="min-w-0 flex-1 truncate font-semibold">{p.name}</span>
+                    <span className="font-mono tabular-nums">{p.pairs}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-auto text-xs text-muted">board {view.mp.round + 1} · right ansers = turns. watch evry flip!!</p>
+            </div>
+          </div>
+        )}
+        {view.status === "playing" && view.mode !== "classic" && view.mode !== "snake" && view.mode !== "mparty" && <SelfPaced view={view} secondsLeft={secondsLeft ?? 0} />}
 
         {view.status === "ended" && <Podium view={view} />}
         {view.status === "ended" && <PlayAgain view={view} busy={busy} onAgain={(m) => act("again", { mode: m })} />}

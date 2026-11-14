@@ -70,6 +70,7 @@ export const TAP_COOLDOWN_MS: Record<LiveMode, number> = {
   sweep: 1200,
   stack: 1200,
   snake: 1500,
+  mparty: 1500,
 };
 
 // ---------- Device modes ----------

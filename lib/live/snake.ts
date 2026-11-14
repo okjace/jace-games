@@ -13,9 +13,9 @@
 
 export const ARENA = 1800;
 const SPACING = 6;
-const BASE_SPEED = 150;
-const BOOST_SPEED = 290;
-const TURN_RATE = 4.2;
+const BASE_SPEED = 215;
+const BOOST_SPEED = 410;
+const TURN_RATE = 5.2;
 const START_LEN = 14;
 const FOOD_TARGET = 260;
 const RESPAWN_MS = 2200;
@@ -64,6 +64,8 @@ export class Arena {
   snakes = new Map<string, Snake>();
   food: Food[] = [];
   events: string[] = [];
+  /** Bots fill the arena up to MIN_SNAKES (the host or a solo player can turn them off). */
+  botsOn = true;
   private nextColor = 0;
 
   constructor() {
@@ -121,7 +123,7 @@ export class Arena {
   private balanceBots() {
     const people = [...this.snakes.values()].filter((s) => !s.bot).length;
     const bots = [...this.snakes.values()].filter((s) => s.bot);
-    const want = Math.max(0, MIN_SNAKES - people);
+    const want = this.botsOn ? Math.max(0, MIN_SNAKES - people) : 0;
     for (let i = bots.length; i < want; i++) this.join(`bot-${i}-${Math.random().toString(36).slice(2, 6)}`, `🤖 ${BOT_NAMES[i % BOT_NAMES.length]}`, true);
     for (let i = want; i < bots.length; i++) this.snakes.delete(bots[i].id);
   }
@@ -256,6 +258,26 @@ export class Arena {
     for (const fd of this.food) f.push(Math.round(fd.x), Math.round(fd.y), fd.v, Math.max(0, FOOD_COLORS.indexOf(fd.c)));
     return { t: now, s, f, e: this.events };
   }
+}
+
+/**
+ * Smooths movement between two snapshots: every snake's body slides from
+ * where it was to where it is (`k` from 0 to 1), so 20 updates a second
+ * look like 60.
+ */
+export function blendSnapshots(a: Snapshot | null, b: Snapshot, k: number): Snapshot {
+  if (!a || k >= 1) return b;
+  const t = Math.max(0, k);
+  const before = new Map(a.s.map((x) => [x[0], x[6]]));
+  return {
+    ...b,
+    s: b.s.map((x) => {
+      const old = before.get(x[0]);
+      if (!old || old.length !== x[6].length || !x[3]) return x;
+      const body = x[6].map((v, i) => old[i] + (v - old[i]) * t);
+      return [x[0], x[1], x[2], x[3], x[4], x[5], body] as Snapshot["s"][number];
+    }),
+  };
 }
 
 export const foodColor = (i: number, fallback = "#fbbf24") => FOOD_COLORS[i] ?? fallback;

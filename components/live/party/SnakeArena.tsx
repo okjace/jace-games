@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Arena, drawArena, radiusOf, type Snapshot } from "@/lib/live/snake";
+import { Arena, blendSnapshots, drawArena, radiusOf, type Snapshot } from "@/lib/live/snake";
 import { openRoomChannel } from "@/lib/realtime/client";
 import { useJuice } from "../fx/Juice";
 import { sfx } from "../fx/sfx";
@@ -17,6 +17,9 @@ export function SnakeArena({ view, act, earn }: StageProps) {
   const juice = useJuice();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const snapRef = useRef<Snapshot | null>(null);
+  // The two latest snapshots from the host, and when they came, for smooth movement in between.
+  const prevRef = useRef<{ snap: Snapshot | null; at: number; gap: number }>({ snap: null, at: 0, gap: 50 });
+  const [bots, setBots] = useState(true);
   const local = useRef<Arena | null>(null);
   const input = useRef({ a: 0, b: false, sentA: NaN, sentB: false, sentAt: 0 });
   const [me, setMe] = useState<{ len: number; best: number; alive: boolean; rank: number; inArena: boolean }>({ len: 0, best: 0, alive: true, rank: 0, inArena: false });
@@ -46,6 +49,9 @@ export function SnakeArena({ view, act, earn }: StageProps) {
     } else {
       ch = openRoomChannel(view.topic, null);
       off = ch.on("snake-state", (p) => {
+        const now = performance.now();
+        const pr = prevRef.current;
+        prevRef.current = { snap: snapRef.current, at: now, gap: Math.min(200, Math.max(20, now - pr.at)) };
         snapRef.current = p as Snapshot;
       });
     }
@@ -74,7 +80,9 @@ export function SnakeArena({ view, act, earn }: StageProps) {
         inp.sentB = inp.b;
         inp.sentAt = now;
       }
-      const snap = snapRef.current;
+      // Online: slide between the last two snapshots. Solo: the arena is right here.
+      const pr = prevRef.current;
+      const snap = solo || !snapRef.current ? snapRef.current : blendSnapshots(pr.snap, snapRef.current, (now - pr.at) / pr.gap);
       const mine = snap?.s.find((s) => s[0] === myId);
       if (mine && mine[3] && mine[6].length >= 2) {
         // The camera glides after your head and pulls back as you grow.
@@ -177,6 +185,20 @@ export function SnakeArena({ view, act, earn }: StageProps) {
           ⚡ BOOST
         </button>
       </div>
+      {solo && (
+        <button
+          type="button"
+          onClick={() => {
+            const on = !bots;
+            setBots(on);
+            if (local.current) local.current.botsOn = on;
+          }}
+          aria-pressed={bots}
+          className="self-center rounded-full bg-black/30 px-4 py-1.5 text-sm font-bold"
+        >
+          🤖 bots: {bots ? "on" : "off"}
+        </button>
+      )}
       <p className="text-center text-xs font-semibold text-white/80">point or drag to steer · hold to boost (costs length) · bonk others into ur body!</p>
       <p className="text-center text-sm font-black">answer right = +10 length (more on a streak) 👇</p>
       {earn}

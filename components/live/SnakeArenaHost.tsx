@@ -16,6 +16,7 @@ export function SnakeArenaHost({ view, secondsLeft, onScores }: { view: HostView
   const arena = useRef<Arena | null>(null);
   const [board, setBoard] = useState<{ name: string; color: string; len: number; best: number; bot: boolean }[]>([]);
   const [events, setEvents] = useState<string[]>([]);
+  const [bots, setBots] = useState(true);
   const scoresRef = useRef(onScores);
   useEffect(() => {
     scoresRef.current = onScores;
@@ -65,7 +66,7 @@ export function SnakeArenaHost({ view, secondsLeft, onScores }: { view: HostView
         a.step(dt, Date.now());
       }
       latest = a.snapshot(Date.now());
-      if (now - lastSent > 90) {
+      if (now - lastSent > 50) {
         lastSent = now;
         ch.send("snake-state", latest);
       }
@@ -85,7 +86,7 @@ export function SnakeArenaHost({ view, secondsLeft, onScores }: { view: HostView
         for (const s of a.snakes.values()) if (!s.bot) scores[s.id] = s.best;
         scoresRef.current(scores);
       }
-    }, 33);
+    }, 16);
     let raf = 0;
     const frame = (now: number) => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -137,6 +138,18 @@ export function SnakeArenaHost({ view, secondsLeft, onScores }: { view: HostView
             </li>
           ))}
         </ol>
+        <button
+          type="button"
+          onClick={() => {
+            const on = !bots;
+            setBots(on);
+            if (arena.current) arena.current.botsOn = on;
+          }}
+          aria-pressed={bots}
+          className="mt-2 rounded-full border border-line px-3 py-1.5 text-sm font-semibold hover:bg-accent/10"
+        >
+          🤖 bots: {bots ? "on" : "off"}
+        </button>
         <p className="mt-auto text-xs text-muted">join at {typeof window !== "undefined" ? window.location.host : ""}/join w/ code {view.code}. right ansers = longer snake!!</p>
       </div>
     </div>
