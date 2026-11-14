@@ -34,9 +34,9 @@ type Props = {
   onScore?: (score: number) => void;
   onGameOver?: (winners: number[] | null) => void;
   onLog?: (entry: LogEntry) => void;
-  /** Jace Games Live: the player's coins (earned from answers). Turns on jace.live in the game. */
+  /** Jace Live: the player's coins (earned from answers). Turns on jace.live in the game. */
   liveCoins?: number | null;
-  /** Jace Games Live: the game asked to go answer questions (jace.live.earn()). */
+  /** Jace Live: the game asked to go answer questions (jace.live.earn()). */
   onEarn?: () => void;
   /** Bump to restart the game. */
   runKey?: number | string;

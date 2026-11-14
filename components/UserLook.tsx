@@ -6,7 +6,7 @@ import { LiveAvatar, LiveName } from "@/components/live/LiveAvatar";
 import type { Avatar } from "@/lib/live/locker";
 
 /**
- * People's Locker looks, shown around Jace Games (header, profile,
+ * People's Locker looks, shown around Jace Live (header, profile,
  * leaderboards, multiplayer). Looks are fetched in batches and cached for
  * the page, so a leaderboard of 50 people is one request. Anyone without a
  * Locker shows the plain avatar.

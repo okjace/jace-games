@@ -91,7 +91,7 @@ export function Locker() {
       }) }).catch(() => null);
     const body = await res?.json().catch(() => null);
     if (res?.ok && user) refreshLook(user.id);
-    setStatus(res?.ok ? "Saved. This is how you show up across Jace Games now." : (body?.error ?? "Couldn't save."));
+    setStatus(res?.ok ? "Saved. This is how you show up across Jace Live now." : (body?.error ?? "Couldn't save."));
   };
 
   const tile = (selected: boolean, locked: boolean) =>
@@ -105,8 +105,8 @@ export function Locker() {
         <Link href="/live" className="text-sm text-muted hover:text-foreground">
           ← Live
         </Link>
-        <h1 className="text-3xl font-bold tracking-tight">Locker</h1>
-        <p className="text-muted">Choose how you show up across Jace Games: your profile, leaderboards, multiplayer and Live.</p>
+        <h1 className="font-display text-3xl font-extrabold tracking-tight">🎽 ur locker</h1>
+        <p className="text-muted">pick how u show up evrywhere on Jace Live. look fresh 😎</p>
       </div>
 
       <section className={`${card} flex flex-wrap items-center gap-5`}>
@@ -264,7 +264,7 @@ export function Locker() {
 
       <section className={card}>
         <h2 className="mb-1 text-sm font-semibold">Title</h2>
-        <p className="mb-3 text-xs text-muted">Shown under your name in games.{!user && " Sign in to unlock titles."}</p>
+        <p className="mb-3 text-xs text-muted">shows up under ur name in games.{!user && " Sign in to unlock titles."}</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
           {TITLES.map((t) => {
             const locked = !user || t.level > level;

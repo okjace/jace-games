@@ -58,7 +58,7 @@ export function Lobby({
   };
   const share = async () => {
     try {
-      await navigator.share({ title: `Play ${data.room.gameName} with me`, text: `Join my ${data.room.gameName} game on Jace Games`, url });
+      await navigator.share({ title: `Play ${data.room.gameName} with me`, text: `Join my ${data.room.gameName} game on Jace Live`, url });
     } catch {}
   };
 

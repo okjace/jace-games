@@ -1,10 +1,10 @@
 import "server-only";
 
 /**
- * Server-side client for Jace Social's Jace Games integration
+ * Server-side client for Jace Social's Jace Live integration
  * (jace_social/server, /api/v1/integrations/games). Every call sends the
  * player's Jace access token plus the shared app key, so the friends list
- * and invites only work through Jace Games' server, never the browser.
+ * and invites only work through Jace Live' server, never the browser.
  */
 
 export const JACE_SOCIAL_URL = (process.env.JACE_SOCIAL_URL || "https://jace-social.vercel.app").replace(/\/$/, "");

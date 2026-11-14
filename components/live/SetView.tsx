@@ -170,7 +170,7 @@ function ReportSet({ id }: { id: string }) {
 export function VerifiedBadge({ small = false }: { small?: boolean }) {
   return (
     <span
-      title="Verified: checked by the Jace Games team"
+      title="Verified: checked by the Jace Live team"
       className={`inline-flex shrink-0 items-center gap-1 rounded-full bg-sky-500/15 font-semibold text-sky-600 dark:text-sky-400 ${small ? "px-1.5 py-0.5 text-[10px]" : "px-2.5 py-0.5 text-xs"}`}
     >
       ✓ Verified

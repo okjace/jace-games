@@ -7,7 +7,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const session = await getSession();
   if (!session || !socialConfigured()) return NextResponse.json({ ok: false });
   const body = (await req.json().catch(() => null)) as { activity?: unknown } | null;
-  const activity = typeof body?.activity === "string" ? `${body.activity.slice(0, 50)} on Jace Games` : null;
+  const activity = typeof body?.activity === "string" ? `${body.activity.slice(0, 50)} on Jace Live` : null;
   try {
     await socialPresence(session.token, activity);
     return NextResponse.json({ ok: true });

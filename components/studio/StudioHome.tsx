@@ -49,8 +49,8 @@ export function StudioHome() {
     return (
       <div className={`${card} mx-auto max-w-md text-center`}>
         <p className="text-5xl">🛠️</p>
-        <h1 className="mt-2 text-xl font-bold">Game Studio</h1>
-        <p className="mt-1 text-sm text-muted">Make your own games with code or blocks, then share them with everyone. Sign in with Jace to start.</p>
+        <h1 className="mt-2 font-display text-2xl font-extrabold">🧩 game studio</h1>
+        <p className="mt-1 text-sm text-muted">make ur own live modes w code or blocks, then share em w evryone. sign in w Jace to start.</p>
         <a href={signInHref("/studio")} className={`${primary} mt-4`}>
           Sign in with Jace
         </a>
@@ -87,8 +87,8 @@ export function StudioHome() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Game Studio</h1>
-          <p className="mt-1 text-muted">Make a game with code or blocks, publish it, and play it with friends.</p>
+          <h1 className="font-display text-3xl font-extrabold tracking-tight">🧩 game studio</h1>
+          <p className="mt-1 text-muted">make a live mode w code or blocks, publish it, n host it for ur frens.</p>
         </div>
         <div className="flex gap-2">
           <Link href="/community" className={secondary}>
@@ -109,7 +109,7 @@ export function StudioHome() {
       {picking && (
         <section className={`${card} flex flex-col gap-4`} aria-label="New game">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="font-semibold">Start from</h2>
+            <h2 className="font-semibold">start from</h2>
             <div className="flex rounded-full border border-line p-1 text-sm" role="radiogroup" aria-label="Editor">
               {(["code", "blocks"] as const).map((k) => (
                 <button
@@ -153,7 +153,7 @@ export function StudioHome() {
       )}
 
       <section aria-label="Your games">
-        <h2 className="mb-3 text-lg font-semibold">Your games</h2>
+        <h2 className="mb-3 text-lg font-semibold">ur games</h2>
         {!games ? (
           <div className="h-32 animate-pulse rounded-2xl bg-foreground/[.04]" aria-busy="true" />
         ) : games.length === 0 ? (

@@ -1,24 +1,24 @@
 @import "tailwindcss";
 
 /*
- * Colors match Jace and Jace Social: cool greys with a green accent. Dark is
- * the default; <html data-theme="light"> switches to the matching light set
- * (see ThemeToggle and the inline script in app/layout.tsx).
+ * Jace Live is light only, with soft colours. The site theme (data-season on
+ * <html>, set in app/layout.tsx) changes the accent and background tints.
+ * The "dark" variant is never on (the page is always data-theme="light").
  */
 @custom-variant dark (&:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *));
 
 :root {
-  --background: #111317;
-  --foreground: #e6e8eb;
-  --panel: #1c1f26;
-  --line: #2a2f38;
-  --muted: #8b919c;
-  --accent: #3ddc84;
-  --accent-hover: #5ae69a;
-  --on-accent: #0c1410;
-  --danger: #f87171;
-  --warn: #fbbf24;
-  color-scheme: dark;
+  --background: #f4f5f7;
+  --foreground: #1b1d23;
+  --panel: #ffffff;
+  --line: #dfe2e7;
+  --muted: #5d6470;
+  --accent: #1f9d5a;
+  --accent-hover: #188049;
+  --on-accent: #ffffff;
+  --danger: #dc2626;
+  --warn: #b45309;
+  color-scheme: light;
 }
 
 :root[data-theme="light"] {
@@ -48,6 +48,7 @@
   --color-warn: var(--warn);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display-face), var(--font-geist-sans);
 }
 
 body {
@@ -151,4 +152,89 @@ body {
 @media (prefers-reduced-motion: reduce) {
   [class*="animate-[jg-"] { animation: none !important; }
   [class*="jg-fx-"], [class*="jg-fx-"] > *, [class*="jg-fx-"]::after, .jg-rain { animation: none !important; }
+}
+
+/*
+ * Site themes (lib/seasons.ts): <html data-season="…"> swaps the colours
+ * (light only, soft backgrounds so nothing glares), and the page gets a
+ * gentle glow in the theme's two colours. "plain" keeps it quiet.
+ */
+:root { --accent2: var(--accent); }
+body {
+  background-image:
+    radial-gradient(62rem 40rem at 6% -14%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    radial-gradient(56rem 42rem at 106% 112%, color-mix(in srgb, var(--accent2) 14%, transparent), transparent 70%),
+    radial-gradient(40rem 30rem at 70% 30%, color-mix(in srgb, var(--accent2) 6%, transparent), transparent 70%);
+  background-attachment: fixed;
+}
+:root[data-season="plain"] body { background-image: none; }
+:root[data-season="plain"] { --accent: #1f9d5a; --accent-hover: color-mix(in srgb, #1f9d5a 86%, black); --on-accent: #ffffff; --accent2: #1f9d5a; --background: #f4f5f7; --panel: #ffffff; --line: #dfe2e7; }
+:root[data-season="fall"] { --accent: #d9580d; --accent-hover: color-mix(in srgb, #d9580d 86%, black); --on-accent: #ffffff; --accent2: #c0262d; --background: #fbefe2; --panel: #fffaf3; --line: #efd6b8; }
+:root[data-season="halloween"] { --accent: #e8590c; --accent-hover: color-mix(in srgb, #e8590c 86%, black); --on-accent: #ffffff; --accent2: #8b3fd1; --background: #f7efe6; --panel: #fffaf4; --line: #e9d6c2; }
+:root[data-season="thanksgiving"] { --accent: #c26a09; --accent-hover: color-mix(in srgb, #c26a09 86%, black); --on-accent: #ffffff; --accent2: #9a3412; --background: #faf0e1; --panel: #fffaf1; --line: #ecd5b3; }
+:root[data-season="christmas"] { --accent: #d42d2d; --accent-hover: color-mix(in srgb, #d42d2d 86%, black); --on-accent: #ffffff; --accent2: #178a46; --background: #eef7f1; --panel: #fcfffd; --line: #cfe5d7; }
+:root[data-season="winter"] { --accent: #1d8fd0; --accent-hover: color-mix(in srgb, #1d8fd0 86%, black); --on-accent: #ffffff; --accent2: #6d6fd8; --background: #edf4fb; --panel: #fbfdff; --line: #d0e0ef; }
+:root[data-season="newyear"] { --accent: #b8860b; --accent-hover: color-mix(in srgb, #b8860b 86%, black); --on-accent: #ffffff; --accent2: #8b45d6; --background: #f6f3ea; --panel: #fffdf7; --line: #e4dcc6; }
+:root[data-season="lunar"] { --accent: #c8262a; --accent-hover: color-mix(in srgb, #c8262a 86%, black); --on-accent: #ffffff; --accent2: #c48a0e; --background: #fbefea; --panel: #fffaf7; --line: #efd0c6; }
+:root[data-season="valentines"] { --accent: #d63384; --accent-hover: color-mix(in srgb, #d63384 86%, black); --on-accent: #ffffff; --accent2: #e0485e; --background: #fdeef4; --panel: #fffafc; --line: #f3cfe0; }
+:root[data-season="stpatricks"] { --accent: #178a46; --accent-hover: color-mix(in srgb, #178a46 86%, black); --on-accent: #ffffff; --accent2: #b8920b; --background: #edf7ef; --panel: #fbfffc; --line: #cbe4d2; }
+:root[data-season="spring"] { --accent: #d6408a; --accent-hover: color-mix(in srgb, #d6408a 86%, black); --on-accent: #ffffff; --accent2: #2f9e5c; --background: #fbf0f6; --panel: #fffbfd; --line: #efd5e3; }
+:root[data-season="easter"] { --accent: #8a4fd6; --accent-hover: color-mix(in srgb, #8a4fd6 86%, black); --on-accent: #ffffff; --accent2: #d4a017; --background: #f6f0fd; --panel: #fdfbff; --line: #e2d6f2; }
+:root[data-season="earth"] { --accent: #178a46; --accent-hover: color-mix(in srgb, #178a46 86%, black); --on-accent: #ffffff; --accent2: #1d7fc4; --background: #edf6f0; --panel: #fbfffc; --line: #cde3d4; }
+:root[data-season="summer"] { --accent: #d97706; --accent-hover: color-mix(in srgb, #d97706 86%, black); --on-accent: #ffffff; --accent2: #0e9fb8; --background: #fdf6e3; --panel: #fffdf6; --line: #f0e1b8; }
+:root[data-season="july4"] { --accent: #2459d6; --accent-hover: color-mix(in srgb, #2459d6 86%, black); --on-accent: #ffffff; --accent2: #d42d2d; --background: #eef2fb; --panel: #fbfcff; --line: #d2dcf2; }
+:root[data-season="school"] { --accent: #b8860b; --accent-hover: color-mix(in srgb, #b8860b 86%, black); --on-accent: #ffffff; --accent2: #d6453d; --background: #f8f5ea; --panel: #fffef8; --line: #e6dfc8; }
+:root[data-season="space"] { --accent: #6d4fd6; --accent-hover: color-mix(in srgb, #6d4fd6 86%, black); --on-accent: #ffffff; --accent2: #1d8fd0; --background: #f1effc; --panel: #fcfbff; --line: #dad3f4; }
+:root[data-season="ocean"] { --accent: #0b8fa8; --accent-hover: color-mix(in srgb, #0b8fa8 86%, black); --on-accent: #ffffff; --accent2: #2563eb; --background: #eaf7f9; --panel: #fafeff; --line: #c6e6ec; }
+:root[data-season="candy"] { --accent: #d63384; --accent-hover: color-mix(in srgb, #d63384 86%, black); --on-accent: #ffffff; --accent2: #8a4fd6; --background: #fdeef7; --panel: #fffafd; --line: #f2cfe4; }
+:root[data-season="neon"] { --accent: #b62fd1; --accent-hover: color-mix(in srgb, #b62fd1 86%, black); --on-accent: #ffffff; --accent2: #0e9fb8; --background: #f8effc; --panel: #fefaff; --line: #ead2f3; }
+:root[data-season="retro"] { --accent: #4d7c0f; --accent-hover: color-mix(in srgb, #4d7c0f 86%, black); --on-accent: #ffffff; --accent2: #d6304f; --background: #f3f5ea; --panel: #fdfef8; --line: #dde3c9; }
+
+/* The garland under the menu bar sways a little. */
+@keyframes jl-sway { 0%, 100% { transform: translateX(-6px) rotate(-0.4deg); } 50% { transform: translateX(6px) rotate(0.4deg); } }
+.jl-garland { animation: jl-sway 6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .jl-garland { animation: none; } }
+
+/* Scrolling rows (the menu bar on phones) without a scrollbar. */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ---------- Theme animations (components/site/SeasonFx.tsx) ---------- */
+
+/* A colour wash that slowly drifts and breathes. */
+.jl-wash {
+  background:
+    radial-gradient(40% 35% at 20% 25%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+    radial-gradient(35% 30% at 80% 20%, color-mix(in srgb, var(--accent2) 20%, transparent), transparent 70%),
+    radial-gradient(45% 40% at 60% 80%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%);
+  animation: jl-wash 22s ease-in-out infinite alternate;
+}
+@keyframes jl-wash { 0% { transform: translate(0, 0) rotate(0deg) scale(1); } 50% { transform: translate(4%, -3%) rotate(8deg) scale(1.08); } 100% { transform: translate(-4%, 3%) rotate(-6deg) scale(1.02); } }
+/* The emoji pattern drifts diagonally forever. */
+.jl-pattern { background-size: 180px 150px; animation: jl-pattern 60s linear infinite; }
+@keyframes jl-pattern { from { transform: translate(0, 0); } to { transform: translate(180px, 150px); } }
+/* Things on the hills sway. */
+.jl-prop { animation: jl-prop 2.6s ease-in-out infinite; transform-origin: 50% 100%; }
+@keyframes jl-prop { 0%, 100% { rotate: -6deg; } 50% { rotate: 6deg; } }
+.jl-hill-back { animation: jl-hill 14s ease-in-out infinite alternate; }
+.jl-hill-mid { animation: jl-hill 10s ease-in-out infinite alternate-reverse; }
+@keyframes jl-hill { from { transform: translateX(-20px); } to { transform: translateX(20px); } }
+/* Flybys. */
+.jl-fly-right { left: -140px; animation: jl-fly-right 9s linear forwards; }
+.jl-fly-left { right: -140px; animation: jl-fly-left 9s linear forwards; }
+@keyframes jl-fly-right { to { transform: translateX(calc(100vw + 280px)); } }
+@keyframes jl-fly-left { to { transform: translateX(calc(-100vw - 280px)); } }
+.jl-hop { animation: jl-hop 0.45s ease-in-out infinite alternate; }
+@keyframes jl-hop { from { translate: 0 0; } to { translate: 0 -18px; } }
+.jl-bob { animation: jl-bob 1.4s ease-in-out infinite; }
+@keyframes jl-bob { 0%, 100% { translate: 0 0; rotate: -4deg; } 50% { translate: 0 -24px; rotate: 6deg; } }
+/* Headline shimmer. */
+.jl-shimmer { background-size: 200% auto; animation: jl-shimmer 5s linear infinite; }
+@keyframes jl-shimmer { to { background-position: 200% center; } }
+/* Everything bouncy. */
+.jl-pop-in { animation: jl-pop-in 0.5s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes jl-pop-in { from { transform: scale(0.85) translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .jl-wash, .jl-pattern, .jl-prop, .jl-hill-back, .jl-hill-mid, .jl-hop, .jl-bob, .jl-shimmer, .jl-pop-in { animation: none; }
 }

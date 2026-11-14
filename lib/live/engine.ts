@@ -49,7 +49,7 @@ const SHOP_MODES: LiveMode[] = ["gold", "hack"];
 import { DEVICE_MODES, MODES, cleanName, forPlayers, isCorrect, isPlayable, type LiveMode, type PlayerQuestion, type Question } from "./types";
 
 /**
- * Jace Games Live, on the server. The host runs the game from a Jace
+ * Jace Live, on the server. The host runs the game from a Jace
  * account; players join with the 6-digit code and a nickname and get a
  * secret token (kept in their browser) that identifies them afterwards.
  * Every answer is checked here, so correct answers never reach players

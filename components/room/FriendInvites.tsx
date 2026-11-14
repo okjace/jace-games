@@ -24,7 +24,7 @@ const STATUS_DOT: Record<Friend["status"], string> = {
 /**
  * Invite Jace Social friends to this room: the friend gets a DM in Jace
  * Social with the room link. Friends without a Jace account can't sign in
- * to Jace Games, so they're shown but can't be invited.
+ * to Jace Live, so they're shown but can't be invited.
  */
 export function FriendInvites({ code, inRoom }: { code: string; gameName: string; inRoom: string[] }) {
   const [state, setState] = useState<{ kind: "loading" } | { kind: "off" } | { kind: "unlinked" } | { kind: "ready"; friends: Friend[] }>({ kind: "loading" });

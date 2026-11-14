@@ -26,7 +26,7 @@ export type SandboxInit = {
   player: { name: string };
   seed: number;
   room: { mode: "race" | "live"; isHost: boolean; mySeat: number; players: SandboxPlayer[] } | null;
-  /** Set when the game runs as a Jace Games Live mode. Coins arrive by message after it loads. */
+  /** Set when the game runs as a Jace Live mode. Coins arrive by message after it loads. */
   live?: { coins: number } | null;
 };
 

@@ -15,8 +15,8 @@ export function SiteFooter() {
         <div className="flex items-center gap-3">
           <Logo size={24} />
           <div>
-            <p className="text-sm font-semibold">Jace Games</p>
-            <p className="text-xs text-muted">From Jace, a company that makes stuff.</p>
+            <p className="text-sm font-semibold">Jace Live</p>
+            <p className="text-xs text-muted">live games for the hole room, from Jace ✌️</p>
           </div>
         </div>
         <nav className="-mx-3 flex flex-wrap items-center gap-1 text-sm sm:mx-0">

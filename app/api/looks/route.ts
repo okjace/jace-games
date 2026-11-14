@@ -5,7 +5,7 @@ import { allow } from "@/lib/rateLimit";
 
 /**
  * GET ?ids=a,b,c → { looks: { [userId]: Avatar } }: how people show up
- * around Jace Games (from their Locker), already checked against what each
+ * around Jace Live (from their Locker), already checked against what each
  * has unlocked. People without a locker aren't listed. A look using a Jace
  * picture comes back as icon "jace" without the picture; the page already
  * has it from Jace.

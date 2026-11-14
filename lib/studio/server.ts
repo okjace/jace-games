@@ -69,6 +69,8 @@ export async function viewGame(id: string, session: Session | null): Promise<Gam
   const isOwner = !!row && row.owner_id === userId;
   const siteOwner = isSiteOwner(userId);
   if (!row || (!isOwner && !siteOwner && (!row.published || row.removed))) throw new StudioError("That game doesn't exist.", 404);
+  // Only Live-ready games are shown to everyone else (their maker can still open it and save it, which makes it one).
+  if (!isOwner && !siteOwner && !row.live_mode) throw new StudioError("That game doesn't exist.", 404);
   const { html: _h, blocks_json: _b, published_html: _p, ...meta } = row;
   void _h;
   void _b;
@@ -151,8 +153,9 @@ export async function myGames(session: Session): Promise<GameSummary[]> {
   return studioStore().gamesByOwner(session.user.id);
 }
 
+/** Published games that can be hosted in Live (Jace Live only shows those). */
 export async function publishedGames(): Promise<GameSummary[]> {
-  return studioStore().published(200);
+  return (await studioStore().published(200)).filter((g) => g.live_mode);
 }
 
 export async function createGame(session: Session, input: GameInput): Promise<CommunityGameRow> {
@@ -176,7 +179,8 @@ export async function createGame(session: Session, input: GameInput): Promise<Co
     kind,
     ...code,
     multiplayer: cleanMultiplayer(input.multiplayer),
-    live_mode: input.live_mode === true,
+    // Jace Live is only Live: every Studio game can be hosted as a Live mode.
+    live_mode: true,
   });
   await store.addVersion(row.id, row.html, row.blocks_json);
   return row;
@@ -191,7 +195,8 @@ export async function saveGame(session: Session, id: string, input: GameInput): 
   if (input.description !== undefined) patch.description = cleanDescription(input.description);
   if (input.icon !== undefined) patch.icon = cleanIcon(input.icon);
   if (input.multiplayer !== undefined) patch.multiplayer = cleanMultiplayer(input.multiplayer);
-  if (input.live_mode !== undefined) patch.live_mode = input.live_mode === true;
+  // Every Studio game is a Live mode now (saving turns it on for older games too).
+  patch.live_mode = true;
   if (input.kind === "code" && row.kind === "blocks") patch.kind = "code"; // "Convert to code" is one-way
   const kind = patch.kind ?? row.kind;
   let codeChanged = false;

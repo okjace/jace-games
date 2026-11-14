@@ -1,5 +1,5 @@
 /**
- * The site owner: the Jace account that runs Jace Games. It can take Studio
+ * The site owner: the Jace account that runs Jace Live. It can take Studio
  * games down and give anyone Live XP. Set by SITE_OWNER_JACE_ID, and always
  * includes okjace's account (Jace account ids aren't secret).
  */

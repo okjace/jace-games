@@ -3,7 +3,7 @@ import { RoomView } from "@/components/room/RoomView";
 
 export async function generateMetadata({ params }: PageProps<"/r/[code]">): Promise<Metadata> {
   const { code } = await params;
-  return { title: `Room ${code.toUpperCase()}`, description: "Join this game on Jace Games." };
+  return { title: `Room ${code.toUpperCase()}`, description: "Join this game on Jace Live." };
 }
 
 export default async function RoomPage({ params }: PageProps<"/r/[code]">) {

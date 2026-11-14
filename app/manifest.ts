@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Jace Games",
-    short_name: "Jace Games",
-    description: "Quick browser games from Jace.",
+    name: "Jace Live",
+    short_name: "Jace Live",
+    description: "Live quiz and party games for the whole room.",
     start_url: "/",
     display: "standalone",
     background_color: "#111317",

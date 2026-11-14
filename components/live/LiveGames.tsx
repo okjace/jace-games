@@ -7,8 +7,11 @@ import { card, primary, secondary } from "./ui";
 
 type OpenGame = { code: string; mode: LiveMode; setTitle: string | null; hostName: string; status: string; players: number };
 
-/** /live/games: Live games their hosts listed publicly. Join one right now. Refreshes every 10 seconds. */
-export function LiveGames() {
+/**
+ * Live games their hosts listed publicly: join one right now. Refreshes every
+ * 10 seconds. `embedded` drops the page heading (for the Join and home pages).
+ */
+export function LiveGames({ embedded = false, limit }: { embedded?: boolean; limit?: number }) {
   const [games, setGames] = useState<OpenGame[] | null>(null);
   useEffect(() => {
     const load = () =>
@@ -22,22 +25,21 @@ export function LiveGames() {
   }, []);
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-5">
-      <div>
-        <Link href="/live" className="text-sm text-muted hover:text-foreground">
-          ← Live
-        </Link>
-        <h1 className="text-3xl font-bold tracking-tight">🌍 Join a live game</h1>
-        <p className="text-muted">Games people are hosting right now that anyone can join. This list updates by itself.</p>
-      </div>
+    <div className={embedded ? "flex flex-col gap-5" : "mx-auto flex max-w-4xl flex-col gap-5"}>
+      {!embedded && (
+        <div>
+          <h1 className="font-display text-3xl font-extrabold tracking-tight">🌍 join a live game</h1>
+          <p className="text-muted">games ppl r hosting rn that anyone can join. this list updates by itself (magic).</p>
+        </div>
+      )}
       {games === null ? (
         <p className="animate-pulse text-muted">Looking for games…</p>
       ) : games.length === 0 ? (
         <div className={`${card} flex flex-col items-center gap-3 py-10 text-center`}>
           <p className="text-5xl">🛋️</p>
-          <p className="text-lg font-semibold">No public games right now</p>
+          <p className="text-lg font-semibold">no public games rn 🛋️</p>
           <p className="max-w-md text-sm text-muted">
-            When someone hosts a game and turns on <b>🌍 List on Discover</b>, it shows up here. Check back soon, or start one yourself!
+            When someone hosts a game and turns on <b>🌍 List on Discover</b>, it shows up here. check back soon, or start one urself!
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             <Link href="/live/host/new" className={primary}>
@@ -50,7 +52,7 @@ export function LiveGames() {
         </div>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2">
-          {games.map((g) => (
+          {(limit ? games.slice(0, limit) : games).map((g) => (
             <li key={g.code} className={`${card} flex items-center gap-3`}>
               <span className="text-4xl">{MODES[g.mode]?.icon ?? "🎮"}</span>
               <span className="min-w-0 flex-1">

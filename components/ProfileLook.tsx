@@ -8,7 +8,7 @@ import type { SessionUser } from "@/lib/types";
 
 type Mine = { level: number; xp: number; into: number; need: number; avatar: Avatar; picture: string | null; badges: string[] };
 
-/** On the profile page: your Locker look (it's how you show up across Jace Games), your level and badges. */
+/** On the profile page: your Locker look (it's how you show up across Jace Live), your level and badges. */
 export function ProfileLook({ user }: { user: SessionUser }) {
   const [mine, setMine] = useState<Mine | null>(null);
   useEffect(() => {
@@ -43,7 +43,7 @@ export function ProfileLook({ user }: { user: SessionUser }) {
         ) : (
           <p className="text-sm text-muted">Loading…</p>
         )}
-        <p className="text-xs text-muted">This is how you show up everywhere on Jace Games: leaderboards, multiplayer and Live.</p>
+        <p className="text-xs text-muted">This is how you show up everywhere on Jace Live: leaderboards, multiplayer and Live.</p>
       </div>
       <Link href="/locker" className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-accent px-5 text-sm font-medium text-on-accent hover:bg-accent-hover">
         🎽 Edit your look

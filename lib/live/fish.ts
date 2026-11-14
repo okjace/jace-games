@@ -2,7 +2,7 @@
  * Every creature (and thing) in Lake Frenzy. Shared by the server, which
  * rolls catches from it, and the Fishdex on players' phones, which lists it.
  * `weight` is out of the table's total, so odds = weight / TOTAL_WEIGHT.
- * All of these are original Jace Games creatures.
+ * All of these are original Jace Live creatures.
  */
 
 export type Rarity = "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary" | "Mythic" | "Secret";

@@ -4,7 +4,7 @@ import { FISH, SPECIALS, type FishDef, type Rarity } from "./fish";
 import type { LiveMode } from "./types";
 
 /**
- * The party modes of Jace Games Live (all original games):
+ * The party modes of Jace Live (all original games):
  *
  * - Tower Siege, Snack Shack and Gadget Factory run their mini-game on the
  *   player's device. A right answer (or a tap, with questions off) puts

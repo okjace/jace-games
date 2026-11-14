@@ -73,8 +73,8 @@ export function MapList() {
           <Link href="/live" className="text-sm text-muted hover:text-foreground">
             ← Live
           </Link>
-          <h1 className="text-2xl font-bold">Tower Siege maps</h1>
-          <p className="text-sm text-muted">Draw your own road, pick a look, and host Tower Siege on it.</p>
+          <h1 className="font-display text-3xl font-extrabold">🗺️ tower siege maps</h1>
+          <p className="text-sm text-muted">draw ur own road, pick a look, n host Tower Siege on it.</p>
         </div>
         {user ? (
           <button type="button" onClick={create} disabled={busy} className={primary}>
@@ -93,7 +93,7 @@ export function MapList() {
         <>
           {user && (
             <section>
-              <h2 className="mb-2 text-sm font-semibold">Your maps</h2>
+              <h2 className="mb-2 text-sm font-semibold">ur maps</h2>
               {lists.mine.length ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {lists.mine.map((m) => (
@@ -106,7 +106,7 @@ export function MapList() {
             </section>
           )}
           <section>
-            <h2 className="mb-2 text-sm font-semibold">Popular maps</h2>
+            <h2 className="mb-2 text-sm font-semibold">popular maps 🔥</h2>
             {lists.public.length ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {lists.public.map((m) => (

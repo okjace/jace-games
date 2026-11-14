@@ -13,7 +13,7 @@ export type ValidationResult =
  * Server-side sanity check for a score before it's sent to Jace. The browser
  * can't be trusted alone, so every score must be a whole number in the game's
  * range, from a game that lasted a plausible amount of time, and dated in the
- * past (but not before Jace Games existed).
+ * past (but not before Jace Live existed).
  */
 export function validateSubmission(raw: unknown, now = Date.now()): ValidationResult {
   if (!raw || typeof raw !== "object") return { ok: false, id: null, reason: "Not an object." };

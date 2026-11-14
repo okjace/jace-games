@@ -54,8 +54,8 @@ export function Discover() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Discover</h1>
-        <p className="mt-1 text-muted">Question sets made by people on Jace. Pick one and host it.</p>
+        <h1 className="font-display text-3xl font-extrabold tracking-tight">🔎 discover</h1>
+        <p className="mt-1 text-muted">question sets made by ppl on Jace. pick one n host it, its that ez.</p>
       </div>
       <Link href="/live/games" className={`${card} flex items-center gap-3 hover:border-accent/50`}>
         <span className="text-3xl">🌍</span>
@@ -71,7 +71,7 @@ export function Discover() {
           type="button"
           aria-pressed={verifiedOnly}
           onClick={() => reset(() => setVerifiedOnly((v) => !v))}
-          title="Only sets checked by the Jace Games team"
+          title="Only sets checked by the Jace Live team"
           className={`h-11 shrink-0 rounded-full border px-4 text-sm font-semibold ${verifiedOnly ? "border-sky-500 bg-sky-500/15 text-sky-600 dark:text-sky-400" : "border-line text-muted hover:text-foreground"}`}
         >
           ✓ Verified

@@ -24,7 +24,7 @@ export type CommunityGameRow = {
   published: boolean;
   removed: boolean;
   multiplayer: Multiplayer | null;
-  /** Hosts can pick this game as a Jace Games Live mode. */
+  /** Hosts can pick this game as a Jace Live mode. */
   live_mode: boolean;
   plays: number;
   created_at: string;

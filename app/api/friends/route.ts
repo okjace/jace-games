@@ -19,7 +19,7 @@ export async function GET(): Promise<NextResponse> {
         picture: f.picture,
         status: f.status,
         activity: f.activity,
-        // Only friends with a Jace account can sign in to Jace Games.
+        // Only friends with a Jace account can sign in to Jace Live.
         canJoin: !!f.jace_sub,
         jaceId: f.jace_sub,
       })),

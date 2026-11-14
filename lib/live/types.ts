@@ -1,5 +1,5 @@
 /**
- * Jace Games Live: question sets and the games hosted from them.
+ * Jace Live: question sets and the games hosted from them.
  *
  * A set holds questions. Players are never sent anything that gives the
  * answer away: `forPlayers()` strips correct answers (and for custom-HTML

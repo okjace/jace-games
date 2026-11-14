@@ -115,12 +115,12 @@ export function HostSetup() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5">
-      <h1 className="text-3xl font-bold tracking-tight">{soloFirst ? "Play solo" : "Host a game"}</h1>
-      {soloFirst && <p className="-mt-3 text-muted">Pick a set and a mode and play on your own, no host or room needed.</p>}
+      <h1 className="text-3xl font-bold tracking-tight">{soloFirst ? "play solo 🎮" : "host a game 📺"}</h1>
+      {soloFirst && <p className="-mt-3 text-muted">pick a set n a mode n play on ur own, no host or room needed.</p>}
       <RejoinBanner />
 
       <section className={card}>
-        <h2 className="text-sm font-semibold">1. Questions</h2>
+        <h2 className="text-sm font-semibold">1. questions</h2>
         <label className="mt-3 flex items-center gap-3 rounded-xl border border-line p-3">
           <input type="checkbox" checked={noSet} onChange={(e) => setNoSet(e.target.checked)} className="h-5 w-5" />
           <span>
@@ -177,7 +177,7 @@ export function HostSetup() {
       </section>
 
       <section className={card}>
-        <h2 className="text-sm font-semibold">2. Game mode</h2>
+        <h2 className="text-sm font-semibold">2. pick a gamemode</h2>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {(Object.keys(MODES) as LiveMode[]).map((m) => {
             const def = MODES[m];
@@ -211,7 +211,7 @@ export function HostSetup() {
               <p className="text-sm text-muted">Loading…</p>
             ) : studioGames.length === 0 ? (
               <p className="text-sm text-muted">
-                No Studio games are Live modes yet. In Game Studio, open a game&apos;s settings and tick &ldquo;Let hosts use this as a Jace Games
+                No Studio games are Live modes yet. In Game Studio, open a game&apos;s settings and tick &ldquo;Let hosts use this as a Jace Live
                 Live mode&rdquo;.
               </p>
             ) : (
@@ -245,7 +245,7 @@ export function HostSetup() {
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <MapCard
-                m={{ id: "", title: "Classic Meadow", owner_name: "Jace Games", visibility: "public", plays: 0, data: { cols: 12, rows: 8, theme: "meadow", pathLength: 23 } }}
+                m={{ id: "", title: "Classic Meadow", owner_name: "Jace Live", visibility: "public", plays: 0, data: { cols: 12, rows: 8, theme: "meadow", pathLength: 23 } }}
                 selected={!mapId}
                 onClick={() => setMapId(null)}
               />

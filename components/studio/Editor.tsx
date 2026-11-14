@@ -509,9 +509,9 @@ function Settings({
         )}
       </fieldset>
       <label className="flex items-start gap-2 text-sm sm:col-span-2">
-        <input type="checkbox" className="mt-1" checked={meta.live_mode} onChange={(e) => setMeta({ ...meta, live_mode: e.target.checked })} />
+        <span aria-hidden="true" className="mt-0.5">📺</span>
         <span>
-          <span className="font-medium">Let hosts use this as a Jace Games Live mode</span>
+          <span className="font-medium">Every Jace Live game is a Live mode</span>
           <span className="block text-muted">
             Players earn coins by answering questions. <code>jace.live.coins</code> is the total they&apos;ve earned (your game keeps track
             of what it spends), <code>jace.live.onCoins(fn)</code> tells you when it goes up, and <code>jace.live.earn()</code> sends them to

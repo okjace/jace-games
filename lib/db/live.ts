@@ -3,7 +3,7 @@ import { supabase, usingSupabase } from "./rooms";
 import type { LiveMode, LiveSet, Question, SetSummary } from "@/lib/live/types";
 
 /**
- * Storage for Jace Games Live (supabase/migrations/004_live.sql): Supabase
+ * Storage for Jace Live (supabase/migrations/004_live.sql): Supabase
  * with the secret key in production, an in-memory stand-in in development
  * without Supabase (never in production).
  */

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
 import { UserAvatar, UserName } from "@/components/UserLook";
 
-/** Most multiplayer wins for a game (from match results kept by Jace Games). */
+/** Most multiplayer wins for a game (from match results kept by Jace Live). */
 export function WinsBoard({ gameId, limit = 10 }: { gameId: string; limit?: number }) {
   const { user } = useScores();
   const [rows, setRows] = useState<{ user_id: string; username: string; wins: number; played: number }[] | null>(null);

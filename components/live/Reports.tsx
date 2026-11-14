@@ -31,8 +31,8 @@ export function ReportList() {
         <Link href="/live" className="text-sm text-muted hover:text-foreground">
           ← Live
         </Link>
-        <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-        <p className="text-muted">What everyone answered in the games you hosted, and your own solo games. Kept for 90 days.</p>
+        <h1 className="font-display text-3xl font-extrabold tracking-tight">📋 reports</h1>
+        <p className="text-muted">wat evryone answered in the games u hosted, plus ur solo games. kept for 90 days.</p>
       </div>
       {!user ? (
         <div className={`${card} text-center`}>

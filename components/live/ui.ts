@@ -1,12 +1,11 @@
 export const primary =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-full bg-accent px-6 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[var(--accent)] to-[color-mix(in_srgb,var(--accent)_70%,var(--accent2))] px-6 text-sm font-semibold text-on-accent shadow-[0_4px_14px_-4px_color-mix(in_srgb,var(--accent)_70%,transparent)] transition-[filter,transform] hover:-rotate-1 hover:scale-[1.04] hover:brightness-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50";
 export const secondary =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-full border border-line bg-panel px-5 text-sm font-medium transition-colors hover:bg-foreground/[.05] disabled:opacity-50";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-full border border-line bg-panel px-5 text-sm font-medium shadow-sm transition-[color,background-color,border-color,transform] hover:rotate-1 hover:scale-[1.04] hover:border-accent/40 hover:bg-accent/[.06] active:scale-95 disabled:opacity-50";
 export const input =
-  "h-11 w-full rounded-xl border border-line bg-background px-3 text-sm outline-none focus:border-accent";
-export const card = "rounded-2xl border border-line bg-panel p-5";
+  "h-11 w-full rounded-xl border border-line bg-background/60 px-3 text-sm outline-none transition-colors focus:border-accent focus:bg-panel";
+export const card = "rounded-3xl border border-line bg-panel p-5 shadow-[0_10px_30px_-18px_rgba(30,20,10,0.25)]";
 
-/** Kahoot-style answer colors, also used on the host screen. */
 export const ANSWER_COLORS = ["#e5484d", "#2f80ed", "#e2a500", "#26a269"];
 export const ANSWER_SHAPES = ["▲", "◆", "●", "■"];
 

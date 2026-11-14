@@ -15,7 +15,7 @@ export type Template = {
   icon: string;
   description: string;
   multiplayer: Multiplayer | null;
-  /** Starts with "Let hosts use this as a Jace Games Live mode" ticked. */
+  /** Starts with "Let hosts use this as a Jace Live mode" ticked. */
   liveMode?: boolean;
 };
 
@@ -562,7 +562,7 @@ const LIVE = `<style>
 </style>
 <canvas id="c" width="480" height="360"></canvas>
 <script>
-// Star Garden: a Jace Games Live mode.
+// Star Garden: a Jace Live mode.
 // Players earn coins by answering questions. jace.live.coins is the total
 // they've earned (it only goes up), so the game keeps track of what it spent.
 // Plant flowers with coins; flowers grow stars; stars are the score.

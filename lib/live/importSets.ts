@@ -5,7 +5,7 @@ import { LIMITS, type Question } from "./types";
  * - Blooket's CSV import template (Question Text, Answer 1–4, Time Limit, Correct Answer(s) as numbers)
  * - Kahoot's spreadsheet template saved as CSV (Question, Answer 1–4, Time limit, Correct answer(s) as numbers)
  * - Gimkit's CSV (Question, Correct Answer, Incorrect Answer 1–3)
- * - Jace Games' own CSV (Question, Answer 1–4, Correct, Time; or Question, Answer for typed answers)
+ * - Jace Live' own CSV (Question, Answer 1–4, Correct, Time; or Question, Answer for typed answers)
  * - Two columns (term, definition), like a flashcard export: multiple choice using the other definitions
  * The header row can be anywhere in the first few rows (templates often have a title above it).
  */
