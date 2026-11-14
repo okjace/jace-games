@@ -3,11 +3,18 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SEASONS, SEASON_IDS, type SeasonId, type ThemeChoice } from "@/lib/seasons";
+import { setMyTheme, useMyThemeChoice } from "./ThemeContext";
 
 type State = { choice: ThemeChoice; active: SeasonId; auto: SeasonId; canEdit: boolean };
 
-/** Site owner only (in profile settings): the theme everyone sees. Automatic follows the calendar. */
+/**
+ * In profile settings: ur own theme first (saved on this device). Admins also
+ * get a 🌍 everyone button that sets the site theme, which everyone sees if
+ * they left theirs on "the site's". Automatic follows the calendar.
+ */
 export function SiteThemePicker() {
+  const mine = useMyThemeChoice();
+  const [scope, setScope] = useState<"me" | "everyone">("me");
   const router = useRouter();
   const [state, setState] = useState<State | null>(null);
   const [saving, setSaving] = useState<ThemeChoice | null>(null);
@@ -18,7 +25,7 @@ export function SiteThemePicker() {
       .then((d) => d && setState(d))
       .catch(() => {});
   }, []);
-  if (!state?.canEdit) return null;
+  if (!state) return null;
 
   const pick = async (choice: ThemeChoice) => {
     setSaving(choice);
@@ -54,19 +61,68 @@ export function SiteThemePicker() {
     );
   };
 
+  const mineOption = (id: string, icon: string, name: string, note: string) => {
+    const on = mine === id;
+    return (
+      <li key={id}>
+        <button
+          type="button"
+          onClick={() => setMyTheme(id as SeasonId | "site")}
+          aria-pressed={on}
+          className={`flex h-full w-full flex-col items-start gap-0.5 rounded-2xl border p-3 text-left transition-colors ${on ? "border-accent bg-accent/10 ring-2 ring-accent/40" : "border-line bg-panel hover:border-accent/40"}`}
+        >
+          <span className="text-2xl" aria-hidden="true">
+            {icon}
+          </span>
+          <span className="font-semibold">{name}</span>
+          <span className="text-xs text-muted">{note}</span>
+        </button>
+      </li>
+    );
+  };
+
   return (
     <section className="rounded-3xl border border-line bg-panel p-5 shadow-[0_10px_30px_-18px_rgba(30,20,10,0.25)]">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-display text-xl font-bold">🎨 Site theme</h2>
-        <p className="text-xs text-muted">
-          Only you can change this. Everyone sees it. Now showing: <b>{SEASONS[state.active].icon} {SEASONS[state.active].name}</b>
-        </p>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-display text-xl font-bold">{scope === "everyone" ? "🌍 theme for evryone" : "🎨 ur theme"}</h2>
+        {state.canEdit && (
+          <div className="flex rounded-full border border-line p-1 text-sm font-bold" role="radiogroup" aria-label="Whose theme">
+            {(["me", "everyone"] as const).map((sc) => (
+              <button
+                key={sc}
+                type="button"
+                role="radio"
+                aria-checked={scope === sc}
+                onClick={() => setScope(sc)}
+                className={`rounded-full px-3 py-1 ${scope === sc ? "bg-accent text-on-accent" : "hover:bg-accent/10"}`}
+              >
+                {sc === "me" ? "👤 me" : "🌍 everyone"}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
+      {scope === "me" ? (
+        <>
+          <p className="mb-3 text-xs text-muted">just for u, on this device. pick &ldquo;the site&apos;s&rdquo; to follow whatever evryone else sees.</p>
+          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {mineOption("site", "📅", "the site's", `right now: ${SEASONS[state.active].name}`)}
+            {SEASON_IDS.map((id) => mineOption(id, SEASONS[id].icon, SEASONS[id].name, id === "plain" ? "no decorations, no extra colour" : SEASONS[id].when))}
+          </ul>
+        </>
+      ) : (
+        <>
+      <p className="mb-3 text-xs text-muted">
+        only admins can change this. evryone who left theirs on &ldquo;the site&apos;s&rdquo; sees it. now showing: <b>{SEASONS[state.active].icon} {SEASONS[state.active].name}</b>
+        {mine !== "site" && " (u have ur own theme on, so u wont see this one)"}
+      </p>
       {error && <p className="mb-2 text-sm text-danger">{error}</p>}
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {option("auto", "📅", "Automatic", `Follows the calendar (today: ${SEASONS[state.auto].name})`)}
         {SEASON_IDS.map((id) => option(id, SEASONS[id].icon, SEASONS[id].name, id === "plain" ? "No decorations, no extra colour" : SEASONS[id].when))}
       </ul>
+        </>
+      )}
     </section>
   );
 }
