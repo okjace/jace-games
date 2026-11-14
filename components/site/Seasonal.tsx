@@ -3,6 +3,7 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { SEASONS, type Motion, type SeasonId } from "@/lib/seasons";
 import { popSound } from "./SeasonFx";
+import { onPrefsLoaded, pushPrefs } from "./ThemeContext";
 
 /**
  * The site theme's decorations: things drifting across the whole page
@@ -26,12 +27,18 @@ function setOff(off: boolean) {
     localStorage.setItem(KEY, off ? "1" : "0");
   } catch {}
   subs.forEach((f) => f());
+  pushPrefs();
 }
 function useEffectsOff(): boolean {
   return useSyncExternalStore(
     (f) => {
       subs.add(f);
-      return () => void subs.delete(f);
+      // Settings from ur account can change it too.
+      const off = onPrefsLoaded(f);
+      return () => {
+        subs.delete(f);
+        off();
+      };
     },
     readOff,
     () => false,

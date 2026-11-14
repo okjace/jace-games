@@ -54,6 +54,45 @@ export function setMyTheme(choice: SeasonId | "site") {
     localStorage.setItem(MY_THEME_KEY, choice);
   } catch {}
   notify();
+  pushPrefs();
+}
+
+// ---------- Saved to ur account (when signed in) ----------
+
+const EFFECTS_KEY = "jace-live:effects-off";
+let prefsListeners: (() => void)[] = [];
+/** Other stores (the falling-stuff switch) re-read when account settings arrive. */
+export function onPrefsLoaded(fn: () => void) {
+  prefsListeners.push(fn);
+  return () => {
+    prefsListeners = prefsListeners.filter((f) => f !== fn);
+  };
+}
+
+/** Saves this device's theme settings to ur account (ignored when signed out). */
+export function pushPrefs() {
+  try {
+    const body = { theme: readTheme(), modes: readModes(), effectsOff: localStorage.getItem(EFFECTS_KEY) === "1" };
+    void fetch("/api/me/prefs", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {});
+  } catch {}
+}
+
+/** On page load: use the settings saved to ur account (or save this device's, the first time). */
+export async function loadPrefs() {
+  const res = await fetch("/api/me/prefs", { cache: "no-store" }).catch(() => null);
+  if (!res?.ok) return;
+  const { prefs } = (await res.json().catch(() => ({}))) as { prefs?: { theme?: string; modes?: string[]; effectsOff?: boolean } | null };
+  if (!prefs) return pushPrefs();
+  try {
+    if (typeof prefs.theme === "string") localStorage.setItem(MY_THEME_KEY, prefs.theme);
+    if (Array.isArray(prefs.modes)) {
+      localStorage.setItem(MY_MODES_KEY, JSON.stringify(prefs.modes));
+      for (const m of SPECIAL_MODES) document.documentElement.classList.toggle(`jl-mode-${m.id}`, prefs.modes.includes(m.id));
+    }
+    if (typeof prefs.effectsOff === "boolean") localStorage.setItem(EFFECTS_KEY, prefs.effectsOff ? "1" : "0");
+  } catch {}
+  notify();
+  prefsListeners.forEach((f) => f());
 }
 export function toggleMode(m: SpecialMode) {
   const cur = readModes();
@@ -63,6 +102,7 @@ export function toggleMode(m: SpecialMode) {
   } catch {}
   document.documentElement.classList.toggle(`jl-mode-${m}`, next.includes(m));
   notify();
+  pushPrefs();
 }
 
 const SiteSeason = createContext<SeasonId>("plain");

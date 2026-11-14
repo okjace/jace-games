@@ -6,7 +6,7 @@ import { EGGS } from "./MoreEggs";
 import { Music } from "./Music";
 import { SeasonBackdrop } from "./SeasonFx";
 import { Garland, SeasonalSky } from "./Seasonal";
-import { useModes, useSeason } from "./ThemeContext";
+import { loadPrefs, useModes, useSeason } from "./ThemeContext";
 
 /** Everything the viewer's theme draws: falling things, the background, corner trees and the music. */
 export function ThemeLayer() {
@@ -14,6 +14,11 @@ export function ThemeLayer() {
   const modes = useModes();
   const chaos = modes.includes("chaos");
   const chill = modes.includes("chill");
+
+  // Ur theme settings from ur account (when signed in), once per page load.
+  useEffect(() => {
+    void loadPrefs();
+  }, []);
 
   // Chaos mode: a random easter egg every so often.
   useEffect(() => {
