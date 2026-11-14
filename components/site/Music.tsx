@@ -204,14 +204,21 @@ export function Music({ season }: { season: SeasonId }) {
       else claim();
     };
     const focus = () => engine.current && claim();
+    // Leaving the tab (or window) pauses the music, so two tabs never play over each other.
+    const blur = () => {
+      const e = engine.current;
+      if (e) void e.ctx.suspend();
+    };
     window.addEventListener("pointerdown", start);
     window.addEventListener("keydown", start);
     window.addEventListener("focus", focus);
+    window.addEventListener("blur", blur);
     document.addEventListener("visibilitychange", onVis);
     return () => {
       window.removeEventListener("pointerdown", start);
       window.removeEventListener("keydown", start);
       window.removeEventListener("focus", focus);
+      window.removeEventListener("blur", blur);
       document.removeEventListener("visibilitychange", onVis);
       bc?.close();
     };
