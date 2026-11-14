@@ -3,7 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { publishedGames } from "@/lib/studio/server";
 
-export const metadata: Metadata = { title: "Community games", description: "live modes made by Jace players in the Studio. host one for ur room!!" };
+export const metadata: Metadata = { title: "community gaems 💬", description: "live modes made by Jace players in the Studio. host one for ur room!!" };
 
 export default async function CommunityPage() {
   await connection();

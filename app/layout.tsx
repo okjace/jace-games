@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 const display = Bricolage_Grotesque({ variable: "--font-display-face", subsets: ["latin"], weight: ["600", "700", "800"] });
 
 export const metadata: Metadata = {
-  title: { default: "Jace Live", template: "%s · Jace Live" },
+  title: { default: "Jace Live 🎉 play together LIVE!!", template: "%s · Jace Live" },
   description: "Live quiz and party games for the whole room: host on the big screen, everyone plays from their phone.",
 };
 
