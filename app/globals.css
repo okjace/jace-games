@@ -284,3 +284,25 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .jl-barrel body, .jl-gravity main > *, .jl-dance main > *, .jl-dizzy main, .jl-walker, .jl-rainer { animation: none; }
 }
+.jl-disco body { animation: jl-disco 0.45s steps(1) infinite; }
+@keyframes jl-disco { 0% { box-shadow: inset 0 0 0 100vmax rgba(236,72,153,0.18); } 25% { box-shadow: inset 0 0 0 100vmax rgba(59,130,246,0.18); } 50% { box-shadow: inset 0 0 0 100vmax rgba(234,179,8,0.18); } 75% { box-shadow: inset 0 0 0 100vmax rgba(34,197,94,0.18); } }
+.jl-disco main > * { animation: jl-dance 0.45s ease-in-out infinite alternate; }
+.jl-matrix { position: fixed; inset: 0; z-index: 83; pointer-events: none; opacity: 0.85; }
+.jl-zoom main { animation: jl-zoom 2.3s ease-in-out; }
+@keyframes jl-zoom { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.6); } 70% { transform: scale(0.7); } }
+.jl-tiny main { transform: scale(0.35); transform-origin: top center; transition: transform 0.5s cubic-bezier(.2,1.6,.4,1); }
+.jl-lava body::after { content: ""; position: fixed; inset: auto 0 0 0; height: 22vh; z-index: 82; pointer-events: none; background: linear-gradient(to top, #dc2626, #f97316 50%, transparent); animation: jl-lava 0.6s ease-in-out infinite alternate; }
+@keyframes jl-lava { from { opacity: 0.75; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.jl-sleep body { filter: brightness(0.55) saturate(0.6); transition: filter 1s; }
+.jl-sleep .jl-jacey::after { content: "💤"; position: absolute; top: -20px; right: -10px; font-size: 22px; }
+.jl-abduct .jl-jacey { transform: translateY(-60vh) rotate(720deg) scale(0.4); transition: transform 2.2s ease-in; }
+.jl-spin-cards main li, .jl-spin-cards main section > div { animation: jl-spin-y 1.5s ease-in-out; }
+@keyframes jl-spin-y { to { transform: rotateY(360deg); } }
+.jl-backflip .jl-jacey { animation: jl-backflip 0.8s ease-in-out; }
+@keyframes jl-backflip { 0% { transform: none; } 50% { transform: translateY(-50px) rotate(-180deg); } 100% { transform: rotate(-360deg); } }
+.jl-walker-high { bottom: auto; top: 18vh; }
+.jl-riser { position: fixed; bottom: -60px; z-index: 84; pointer-events: none; animation: jl-rise-up 3s ease-out forwards; }
+@keyframes jl-rise-up { to { transform: translateY(-115vh) translateX(30px); opacity: 0.7; } }
+.jl-launcher { position: fixed; bottom: -60px; left: 50%; z-index: 84; font-size: 64px; pointer-events: none; animation: jl-launch 2.4s cubic-bezier(.6,0,.9,.6) forwards; }
+@keyframes jl-launch { to { transform: translateY(-120vh) rotate(-45deg); } }
+@media (prefers-reduced-motion: reduce) { .jl-disco body, .jl-disco main > *, .jl-zoom main, .jl-riser, .jl-launcher, .jl-backflip .jl-jacey { animation: none; } }

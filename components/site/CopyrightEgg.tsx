@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { sfx } from "@/components/live/fx/sfx";
 
 /** The © line in the footer. Click it enough times and find out. */
@@ -8,17 +8,25 @@ export function CopyrightEgg() {
   const [clicks, setClicks] = useState(0);
   const [shown, setShown] = useState<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const show = () => {
+    setClicks(0);
+    setShown(Date.now());
+    sfx.levelUp();
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setShown(null), 4200);
+  };
   const click = () => {
     const n = clicks + 1;
     setClicks(n);
-    if (n >= 7) {
-      setClicks(0);
-      setShown(Date.now());
-      sfx.levelUp();
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => setShown(null), 4200);
-    } else if (n >= 4) sfx.tap();
+    if (n >= 7) show();
+    else if (n >= 4) sfx.tap();
   };
+  // The admin egg menu can show it too.
+  useEffect(() => {
+    const onRun = (e: Event) => (e as CustomEvent<string>).detail === "profesenal" && show();
+    window.addEventListener("jl-run-egg", onRun);
+    return () => window.removeEventListener("jl-run-egg", onRun);
+  });
   return (
     <>
       <button type="button" onClick={click} className="select-none text-xs text-muted" style={clicks >= 4 ? { transform: `rotate(${(clicks - 3) * 4}deg) scale(${1 + (clicks - 3) * 0.06})` } : undefined}>

@@ -308,7 +308,7 @@ export function SoundToggle({ season }: { season: SeasonId }) {
             <button type="button" onClick={() => setAudio({ sfx: 0, music: 0 })} className="flex-1 rounded-full border border-line px-3 py-1.5 text-xs font-semibold hover:bg-accent/10">
               🔇 mute all
             </button>
-            <button type="button" onClick={() => setAudio({ sfx: 0.8, music: 0.35 })} className="flex-1 rounded-full border border-line px-3 py-1.5 text-xs font-semibold hover:bg-accent/10">
+            <button type="button" onClick={() => setAudio({ sfx: 0.8, music: 0.6 })} className="flex-1 rounded-full border border-line px-3 py-1.5 text-xs font-semibold hover:bg-accent/10">
               ↩️ reset
             </button>
           </div>

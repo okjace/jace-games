@@ -10,7 +10,7 @@ import { useSyncExternalStore } from "react";
 export type AudioSettings = { sfx: number; music: number };
 
 const KEY = "jace-live:audio";
-const DEFAULTS: AudioSettings = { sfx: 0.8, music: 0.35 };
+const DEFAULTS: AudioSettings = { sfx: 0.8, music: 0.6 };
 const subs = new Set<() => void>();
 let cache: AudioSettings | null = null;
 

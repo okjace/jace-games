@@ -61,7 +61,7 @@ export function Music({ season }: { season: SeasonId }) {
   // Follow the Music slider.
   useEffect(() => {
     const e = engine.current;
-    if (e) e.master.gain.setTargetAtTime(music * 0.5, e.ctx.currentTime, 0.2);
+    if (e) e.master.gain.setTargetAtTime(music * 1.4, e.ctx.currentTime, 0.2);
   }, [music]);
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export function Music({ season }: { season: SeasonId }) {
       }
       const master = ctx.createGain();
       master.gain.value = 0;
-      master.gain.setTargetAtTime(getAudio().music * 0.5, ctx.currentTime, 1.5);
+      master.gain.setTargetAtTime(getAudio().music * 1.4, ctx.currentTime, 1.5);
       // A touch of echo makes the synths feel less plasticky.
       const delay = ctx.createDelay();
       delay.delayTime.value = 0.28;
@@ -85,7 +85,11 @@ export function Music({ season }: { season: SeasonId }) {
       const wet = ctx.createGain();
       wet.gain.value = 0.25;
       delay.connect(wet).connect(master);
-      master.connect(ctx.destination);
+      // A limiter so it can be loud without crackling.
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -10;
+      limiter.ratio.value = 8;
+      master.connect(limiter).connect(ctx.destination);
       const e = { ctx, master, timer: null as ReturnType<typeof setInterval> | null, next: ctx.currentTime + 0.2, step: 0 };
       engine.current = e;
 
@@ -147,15 +151,15 @@ export function Music({ season }: { season: SeasonId }) {
           const third = root + (mood.minor ? (bar === 0 ? 3 : 4) : bar === 2 ? 3 : 4);
           if (beat === 0) {
             // Pad chord and bass at the top of each bar.
-            for (const n of [root, third, root + 7]) voice(hz(n - 12), t, eighth * 8, "triangle", 0.035);
-            voice(hz(root - 24), t, eighth * 3, "sine", 0.12);
+            for (const n of [root, third, root + 7]) voice(hz(n - 12), t, eighth * 8, "triangle", 0.05);
+            voice(hz(root - 24), t, eighth * 3, "sine", 0.16);
           }
           if (beat === 4) voice(hz(root - 24 + 7), t, eighth * 3, "sine", 0.08);
           // Melody: wanders the scale, mostly on chord notes.
           if (Math.random() < (g ? 0.7 : 0.45)) {
             melody = Math.max(0, Math.min(scale.length * 2 - 1, melody + Math.round((Math.random() - 0.5) * 4)));
             const deg = scale[melody % scale.length] + 12 * Math.floor(melody / scale.length);
-            voice(hz(mood.key + deg), t, eighth * (Math.random() < 0.3 ? 3 : 1.6), mood.bell ? "sine" : "triangle", mood.bell ? 0.07 : 0.05, true);
+            voice(hz(mood.key + deg), t, eighth * (Math.random() < 0.3 ? 3 : 1.6), mood.bell ? "sine" : "triangle", mood.bell ? 0.09 : 0.07, true);
           }
           if (g) {
             // Game pages: drums and a quick arpeggio.

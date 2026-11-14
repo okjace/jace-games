@@ -87,6 +87,32 @@ export function EasterEggs() {
     return () => clearTimeout(t);
   }, []);
 
+  const partyMode = () => {
+    document.documentElement.classList.add("jl-party");
+    setTimeout(() => document.documentElement.classList.remove("jl-party"), 9000);
+    shout("🪩 PARTY MODE 🪩", true);
+    party(["🪩", "🎉", "🌈", "🕺", "💃", "✨"]);
+    sfx.levelUp();
+    setTimeout(() => sfx.levelUp(), 350);
+  };
+  const jaceMode = () => {
+    document.documentElement.classList.add("jl-jace");
+    setTimeout(() => document.documentElement.classList.remove("jl-jace"), 4000);
+    shout("😎 JACE MODE ACTIVATED 😎", true);
+    party(["😎", "🔥", "💯"]);
+    sfx.cash();
+  };
+  // The admin egg menu can set these two off too.
+  useEffect(() => {
+    const onRun = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (id === "party mode") partyMode();
+      if (id === "jace mode") jaceMode();
+    };
+    window.addEventListener("jl-run-egg", onRun);
+    return () => window.removeEventListener("jl-run-egg", onRun);
+  });
+
   // Other eggs (MoreEggs.tsx) ask for a shout, a Jacey line or confetti with a "jl-egg" event.
   useEffect(() => {
     const onEgg = (e: Event) => {
@@ -122,22 +148,11 @@ export function EasterEggs() {
       if ((e.ctrlKey || e.metaKey) && k === "y" && pHeld) {
         e.preventDefault();
         pHeld = false;
-        document.documentElement.classList.add("jl-party");
-        setTimeout(() => document.documentElement.classList.remove("jl-party"), 9000);
-        shout("🪩 PARTY MODE 🪩", true);
-        party(["🪩", "🎉", "🌈", "🕺", "💃", "✨"]);
-        sfx.levelUp();
-        setTimeout(() => sfx.levelUp(), 350);
+        partyMode();
       }
       if (e.key.length === 1) {
         typed = (typed + e.key.toLowerCase()).slice(-4);
-        if (typed === "jace") {
-          document.documentElement.classList.add("jl-jace");
-          setTimeout(() => document.documentElement.classList.remove("jl-jace"), 4000);
-          shout("😎 JACE MODE ACTIVATED 😎", true);
-          party(["😎", "🔥", "💯"]);
-          sfx.cash();
-        }
+        if (typed === "jace") jaceMode();
       }
     };
     const keyUp = (e: KeyboardEvent) => {
@@ -153,6 +168,8 @@ export function EasterEggs() {
       window.removeEventListener("keyup", keyUp);
       window.removeEventListener("pointermove", resetIdle);
     };
+    // partyMode and jaceMode only use state setters and refs, so the first ones are fine.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Clicks on the logo, the LIVE badge and the garland.
