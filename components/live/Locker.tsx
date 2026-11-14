@@ -19,8 +19,10 @@ import {
   levelInfo,
   type Avatar,
   type CustomFrame,
+  type ItemKind,
   type LiveStats,
 } from "@/lib/live/locker";
+import { ask } from "@/components/site/ConfirmBox";
 import { refreshLook } from "@/components/UserLook";
 import { Celebration, LiveAvatar, LiveName, guestAvatar, setGuestAvatar } from "./LiveAvatar";
 import { card, input, primary } from "./ui";
@@ -71,6 +73,39 @@ export function Locker() {
   }, [user]);
 
   const level = data?.level ?? 1;
+  // Items unlocked by a free pick or given by the site owner, and free picks left to spend.
+  const granted = new Set(data?.granted ?? []);
+  const picks = data?.stats?.vouchers ?? 0;
+  const owns = (kind: ItemKind, id: string) => granted.has(`item:${kind}:${id}`);
+  const lockedItem = (kind: ItemKind, id: string, lvl: number) => !!id && lvl > level && !owns(kind, id);
+  const reload = () =>
+    fetch("/api/live/locker", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: LockerData | null) => d && setData(d))
+      .catch(() => {});
+  const redeem = async (kind: ItemKind, id: string, name: string) => {
+    if (!(await ask(`use a free pick to unlock ${name}?`, { yes: "unlock it!!", danger: false }))) return;
+    const res = await fetch("/api/live/locker/redeem", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, id }) }).catch(() => null);
+    const body = await res?.json().catch(() => null);
+    setStatus(res?.ok ? `🎁 unlocked ${name}!! go pick it` : (body?.error ?? "couldnt unlock it"));
+    if (res?.ok) await reload();
+  };
+  // Admins: right-click any item to give it to someone.
+  const [giving, setGiving] = useState<{ kind: ItemKind; id: string; name: string } | null>(null);
+  useEffect(() => {
+    if (!data?.owner) return;
+    const menu = (e: MouseEvent) => {
+      const el = (e.target as HTMLElement | null)?.closest("[data-item]") as HTMLElement | null;
+      if (!el) return;
+      e.preventDefault();
+      const [kind, id, name] = (el.dataset.item ?? "").split("|");
+      if (kind && id) setGiving({ kind: kind as ItemKind, id, name: name || id });
+    };
+    document.addEventListener("contextmenu", menu);
+    return () => document.removeEventListener("contextmenu", menu);
+  }, [data?.owner]);
+  /** What a locked item does when tapped: spend a free pick (if u have one). */
+  const tapLocked = (kind: ItemKind, id: string, name: string) => (picks > 0 ? void redeem(kind, id, name) : undefined);
   const choose = async (next: Avatar) => {
     setLook(next);
     if (!user) {
@@ -108,6 +143,13 @@ export function Locker() {
         <h1 className="font-display text-3xl font-extrabold tracking-tight">🎽 ur locker</h1>
         <p className="text-muted">pick how u show up evrywhere on Jace Live. look fresh 😎</p>
       </div>
+      {picks > 0 && (
+        <p className="jl-pop-in rounded-3xl border-2 border-dashed border-accent bg-accent/10 px-4 py-3 text-center font-bold">
+          🎁 u have {picks} free pick{picks === 1 ? "" : "s"}!! tap any 🔒 item to unlock it for free
+        </p>
+      )}
+      {data?.owner && <p className="text-center text-xs text-muted">👑 admin: right-click any item to give it to someone</p>}
+      {giving && <GiveItem item={giving} onClose={() => setGiving(null)} />}
 
       <section className={`${card} flex flex-wrap items-center gap-5`}>
         <LiveAvatar avatar={look.icon === "jace" ? { ...look, picture: data?.picture } : look} size={88} />
@@ -154,13 +196,14 @@ export function Locker() {
             </button>
           )}
           {ICONS.map((i) => {
-            const locked = i.level > level;
+            const locked = lockedItem("icon", i.id, i.level);
             return (
               <button
                 key={i.id}
                 type="button"
-                disabled={locked}
-                onClick={() => choose({ ...look, icon: i.id })}
+                data-item={`icon|${i.id}|${i.name}`}
+                disabled={locked && picks < 1}
+                onClick={() => (locked ? tapLocked("icon", i.id, i.name) : choose({ ...look, icon: i.id }))}
                 aria-pressed={look.icon === i.id}
                 aria-label={locked ? `${i.name}, unlocks at level ${i.level}` : i.name}
                 className={tile(look.icon === i.id, locked)}
@@ -177,13 +220,14 @@ export function Locker() {
         <h2 className="mb-3 text-sm font-semibold">Frame</h2>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-9">
           {FRAMES.map((f) => {
-            const locked = f.level > level;
+            const locked = lockedItem("frame", f.id, f.level);
             return (
               <button
                 key={f.id}
                 type="button"
-                disabled={locked}
-                onClick={() => choose({ ...look, frame: f.id })}
+                data-item={`frame|${f.id}|${f.name} frame`}
+                disabled={locked && picks < 1}
+                onClick={() => (locked ? tapLocked("frame", f.id, `${f.name} frame`) : choose({ ...look, frame: f.id }))}
                 aria-pressed={look.frame === f.id}
                 aria-label={locked ? `${f.name} frame, unlocks at level ${f.level}` : `${f.name} frame`}
                 className={tile(look.frame === f.id, locked)}
@@ -224,6 +268,10 @@ export function Locker() {
       </section>
 
       <Picker
+        kind="fx"
+        locked={(k, id, lvl) => lockedItem(k, id, lvl)}
+        picks={picks}
+        onLocked={tapLocked}
         title="Frame effect"
         note="How your frame moves."
         items={FRAME_FX}
@@ -235,6 +283,10 @@ export function Locker() {
       />
 
       <Picker
+        kind="nameColor"
+        locked={(k, id, lvl) => lockedItem(k, id, lvl)}
+        picks={picks}
+        onLocked={tapLocked}
         title="Name color"
         note="How your name looks in games."
         items={NAME_COLORS}
@@ -246,6 +298,10 @@ export function Locker() {
       />
 
       <Picker
+        kind="effect"
+        locked={(k, id, lvl) => lockedItem(k, id, lvl)}
+        picks={picks}
+        onLocked={tapLocked}
         title="Win celebration"
         note="Rains down on your results screen (and the host's podium) when you win."
         items={EFFECTS}
@@ -267,14 +323,15 @@ export function Locker() {
         <p className="mb-3 text-xs text-muted">shows up under ur name in games.{!user && " Sign in to unlock titles."}</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
           {TITLES.map((t) => {
-            const locked = !user || t.level > level;
+            const locked = !user || lockedItem("title", t.id, t.level);
             const selected = (look.title ?? "") === t.id;
             return (
               <button
                 key={t.id || "none"}
                 type="button"
-                disabled={locked && !!t.id}
-                onClick={() => choose({ ...look, title: t.id || undefined })}
+                data-item={t.id ? `title|${t.id}|${t.name} title` : undefined}
+                disabled={locked && !!t.id && picks < 1}
+                onClick={() => (locked && t.id ? tapLocked("title", t.id, `${t.name} title`) : choose({ ...look, title: t.id || undefined }))}
                 aria-pressed={selected}
                 aria-label={locked && t.id ? `${t.name} title, unlocks at level ${t.level}` : `${t.name}`}
                 className={tile(selected, locked && !!t.id)}
@@ -437,15 +494,22 @@ const tileClass = (selected: boolean, locked: boolean) =>
 
 /** A grid of level-locked choices (frame effects, name colors, celebrations). */
 function Picker<T extends { id: string; name: string; level: number }>({
+  kind,
+  locked: isLocked,
+  picks,
+  onLocked,
   title,
   note,
   items,
-  level,
   signedIn,
   selected,
   onPick,
   render,
 }: {
+  kind: ItemKind;
+  locked: (kind: ItemKind, id: string, level: number) => boolean;
+  picks: number;
+  onLocked: (kind: ItemKind, id: string, name: string) => void;
   title: string;
   note: string;
   items: T[];
@@ -464,13 +528,14 @@ function Picker<T extends { id: string; name: string; level: number }>({
       </p>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
         {items.map((it) => {
-          const locked = !!it.id && (!signedIn || it.level > level);
+          const locked = !!it.id && (!signedIn || isLocked(kind, it.id, it.level));
           return (
             <button
               key={it.id || "none"}
               type="button"
-              disabled={locked}
-              onClick={() => onPick(it.id)}
+              data-item={it.id ? `${kind}|${it.id}|${it.name}` : undefined}
+              disabled={locked && (picks < 1 || !signedIn)}
+              onClick={() => (locked ? onLocked(kind, it.id, it.name) : onPick(it.id))}
               aria-pressed={selected === it.id}
               aria-label={locked ? `${it.name}, unlocks at level ${it.level}` : it.name}
               className={tileClass(selected === it.id, locked)}
@@ -482,6 +547,58 @@ function Picker<T extends { id: string; name: string; level: number }>({
         })}
       </div>
     </section>
+  );
+}
+
+/** Admins: give a locker item to someone (find them by name). */
+function GiveItem({ item, onClose }: { item: { kind: ItemKind; id: string; name: string }; onClose: () => void }) {
+  const [q, setQ] = useState("");
+  const [people, setPeople] = useState<{ userId: string; username: string | null; level: number }[] | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetch(`/api/live/admin/xp?q=${encodeURIComponent(q)}`, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : { people: [] }))
+        .then((d) => setPeople(d.people ?? []))
+        .catch(() => setPeople([]));
+    }, 200);
+    return () => clearTimeout(t);
+  }, [q]);
+  const give = async (userId: string, name: string) => {
+    const res = await fetch("/api/live/admin/gift-item", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, kind: item.kind, id: item.id }) }).catch(() => null);
+    const body = await res?.json().catch(() => null);
+    setMsg(res?.ok ? `🎁 gave ${item.name} to ${name}!!` : (body?.error ?? "couldnt give it"));
+  };
+  return (
+    <div role="dialog" aria-modal="true" aria-label={`Give ${item.name}`} className="fixed inset-0 z-[150] flex items-center justify-center bg-black/40 p-4" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="jl-pop-in flex max-h-[80vh] w-full max-w-sm flex-col gap-3 rounded-3xl border border-line bg-panel p-5 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <p className="font-display text-lg font-extrabold">🎁 give {item.name} to…</p>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-muted hover:text-foreground">
+            ✕
+          </button>
+        </div>
+        <input value={q} onChange={(e) => setQ(e.target.value.slice(0, 40))} placeholder="find someone…" aria-label="Find someone" autoFocus className={input} />
+        {msg && <p className="text-sm font-semibold">{msg}</p>}
+        <ul className="flex flex-col gap-1 overflow-y-auto">
+          {people === null ? (
+            <li className="h-20 animate-pulse rounded-xl bg-foreground/[.04]" />
+          ) : people.length === 0 ? (
+            <li className="text-sm text-muted">nobody found (ppl show up once they open their locker or play Live signed in)</li>
+          ) : (
+            people.map((p) => (
+              <li key={p.userId} className="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-accent/10">
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{p.username ?? p.userId}</span>
+                <span className="text-xs text-muted">lv {p.level}</span>
+                <button type="button" onClick={() => void give(p.userId, p.username ?? "them")} className="rounded-full bg-accent px-3 py-1 text-xs font-bold text-on-accent">
+                  give
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      </div>
+    </div>
   );
 }
 

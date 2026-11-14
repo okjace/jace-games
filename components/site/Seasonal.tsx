@@ -84,6 +84,17 @@ function spawn(motion: Motion, w: number, h: number, sprites: HTMLCanvasElement[
   return p;
 }
 
+/** A popped Christmas present: the server decides if there's a prize inside. */
+async function openPresent() {
+  const res = await fetch("/api/live/gift", { method: "POST" }).catch(() => null);
+  const body = (await res?.json().catch(() => null)) as { won?: boolean; signIn?: boolean; prize?: { kind: "xp" | "pick"; amount?: number } } | null;
+  const egg = (detail: Record<string, unknown>) => window.dispatchEvent(new CustomEvent("jl-egg", { detail }));
+  if (body?.signIn) return egg({ say: "psst 🎁 sign in n presents can have prizes inside!!" });
+  if (!body?.won || !body.prize) return;
+  if (body.prize.kind === "xp") egg({ shout: `🎁 +${body.prize.amount} XP!!`, big: true, party: ["🎁", "⭐", "🎄"] });
+  else egg({ shout: "🎁 FREE PICK!! unlock anything in ur locker", big: true, party: ["🎁", "🎉", "✨"] });
+}
+
 export function SeasonalSky({ season, boost = 1 }: { season: SeasonId; boost?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const off = useEffectsOff();
@@ -97,6 +108,8 @@ export function SeasonalSky({ season, boost = 1 }: { season: SeasonId; boost?: n
     const css = getComputedStyle(document.documentElement);
     const tint = [css.getPropertyValue("--accent").trim() || "#38bdf8", css.getPropertyValue("--accent2").trim() || "#a5b4fc"];
     const sprites = s.particles.map((ch, i) => sprite(ch, 24, s.motion === "snow" ? "#7cc4ea" : tint[i % 2]));
+    // Which emoji each sprite is (presents can hold prizes).
+    const charOf = new Map(sprites.map((sp, i) => [sp, s.particles[i]]));
     let w = 0;
     let h = 0;
     let parts: P[] = [];
@@ -126,6 +139,7 @@ export function SeasonalSky({ season, boost = 1 }: { season: SeasonId; boost?: n
       }
       parts[i] = spawn(s.motion, w, h, sprites, false);
       popSound(season);
+      if (charOf.get(p.sprite) === "🎁") void openPresent();
     };
     window.addEventListener("pointerdown", onDown);
     let raf = 0;
