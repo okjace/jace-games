@@ -23,6 +23,11 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   if (typeof body.theme === "string" && (body.theme === "site" || isSeasonId(body.theme) || /^custom:[0-9a-f-]{36}$/i.test(body.theme))) next.theme = body.theme;
   if (Array.isArray(body.modes)) next.modes = body.modes.filter((m): m is string => typeof m === "string" && MODES.includes(m)).slice(0, MODES.length);
   if (typeof body.effectsOff === "boolean") next.effectsOff = body.effectsOff;
+  if (typeof body.publicProfile === "boolean") next.publicProfile = body.publicProfile;
+  if (typeof body.bio === "string") next.bio = body.bio.replace(/[<>]/g, "").slice(0, 160);
+  // A public profile keeps the name it's found by up to date.
+  next.username = session.user.username;
+  next.displayName = session.user.displayName || session.user.username;
   await savePrefs(session.user.id, next);
   return NextResponse.json({ prefs: next });
 }

@@ -23,6 +23,7 @@ const LINKS: { href: string; label: string; icon: string; signedIn?: boolean; ma
   { href: "/live/reports", label: "Reports", icon: "📋", signedIn: true, match: (p) => p.startsWith("/live/reports") },
   { href: "/studio", label: "Studio", icon: "🧩", match: (p) => p.startsWith("/studio") },
   { href: "/community", label: "Community", icon: "💬", match: (p) => p.startsWith("/community") },
+  { href: "/people", label: "People", icon: "👥", match: (p) => p.startsWith("/people") || p.startsWith("/u/") },
 ];
 
 export function signInHref(next: string): string {

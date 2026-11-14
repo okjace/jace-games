@@ -34,3 +34,11 @@ export async function topScores(mode: string, limit = 50): Promise<BoardRow[]> {
   if (res.error) throw new Error(res.error.message);
   return res.data as BoardRow[];
 }
+
+/** Someone's bests in every mode (for their public profile). */
+export async function bestsFor(userId: string): Promise<BoardRow[]> {
+  if (!usingSupabase()) return [...memory().values()].filter((r) => r.user_id === userId).sort((a, b) => b.best - a.best);
+  const res = await supabase().from("live_mode_scores").select().eq("user_id", userId).order("best", { ascending: false }).limit(40);
+  if (res.error) throw new Error(res.error.message);
+  return res.data as BoardRow[];
+}
