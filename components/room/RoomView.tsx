@@ -15,6 +15,7 @@ import { Lobby } from "./Lobby";
 import { RaceView } from "./RaceView";
 import { Results } from "./Results";
 import { useRoom, type RoomPayload } from "./useRoom";
+import { ask } from "@/components/site/ConfirmBox";
 
 const card = "rounded-2xl border border-line bg-panel p-6";
 const primary =
@@ -77,7 +78,7 @@ export function RoomView({ code }: { code: string }) {
   }
 
   const leave = async () => {
-    if (data.room.status === "playing" && !confirm("Leave this game? You'll forfeit.")) return;
+    if (data.room.status === "playing" && !(await ask("Leave this game? You'll forfeit."))) return;
     await act("leave");
     window.location.href = home;
   };

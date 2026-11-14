@@ -6,6 +6,7 @@ import { SeasonBackdrop } from "@/components/site/SeasonFx";
 import { EasterEggs } from "@/components/site/EasterEggs";
 import { MoreEggs } from "@/components/site/MoreEggs";
 import { EggMenu } from "@/components/site/EggMenu";
+import { ConfirmHost } from "@/components/site/ConfirmBox";
 import { Music } from "@/components/site/Music";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
@@ -55,6 +56,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <EasterEggs />
           <MoreEggs />
           <EggMenu />
+          <ConfirmHost />
           <Music season={season} />
         </ScoresProvider>
       </body>

@@ -16,6 +16,7 @@ import { Celebration, LiveAvatar, LiveName } from "./LiveAvatar";
 import { Markdown, QuestionMediaView } from "./Markdown";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
 import { PlayLive } from "./PlayLive";
+import { ask } from "@/components/site/ConfirmBox";
 
 /**
  * The host's big screen. It refreshes when the server pushes a change (a
@@ -166,7 +167,7 @@ export function HostScreen({ code }: { code: string }) {
             <VolumeButton className={secondary} />
             <FullscreenButton on={full.on} toggle={full.toggle} className="border border-line bg-panel" />
             {view.status !== "ended" && (
-              <button type="button" onClick={() => confirm("End da game for evryone?") && act("end")} className={secondary}>
+              <button type="button" onClick={() => void ask("End da game for evryone?").then((ok) => { if (ok) void act("end"); })} className={secondary}>
                 End game
               </button>
             )}
@@ -236,7 +237,7 @@ export function HostScreen({ code }: { code: string }) {
         hostOpen={hostOpen}
         onToggle={() => setHostOpen((o) => !o)}
         onStart={() => act("start")}
-        onEnd={() => confirm("End da game for evryone?") && act("end")}
+        onEnd={() => void ask("End da game for evryone?").then((ok) => { if (ok) void act("end"); })}
         onStop={() => playToo(false)}
       />
       {error && <p className="text-sm text-danger">{error}</p>}
@@ -317,7 +318,7 @@ function Lobby({ view, busy, onStart, onKick }: { view: HostView; busy: boolean;
           <li key={p.id}>
             <button
               type="button"
-              onClick={() => confirm(`Remove ${p.name} from the game?`) && onKick(p.id)}
+              onClick={() => void ask(`Remove ${p.name} from the game?`).then((ok) => { if (ok) void onKick(p.id); })}
               title="Click to remove"
               className="animate-pop flex items-center gap-2 rounded-full bg-foreground/[.08] py-1.5 pl-1.5 pr-4 text-sm font-semibold hover:bg-danger/20 hover:line-through"
             >
@@ -532,7 +533,7 @@ function PlayerList({ view, onKick, onClose }: { view: HostView; onKick: (id: st
               <span className="shrink-0 font-mono tabular-nums">{fmt(p.score)}</span>
               <button
                 type="button"
-                onClick={() => confirm(`Remove ${p.name} from the game?`) && onKick(p.id)}
+                onClick={() => void ask(`Remove ${p.name} from the game?`).then((ok) => { if (ok) void onKick(p.id); })}
                 title={`Remove ${p.name}`}
                 aria-label={`Remove ${p.name}`}
                 className="shrink-0 rounded-full px-2 text-muted hover:bg-danger/15 hover:text-danger"

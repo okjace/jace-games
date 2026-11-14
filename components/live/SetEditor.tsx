@@ -9,6 +9,7 @@ import { HTML_TEMPLATE, HtmlFrame } from "./HtmlFrame";
 import { ImportQuestions } from "./ImportQuestions";
 import { PromptEditor } from "./PromptEditor";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, input, primary, secondary } from "./ui";
+import { ask } from "@/components/site/ConfirmBox";
 
 const TIMES = [5, 10, 20, 30, 60, 90, 120];
 const TYPES: { id: QuestionType; label: string }[] = [
@@ -253,7 +254,7 @@ export function SetEditor({ id }: { id: string }) {
         <button
           type="button"
           onClick={async () => {
-            if (!confirm("Delete this set? This cant be undone.")) return;
+            if (!(await ask("Delete this set? This cant be undone."))) return;
             const res = await fetch(`/api/live/sets/${id}`, { method: "DELETE" });
             if (res.ok) {
               dirty.current = false;

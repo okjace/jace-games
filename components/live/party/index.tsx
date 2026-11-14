@@ -29,6 +29,7 @@ import { ChatButton, useChatShown } from "../ChatPanel";
 import { KingOfTheHill, MemoryMatch, Minefield, SkyStacker, TerritoryWars, VaultCracker } from "./SkillModes";
 import { SnakeArena } from "./SnakeArena";
 import { MemoryParty } from "./MemoryParty";
+import { ask } from "@/components/site/ConfirmBox";
 
 /** Every self-paced mode plays on this stage. */
 export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom", "banana", "summit", "survival", "boss", "tug", "hatchery", "pinata", "rare", "territory", "vault", "king", "memory", "sweep", "stack", "snake", "mparty"];
@@ -254,7 +255,7 @@ function Stage({ view, busy, act, chat, embedded = false }: { view: PlayerView; 
           {view.solo && (
             <button
               type="button"
-              onClick={() => confirm("End this game now? Ur score so far counts.") && void act({ action: "solo", op: "end" })}
+              onClick={() => void ask("End this game now? Ur score so far counts.").then((ok) => { if (ok) void act({ action: "solo", op: "end" }); })}
               title="End da game now"
               className="rounded-full bg-black/25 px-3 py-2 text-sm font-bold backdrop-blur hover:bg-black/40"
             >

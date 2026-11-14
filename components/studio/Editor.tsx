@@ -10,6 +10,7 @@ import { timeAgo } from "@/lib/format";
 import { MAX_GAME_BYTES, MAX_PLAYERS, gameBytes } from "@/lib/studio/limits";
 import { GameFrame, type LogEntry, type RoomLink } from "./GameFrame";
 import { api, card, input, primary, secondary, small } from "./ui";
+import { ask } from "@/components/site/ConfirmBox";
 
 // Both editors only work in the browser, and Blockly is big: load them when needed.
 const CodeEditor = dynamic(() => import("./CodeEditor").then((m) => m.CodeEditor), { ssr: false, loading: () => <EditorLoading /> });
@@ -148,7 +149,7 @@ export function Editor({ id }: { id: string }) {
   }
 
   async function convertToCode() {
-    if (!confirm("Turn this game into code? U can edit evrything as HTML and JavaScript afterwards, but u cant go back to blocks.")) return;
+    if (!(await ask("Turn this game into code? U can edit evrything as HTML and JavaScript afterwards, but u cant go back to blocks."))) return;
     setBusy("convert");
     try {
       const code = html;
@@ -165,7 +166,7 @@ export function Editor({ id }: { id: string }) {
   }
 
   async function remove() {
-    if (!confirm(`Delete "${meta.title}" for good? Its scores and versions go too.`)) return;
+    if (!(await ask(`Delete "${meta.title}" for good? Its scores and versions go too.`))) return;
     try {
       await api(`/api/studio/games/${id}`, { method: "DELETE" });
       router.push("/studio");
@@ -185,7 +186,7 @@ export function Editor({ id }: { id: string }) {
   }
 
   async function restore(version: number) {
-    if (dirty && !confirm("Replace ur unsaved changes w/ this version?")) return;
+    if (dirty && !(await ask("Replace ur unsaved changes w/ this version?"))) return;
     try {
       const v = await api<{ html: string; blocks_json: object | null }>(`/api/studio/games/${id}/versions/${version}`);
       if (kind === "blocks" && v.blocks_json) {

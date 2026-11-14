@@ -8,6 +8,7 @@ import { signInHref } from "@/components/site/SiteHeader";
 import type { GameReport, ReportSummary } from "@/lib/live/report";
 import { ReportView } from "./ReportView";
 import { card, primary, secondary } from "./ui";
+import { ask } from "@/components/site/ConfirmBox";
 
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -107,7 +108,7 @@ export function SavedReport({ id }: { id: string }) {
   }, [id]);
 
   const remove = async () => {
-    if (!confirm("Delete this report? This cant be undone.")) return;
+    if (!(await ask("Delete this report? This cant be undone."))) return;
     const res = await fetch(`/api/live/reports/${id}`, { method: "DELETE" }).catch(() => null);
     if (res?.ok) router.push("/live/reports");
   };

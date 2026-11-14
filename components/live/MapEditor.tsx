@@ -25,6 +25,7 @@ import {
 } from "@/lib/live/maps";
 import { drawMapBase } from "./party/towerMap";
 import { card, input, primary, secondary } from "./ui";
+import { ask } from "@/components/site/ConfirmBox";
 
 /**
  * The Tower Siege map maker. Lay the road by tapping (or dragging) from an
@@ -252,7 +253,7 @@ export function MapEditor({ id }: { id: string }) {
   const editPicked = (patch: Partial<Device>) =>
     change({ ...map, devices: (map.devices ?? []).map((d) => (d === pickedDevice ? { ...d, ...patch } : d)) });
   const remove = async () => {
-    if (!confirm(`Delete "${row.title}"? This can't be undone.`)) return;
+    if (!(await ask(`Delete "${row.title}"? This can't be undone.`))) return;
     const res = await fetch(`/api/live/maps/${id}`, { method: "DELETE" }).catch(() => null);
     if (res?.ok) router.push("/live/maps");
   };

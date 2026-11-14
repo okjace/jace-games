@@ -16,6 +16,7 @@ import { Markdown } from "./Markdown";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { PARTY_MODES, PartyPlay } from "./party";
 import { card, getPin, getToken, input, primary, secondary, setPin, setToken } from "./ui";
+import { ask } from "@/components/site/ConfirmBox";
 
 /** A player's screen for a Live game (usually a phone). */
 /** A player's screen. embedded: inside the host's page (the host playing too). */
@@ -171,7 +172,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
             <button
               type="button"
               disabled={busy}
-              onClick={() => confirm("End this game now? Ur score so far counts.") && void act({ action: "solo", op: "end" })}
+              onClick={() => void ask("End this game now? Ur score so far counts.").then((ok) => { if (ok) void act({ action: "solo", op: "end" }); })}
               title="End da game now"
               className="-my-1 rounded-full border border-line px-2.5 py-1 text-xs font-semibold hover:bg-foreground/[.05]"
             >
