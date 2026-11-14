@@ -6,6 +6,7 @@ import { ProfileLook } from "@/components/ProfileLook";
 import { ProfileName } from "@/components/ProfileName";
 import { UserAvatar } from "@/components/UserLook";
 import { SiteThemePicker } from "@/components/site/SiteThemePicker";
+import { SpecialModesCard } from "@/components/site/SpecialModesCard";
 
 export function ProfileView() {
   const { user } = useScores();
@@ -47,7 +48,8 @@ export function ProfileView() {
 
       {user && <ProfileLook user={user} />}
 
-      {user && <SiteThemePicker />}
+      <SiteThemePicker />
+      <SpecialModesCard />
     </div>
   );
 }
