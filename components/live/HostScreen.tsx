@@ -117,7 +117,7 @@ export function HostScreen({ code }: { code: string }) {
 
   return (
     <div ref={hostRef} className={`bg-background ${full.on ? `${FULLSCREEN_CLASS} p-6` : ""}`}>
-      <div className="mx-auto flex max-w-6xl flex-col gap-4">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="text-3xl">{mode.icon}</span>
@@ -165,7 +165,8 @@ export function HostScreen({ code }: { code: string }) {
           </div>
         </div>
         {error && <p className="text-sm text-danger">{error}</p>}
-        {view.status !== "ended" && <ChatPanel code={view.code} topic={view.topic} token={null} host on={view.settings.chat !== false} />}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
         {showPlayers && <PlayerList view={view} onKick={(id) => act("kick", { playerId: id })} onClose={() => setShowPlayers(false)} />}
 
         {view.status === "lobby" && <Lobby view={view} busy={busy} onStart={() => act("start")} onKick={(id) => act("kick", { playerId: id })} />}
@@ -180,6 +181,13 @@ export function HostScreen({ code }: { code: string }) {
         {view.status === "ended" && <PlayAgain view={view} busy={busy} onAgain={(m) => act("again", { mode: m })} />}
 
         {hasQuestions && (view.status === "ended" || (view.status === "playing" && showAnswers)) && <HostReport code={view.code} live={view.status === "playing"} />}
+        </div>
+        {view.status !== "ended" && (
+          <aside className="lg:sticky lg:top-4 lg:w-80 lg:shrink-0">
+            <ChatPanel code={view.code} topic={view.topic} token={null} host on={view.settings.chat !== false} className="h-80 lg:h-[calc(100vh-11rem)]" />
+          </aside>
+        )}
+        </div>
       </div>
     </div>
   );

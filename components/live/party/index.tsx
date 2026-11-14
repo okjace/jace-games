@@ -105,7 +105,7 @@ export type StageProps = {
   setEarnHidden?: (hidden: boolean) => void;
 };
 
-export function PartyPlay(props: { view: PlayerView; busy: boolean; act: Act }) {
+export function PartyPlay(props: { view: PlayerView; busy: boolean; act: Act; chat?: React.ReactNode }) {
   return (
     <Juice>
       <Stage {...props} />
@@ -113,7 +113,7 @@ export function PartyPlay(props: { view: PlayerView; busy: boolean; act: Act }) 
   );
 }
 
-function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act }) {
+function Stage({ view, busy, act, chat }: { view: PlayerView; busy: boolean; act: Act; chat?: React.ReactNode }) {
   const juice = useJuice();
   const mode = view.mode;
   const theme = THEMES[mode] ?? THEMES.gold;
@@ -215,7 +215,9 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
       className={`relative -mx-4 -mt-6 min-h-[calc(100vh-4rem)] px-4 pb-10 pt-4 text-white sm:-mx-6 sm:-mt-8 sm:px-6 ${full.on ? FULLSCREEN_CLASS : ""}`}
       style={{ background: theme.bg }}
     >
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
+      {/* The game in the middle; chat beside it on wide screens, under it on phones. */}
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-4 lg:max-w-[60rem] lg:flex-row lg:items-start lg:justify-center">
+      <div className="flex w-full min-w-0 max-w-xl flex-col gap-4">
         {/* HUD */}
         <div className="flex items-center gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-black/25 py-1.5 pl-2 pr-4 backdrop-blur">
@@ -284,6 +286,8 @@ function Stage({ view, busy, act }: { view: PlayerView; busy: boolean; act: Act 
             </li>
           ))}
         </ol>
+      </div>
+      {chat && <aside className="lg:sticky lg:top-4 lg:w-80 lg:shrink-0">{chat}</aside>}
       </div>
       {shopOpen && <Shop view={view} act={act} unit={def.unit} onClose={() => setShopOpen(false)} />}
     </div>
