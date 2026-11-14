@@ -87,6 +87,18 @@ export function EasterEggs() {
     return () => clearTimeout(t);
   }, []);
 
+  // Other eggs (MoreEggs.tsx) ask for a shout, a Jacey line or confetti with a "jl-egg" event.
+  useEffect(() => {
+    const onEgg = (e: Event) => {
+      const d = (e as CustomEvent<{ shout?: string; big?: boolean; say?: string; party?: string[] }>).detail ?? {};
+      if (d.shout) shout(d.shout, d.big);
+      if (d.say) say(d.say);
+      if (d.party) party(d.party);
+    };
+    window.addEventListener("jl-egg", onEgg);
+    return () => window.removeEventListener("jl-egg", onEgg);
+  }, []);
+
   // Ctrl+P+Y, typing "jace", and checking in when it's quiet.
   useEffect(() => {
     let pHeld = false;

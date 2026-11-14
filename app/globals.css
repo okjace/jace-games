@@ -258,3 +258,29 @@ body {
 @media (prefers-reduced-motion: reduce) { .jl-jacey, .jl-eye, .jl-party main, .jl-jace main, .jl-confetti { animation: none; } }
 .jl-bob-small { animation: jl-bob-small 1.2s ease-in-out infinite; }
 @keyframes jl-bob-small { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-2px) rotate(6deg); } }
+
+/* ---------- More easter eggs (components/site/MoreEggs.tsx) ---------- */
+.jl-barrel body { animation: jl-barrel 1.2s ease-in-out; }
+@keyframes jl-barrel { to { transform: rotate(360deg); } }
+.jl-flip main { transform: rotate(180deg); transition: transform 0.6s; }
+.jl-gravity main > * { animation: jl-gravity 3.4s cubic-bezier(.5,0,.75,0) both; }
+.jl-gravity main > *:nth-child(2n) { animation-delay: 0.12s; }
+.jl-gravity main > *:nth-child(3n) { animation-delay: 0.25s; }
+@keyframes jl-gravity { 0% { transform: none; } 35% { transform: translateY(80vh) rotate(8deg); } 65% { transform: translateY(80vh) rotate(-6deg); } 100% { transform: none; } }
+.jl-rainbow main h1, .jl-rainbow main h2, .jl-rainbow main p { background: linear-gradient(90deg, #ef4444, #f97316, #eab308, #22c55e, #3b82f6, #8b5cf6, #ef4444); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent; animation: jl-shimmer 1.5s linear infinite; }
+.jl-dance main > * { animation: jl-dance 0.5s ease-in-out infinite alternate; }
+.jl-dance main > *:nth-child(even) { animation-direction: alternate-reverse; }
+@keyframes jl-dance { from { transform: translateY(0) rotate(-2deg); } to { transform: translateY(-10px) rotate(2deg); } }
+.jl-boo body { animation: jl-boo 1.3s ease-out; }
+@keyframes jl-boo { 0% { filter: brightness(0.2); } 20% { filter: brightness(0.15) contrast(1.5); } 100% { filter: none; } }
+.jl-dizzy main { animation: jl-dizzy 1.9s ease-in-out; }
+@keyframes jl-dizzy { 0%, 100% { transform: none; filter: none; } 25% { transform: rotate(3deg) skewX(4deg); filter: blur(1px); } 50% { transform: rotate(-3deg) skewX(-4deg); } 75% { transform: rotate(2deg); filter: blur(0.5px); } }
+.jl-mad .jl-jacey { filter: hue-rotate(-60deg) saturate(3) brightness(0.9); animation: jl-shake-mad 0.12s linear infinite; }
+@keyframes jl-shake-mad { 0% { transform: translateX(-2px); } 50% { transform: translateX(2px); } 100% { transform: translateX(-2px); } }
+.jl-big-jacey .jl-jacey { transform: scale(3); transform-origin: bottom left; transition: transform 0.4s cubic-bezier(.2,1.6,.4,1); }
+.jl-walker { position: fixed; bottom: 8px; left: -80px; z-index: 84; font-size: 56px; pointer-events: none; animation: jl-walk 7s linear forwards; }
+@keyframes jl-walk { to { transform: translateX(calc(100vw + 160px)); } }
+.jl-rainer { position: fixed; top: -60px; z-index: 84; pointer-events: none; animation: jl-confetti 2.6s ease-in forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .jl-barrel body, .jl-gravity main > *, .jl-dance main > *, .jl-dizzy main, .jl-walker, .jl-rainer { animation: none; }
+}
