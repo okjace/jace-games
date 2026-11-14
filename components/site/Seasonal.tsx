@@ -77,7 +77,7 @@ function spawn(motion: Motion, w: number, h: number, sprites: HTMLCanvasElement[
   return p;
 }
 
-export function SeasonalSky({ season }: { season: SeasonId }) {
+export function SeasonalSky({ season, boost = 1 }: { season: SeasonId; boost?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const off = useEffectsOff();
   const s = SEASONS[season];
@@ -101,7 +101,7 @@ export function SeasonalSky({ season }: { season: SeasonId }) {
       canvas.height = h * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       // About `density` on a big screen, fewer on small ones.
-      const want = Math.round(s.density * Math.min(1, (w * h) / (1440 * 900)) + s.density * 0.3);
+      const want = Math.round((s.density * Math.min(1, (w * h) / (1440 * 900)) + s.density * 0.3) * boost);
       while (parts.length < want) parts.push(spawn(s.motion, w, h, sprites, true));
       parts = parts.slice(0, want);
     };
@@ -178,9 +178,9 @@ export function SeasonalSky({ season }: { season: SeasonId }) {
       document.removeEventListener("visibilitychange", visibility);
       ctx.clearRect(0, 0, w, h);
     };
-  }, [s, off, season]);
+  }, [s, off, season, boost]);
   if (!s.particles.length) return null;
-  return <canvas ref={ref} aria-hidden="true" className="pointer-events-none fixed inset-0 z-30 h-screen w-screen" />;
+  return <canvas ref={ref} aria-hidden="true" className="jl-sky pointer-events-none fixed inset-0 z-30 h-screen w-screen" />;
 }
 
 /** The row of emoji under the menu bar. */

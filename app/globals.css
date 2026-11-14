@@ -306,3 +306,23 @@ body {
 .jl-launcher { position: fixed; bottom: -60px; left: 50%; z-index: 84; font-size: 64px; pointer-events: none; animation: jl-launch 2.4s cubic-bezier(.6,0,.9,.6) forwards; }
 @keyframes jl-launch { to { transform: translateY(-120vh) rotate(-45deg); } }
 @media (prefers-reduced-motion: reduce) { .jl-disco body, .jl-disco main > *, .jl-zoom main, .jl-riser, .jl-launcher, .jl-backflip .jl-jacey { animation: none; } }
+
+/* ---------- Corner trees (components/site/Corners.tsx) ---------- */
+.jl-tree { animation: jl-tree 5s ease-in-out infinite; }
+@keyframes jl-tree { 0%, 100% { transform: rotate(-1.5deg); } 50% { transform: rotate(1.5deg); } }
+.jl-bulb { animation: jl-bulb 1.6s ease-in-out infinite; }
+@keyframes jl-bulb { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+.jl-dangle { animation: jl-dangle 2.2s ease-in-out infinite; transform-origin: center top; transform-box: fill-box; }
+@keyframes jl-dangle { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
+
+/* ---------- Special modes (components/site/ThemeContext.tsx) ---------- */
+.jl-mode-chill .jl-sky, .jl-mode-chill .jl-flyby, .jl-mode-chill .jl-trail { display: none; }
+.jl-mode-chill .jl-wash, .jl-mode-chill .jl-pattern, .jl-mode-chill .jl-prop, .jl-mode-chill .jl-tree, .jl-mode-chill .jl-garland { animation: none; }
+.jl-mode-crt body::before { content: ""; position: fixed; inset: 0; z-index: 95; pointer-events: none; background: repeating-linear-gradient(to bottom, rgba(0,0,0,0.07) 0 1px, transparent 1px 3px), radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.35)); animation: jl-flicker 0.15s steps(2) infinite; }
+.jl-mode-crt body { text-shadow: 0.6px 0 rgba(255,0,0,0.25), -0.6px 0 rgba(0,180,255,0.25); }
+@keyframes jl-flicker { 50% { opacity: 0.92; } }
+.jl-mode-comic body, .jl-mode-comic .font-display, .jl-mode-comic button, .jl-mode-comic input { font-family: "Comic Sans MS", "Comic Neue", "Chalkboard SE", cursive !important; }
+.jl-mode-rainbow body { animation: jl-rainbow-mode 24s linear infinite; }
+@keyframes jl-rainbow-mode { to { filter: hue-rotate(360deg); } }
+.jl-mode-bigtext { font-size: 118%; }
+@media (prefers-reduced-motion: reduce) { .jl-tree, .jl-bulb, .jl-dangle, .jl-mode-rainbow body, .jl-mode-crt body::before { animation: none; } }

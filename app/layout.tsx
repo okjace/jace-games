@@ -1,15 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import { Notices } from "@/components/site/Notices";
-import { Garland, SeasonalSky } from "@/components/site/Seasonal";
-import { SeasonBackdrop } from "@/components/site/SeasonFx";
 import { EasterEggs } from "@/components/site/EasterEggs";
 import { MoreEggs } from "@/components/site/MoreEggs";
 import { EggMenu } from "@/components/site/EggMenu";
 import { ConfirmHost } from "@/components/site/ConfirmBox";
-import { Music } from "@/components/site/Music";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/SiteHeader";
+import { HEAD_SCRIPT, SeasonProvider } from "@/components/site/ThemeContext";
+import { ThemeLayer, ThemedGarland } from "@/components/site/ThemeLayer";
 import { ScoresProvider } from "@/components/ScoresProvider";
 import { getThemeChoice } from "@/lib/db/siteSettings";
 import { activeSeason } from "@/lib/seasons";
@@ -44,21 +43,24 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${display.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: HEAD_SCRIPT }} />
+      </head>
       <body className="relative isolate flex min-h-full flex-col">
+        <SeasonProvider season={season}>
         <ScoresProvider initialUser={session?.user ?? null}>
-          <SiteHeader season={season} />
-          <Garland season={season} />
+          <SiteHeader />
+          <ThemedGarland />
           <Notices />
           <main className="relative mx-auto w-full max-w-6xl flex-1 px-4 pt-6 sm:px-6 sm:pt-8">{children}</main>
           <SiteFooter />
-          <SeasonalSky season={season} />
-          <SeasonBackdrop season={season} />
+          <ThemeLayer />
           <EasterEggs />
           <MoreEggs />
           <EggMenu />
           <ConfirmHost />
-          <Music season={season} />
         </ScoresProvider>
+        </SeasonProvider>
       </body>
     </html>
   );

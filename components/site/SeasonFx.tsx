@@ -216,7 +216,7 @@ export function SeasonBackdrop({ season }: { season: SeasonId }) {
   return (
     <>
       {/* Behind everything: the colour wash, the emoji pattern and the hills. */}
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+      <div aria-hidden="true" className="jl-backdrop pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <div className="jl-wash absolute -inset-[20%]" />
         <div className="jl-pattern absolute -inset-[200px] opacity-[0.07]" style={{ backgroundImage: patternUrl(s.particles.length ? s.particles : [s.icon]) }} />
         <svg className="absolute inset-x-0 bottom-0 h-[26vh] min-h-40 w-full" viewBox="0 0 1440 260" preserveAspectRatio="none">
@@ -237,13 +237,13 @@ export function SeasonBackdrop({ season }: { season: SeasonId }) {
         </div>
       </div>
       {/* In front (never in the way of clicks): pointer sparkles and flybys. */}
-      <canvas ref={trailRef} aria-hidden="true" className="pointer-events-none fixed inset-0 z-[31] h-screen w-screen" />
+      <canvas ref={trailRef} aria-hidden="true" className="jl-trail pointer-events-none fixed inset-0 z-[31] h-screen w-screen" />
       {flyby && (
         <div
           key={flyby.id}
           aria-hidden="true"
           onAnimationEnd={() => setFlyby(null)}
-          className={`pointer-events-none fixed z-[32] ${flyby.dir === 1 ? "jl-fly-right" : "jl-fly-left"}`}
+          className={`jl-flyby pointer-events-none fixed z-[32] ${flyby.dir === 1 ? "jl-fly-right" : "jl-fly-left"}`}
           style={{ top: fx.flybyPath === "ground" ? undefined : `${flyby.y}vh`, bottom: fx.flybyPath === "ground" ? "2vh" : undefined, fontSize: flyby.size }}
         >
           <span className={`inline-block ${fx.flybyPath === "ground" ? "jl-hop" : "jl-bob"}`} style={{ transform: flyby.dir === 1 ? "scaleX(-1)" : undefined }}>

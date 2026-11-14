@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
 import { UserAvatar } from "@/components/UserLook";
-import type { SeasonId } from "@/lib/seasons";
 import { Logo } from "./Logo";
-import { EffectsToggle } from "./Seasonal";
+import { ThemeMenu } from "./ThemeMenu";
+import { useSeason } from "./ThemeContext";
 import { SoundToggle } from "./SeasonFx";
 
 /** The menu bar: every part of Jace Live. `match` decides which item is lit up. */
@@ -29,7 +29,8 @@ export function signInHref(next: string): string {
   return `/api/auth/signin?next=${encodeURIComponent(next)}`;
 }
 
-export function SiteHeader({ season }: { season: SeasonId }) {
+export function SiteHeader() {
+  const season = useSeason();
   const pathname = usePathname();
   const { user } = useScores();
   const links = LINKS.filter((l) => !l.signedIn || user);
@@ -71,7 +72,7 @@ export function SiteHeader({ season }: { season: SeasonId }) {
         </NavRow>
         <div className="flex shrink-0 items-center gap-1">
           <SoundToggle season={season} />
-          <EffectsToggle season={season} />
+          <ThemeMenu />
           {user ? (
             <Link
               href="/profile"

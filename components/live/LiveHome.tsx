@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import { MODES, type LiveMode, type SetSummary } from "@/lib/live/types";
-import { SEASONS, type SeasonId } from "@/lib/seasons";
+import { SEASONS } from "@/lib/seasons";
+import { useSeason } from "@/components/site/ThemeContext";
 import { JoinCodeForm } from "./JoinPage";
 import { LiveGames } from "./LiveGames";
 import { RejoinBanner } from "./RejoinBanner";
@@ -26,7 +27,8 @@ const TILES = [
 ];
 
 /** The Jace Live home page. */
-export function LiveHome({ season }: { season: SeasonId }) {
+export function LiveHome() {
+  const season = useSeason();
   const { user } = useScores();
   const router = useRouter();
   const [code, setCode] = useState("");
