@@ -27,6 +27,39 @@ function supabase(): SupabaseClient {
   return (sb ??= createClient(SUPABASE_URL!, SUPABASE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } }));
 }
 
+type Listener = { emit: (event: string, payload: unknown) => void; presence: (members: PresenceMember[]) => void };
+type Shared = { channel: RealtimeChannel; listeners: Set<Listener>; members: PresenceMember[] | null; closed: boolean };
+
+/**
+ * Supabase keeps one channel per topic and refuses new listeners once it has
+ * subscribed, so every part of a page that opens the same topic (a game's
+ * screen and its chat, say) shares one channel here, closed with the last one.
+ */
+const openChannels = new Map<string, Shared>();
+
+function sharedChannel(topic: string, me: { userId: string; username: string } | null): Shared {
+  const existing = openChannels.get(topic);
+  if (existing && !existing.closed) {
+    if (me) existing.channel.track(me).catch(() => {});
+    return existing;
+  }
+  const channel: RealtimeChannel = supabase().channel(topic, {
+    config: { broadcast: { self: false }, presence: { key: me?.userId ?? `spectator-${Math.random().toString(36).slice(2)}` } },
+  });
+  const shared: Shared = { channel, listeners: new Set(), members: null, closed: false };
+  channel.on("broadcast", { event: "*" }, (msg) => shared.listeners.forEach((l) => l.emit(msg.event, msg.payload)));
+  channel.on("presence", { event: "sync" }, () => {
+    const state = channel.presenceState<{ userId: string; username: string }>();
+    shared.members = Object.entries(state).map(([key, metas]) => ({ key, meta: metas[0] as unknown as PresenceMember["meta"] }));
+    shared.listeners.forEach((l) => l.presence(shared.members!));
+  });
+  channel.subscribe((status) => {
+    if (status === "SUBSCRIBED" && me) void channel.track(me);
+  });
+  openChannels.set(topic, shared);
+  return shared;
+}
+
 export function openRoomChannel(topic: string, me: { userId: string; username: string } | null): RoomChannel {
   const handlers = new Map<string, Set<(p: unknown) => void>>();
   const presenceHandlers = new Set<(m: PresenceMember[]) => void>();
@@ -42,23 +75,25 @@ export function openRoomChannel(topic: string, me: { userId: string; username: s
   };
 
   if (SUPABASE_URL && SUPABASE_KEY) {
-    const channel: RealtimeChannel = supabase().channel(topic, {
-      config: { broadcast: { self: false }, presence: { key: me?.userId ?? `spectator-${Math.random().toString(36).slice(2)}` } },
-    });
-    channel.on("broadcast", { event: "*" }, (msg) => emit(msg.event, msg.payload));
-    channel.on("presence", { event: "sync" }, () => {
-      const state = channel.presenceState<{ userId: string; username: string }>();
-      const list = Object.entries(state).map(([key, metas]) => ({ key, meta: metas[0] as unknown as PresenceMember["meta"] }));
-      presenceHandlers.forEach((fn) => fn(list));
-    });
-    channel.subscribe((status) => {
-      if (status === "SUBSCRIBED" && me) void channel.track(me);
-    });
+    const shared = sharedChannel(topic, me);
+    const listener = { emit, presence: (m: PresenceMember[]) => presenceHandlers.forEach((fn) => fn(m)) };
+    shared.listeners.add(listener);
+    if (shared.members) listener.presence(shared.members);
+    let closed = false;
     return {
-      send: (event, payload) => void channel.send({ type: "broadcast", event, payload }),
+      send: (event, payload) => void shared.channel.send({ type: "broadcast", event, payload }),
       on,
       onPresence,
-      close: () => void supabase().removeChannel(channel),
+      close: () => {
+        if (closed) return;
+        closed = true;
+        shared.listeners.delete(listener);
+        if (shared.listeners.size === 0) {
+          shared.closed = true;
+          openChannels.delete(topic);
+          void supabase().removeChannel(shared.channel);
+        }
+      },
     };
   }
 
