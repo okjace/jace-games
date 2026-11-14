@@ -15,21 +15,66 @@ import { drawMapBase } from "./towerMap";
 
 const CELL = 40;
 
-type Kind = "archer" | "cannon" | "frost";
-const TOWERS: Record<Kind, { icon: string; name: string; cost: number; range: number; dmg: number; rate: number; splash?: number; slow?: number }> = {
-  archer: { icon: "🏹", name: "Archer", cost: 15, range: 2.6, dmg: 1, rate: 0.55 },
-  cannon: { icon: "💣", name: "Cannon", cost: 35, range: 2.1, dmg: 3, rate: 1.4, splash: 0.9 },
-  frost: { icon: "❄️", name: "Frost", cost: 25, range: 2.1, dmg: 0.3, rate: 0.8, slow: 0.5 },
+type Kind = "archer" | "cannon" | "frost" | "tesla" | "sniper" | "flame" | "venom" | "vortex" | "mine";
+type TowerDef = {
+  icon: string;
+  name: string;
+  blurb: string;
+  cost: number;
+  range: number;
+  dmg: number;
+  /** Seconds between shots. */
+  rate: number;
+  /** Hits everything this close to where the shot lands. */
+  splash?: number;
+  slow?: number;
+  /** Lightning that jumps to this many enemies in all. */
+  chain?: number;
+  /** Aims for the toughest enemy in range instead of the one furthest along. */
+  strong?: boolean;
+  /** Hits every enemy in range at once. */
+  aura?: boolean;
+  /** Poison: damage per second for 3 seconds. */
+  poison?: number;
+  /** Knocks the target back this far along the road. */
+  push?: number;
+  /** Doesn't fight: coins per level each wave you clear. */
+  mine?: number;
+};
+const TOWERS: Record<Kind, TowerDef> = {
+  archer: { icon: "🏹", name: "Archer", blurb: "Quick arrows at the enemy furthest along.", cost: 15, range: 2.6, dmg: 1, rate: 0.55 },
+  frost: { icon: "❄️", name: "Frost", blurb: "Slows enemies down.", cost: 25, range: 2.1, dmg: 0.3, rate: 0.8, slow: 0.5 },
+  flame: { icon: "🔥", name: "Flamer", blurb: "Short range, but burns every enemy near it at once.", cost: 30, range: 1.5, dmg: 0.45, rate: 0.3, aura: true },
+  venom: { icon: "☠️", name: "Venom", blurb: "Poisons enemies so they keep losing health.", cost: 30, range: 2.4, dmg: 0.2, rate: 0.9, poison: 1.2 },
+  cannon: { icon: "💣", name: "Cannon", blurb: "Slow, heavy shots that hit a whole group.", cost: 35, range: 2.1, dmg: 3, rate: 1.4, splash: 0.9 },
+  tesla: { icon: "⚡", name: "Tesla", blurb: "Lightning that jumps between up to 3 enemies.", cost: 40, range: 2.3, dmg: 1.6, rate: 1.0, chain: 3 },
+  sniper: { icon: "🎯", name: "Sniper", blurb: "Huge range and big hits, aimed at the toughest enemy.", cost: 45, range: 5, dmg: 6, rate: 2.4, strong: true },
+  vortex: { icon: "🌀", name: "Vortex", blurb: "Knocks enemies back along the road.", cost: 55, range: 2, dmg: 0.5, rate: 2.8, push: 1.2 },
+  mine: { icon: "⛏️", name: "Gold Mine", blurb: "Doesn't fight. Earns 🪙4 per level every wave you clear.", cost: 50, range: 0, dmg: 0, rate: 0, mine: 4 },
 };
 type Tower = { x: number; y: number; kind: Kind; level: number };
-type Enemy = { id: number; d: number; hp: number; max: number; speed: number; icon: string; slowUntil: number; /** last road square it stepped on (for traps and zones) */ cell: number };
+type Enemy = {
+  id: number;
+  d: number;
+  hp: number;
+  max: number;
+  speed: number;
+  icon: string;
+  slowUntil: number;
+  /** last road square it stepped on (for traps and zones) */
+  cell: number;
+  poisonUntil: number;
+  poison: number;
+  /** reached the castle (not a defeat) */
+  leaked?: boolean;
+};
 type Saved = { towers: Tower[]; spent: number; bonus: number; wave: number; best: number; kills: number; lives: number; started?: boolean };
 
 const MAX_LIVES = 20;
 let nextEnemyId = 0;
 function makeEnemy(kind: "normal" | "fast" | "boss", wave: number): Enemy {
   const hp = (kind === "boss" ? 25 : kind === "fast" ? 2 : 4) * 1.22 ** (wave - 1);
-  return { id: nextEnemyId++, d: 0, hp, max: hp, speed: kind === "boss" ? 0.8 : kind === "fast" ? 2.4 : 1.4, icon: kind === "boss" ? "🐲" : kind === "fast" ? "🦇" : "👾", slowUntil: 0, cell: -1 };
+  return { id: nextEnemyId++, d: 0, hp, max: hp, speed: kind === "boss" ? 0.8 : kind === "fast" ? 2.4 : 1.4, icon: kind === "boss" ? "🐲" : kind === "fast" ? "🦇" : "👾", slowUntil: 0, cell: -1, poisonUntil: 0, poison: 0 };
 }
 
 /** Does a rule fire for this event? */
@@ -44,7 +89,8 @@ function matches(r: Rule, when: WhenKind, n: number): boolean {
 const upgradeCost = (t: Tower) => Math.round(TOWERS[t.kind].cost * 1.6 ** t.level);
 const stat = (t: Tower) => {
   const b = TOWERS[t.kind];
-  return { ...b, dmg: b.dmg * 1.5 ** (t.level - 1), range: b.range + (t.level - 1) * 0.3 };
+  const up = 1.5 ** (t.level - 1);
+  return { ...b, dmg: b.dmg * up, poison: b.poison ? b.poison * up : undefined, range: b.range ? b.range + (t.level - 1) * 0.3 : 0 };
 };
 
 function pointAt(PATH: [number, number][], d: number): [number, number] {
@@ -69,7 +115,7 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
   const [running, setRunning] = useState(false);
   const [toast, setToast] = useState<{ text: string; good: boolean; id: number } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const live = useRef<{ enemies: Enemy[]; cooldowns: Map<string, number>; spawnLeft: number; nextSpawn: number; shots: { x1: number; y1: number; x2: number; y2: number; until: number }[] }>({
+  const live = useRef<{ enemies: Enemy[]; cooldowns: Map<string, number>; spawnLeft: number; nextSpawn: number; shots: { x1: number; y1: number; x2: number; y2: number; until: number; color?: string }[] }>({
     enemies: [],
     cooldowns: new Map(),
     spawnLeft: 0,
@@ -179,8 +225,8 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
       }
       // Move (mud halves speed), and set off traps and zones on each new road square.
       let leaked = 0;
-      let trapped = 0;
       for (const e of L.enemies) {
+        if (now < e.poisonUntil) e.hp -= e.poison * dt;
         const onMud = roadDevices.get(Math.max(0, Math.floor(e.d)))?.kind === "mud";
         e.d += e.speed * (now < e.slowUntil ? 0.5 : 1) * (onMud ? 0.5 : 1) * dt;
         const cell = Math.floor(e.d);
@@ -189,20 +235,21 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
             const dev = roadDevices.get(c);
             if (dev?.kind === "spikes") {
               e.hp -= 3 * 1.15 ** (n - 1);
-              if (e.hp <= 0) trapped++;
             } else if (dev?.kind === "zone" && dev.channel) fire("zone", dev.channel);
           }
           e.cell = cell;
         }
         if (e.hp > 0 && e.d >= PATH.length - 1) {
           e.hp = 0;
+          e.leaked = true;
           leaked++;
           fire("leak", 0);
         }
       }
       // Towers fire.
-      let killed = trapped;
+      const posOf = (e: Enemy) => pointAt(PATH, e.d);
       for (const t of s.towers) {
+        if (TOWERS[t.kind].mine) continue;
         const key = `${t.x},${t.y}`;
         const cd = (L.cooldowns.get(key) ?? 0) - dt;
         if (cd > 0) {
@@ -212,29 +259,50 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
         const st = stat(t);
         const tx = (t.x + 0.5) * CELL;
         const ty = (t.y + 0.5) * CELL;
-        const target = L.enemies
-          .filter((e) => e.hp > 0)
-          .filter((e) => {
-            const [ex, ey] = pointAt(PATH, e.d);
-            return Math.hypot(ex - tx, ey - ty) <= st.range * CELL;
-          })
-          .sort((a, b) => b.d - a.d)[0];
+        const inRange = L.enemies.filter((e) => {
+          if (e.hp <= 0) return false;
+          const [ex, ey] = posOf(e);
+          return Math.hypot(ex - tx, ey - ty) <= st.range * CELL;
+        });
+        const target = [...inRange].sort((a, b) => (st.strong ? b.hp - a.hp : b.d - a.d))[0];
         if (!target) {
           L.cooldowns.set(key, 0);
           continue;
         }
         L.cooldowns.set(key, st.rate);
-        const [ex, ey] = pointAt(PATH, target.d);
-        L.shots.push({ x1: tx, y1: ty, x2: ex, y2: ey, until: now + 120 });
-        const hit = st.splash
-          ? L.enemies.filter((e) => e.hp > 0 && Math.hypot(pointAt(PATH, e.d)[0] - ex, pointAt(PATH, e.d)[1] - ey) <= st.splash! * CELL)
-          : [target];
-        for (const e of hit) {
-          e.hp -= st.dmg;
-          if (st.slow) e.slowUntil = now + 1500;
-          if (e.hp <= 0) killed++;
+        const [ex, ey] = posOf(target);
+        const color = st.chain ? "#fde047" : st.poison ? "#a3e635" : st.aura ? "#fb923c" : st.push ? "#c084fc" : "#fff";
+        let hit: Enemy[] = [target];
+        if (st.aura) hit = inRange;
+        else if (st.splash) hit = L.enemies.filter((e) => e.hp > 0 && Math.hypot(posOf(e)[0] - ex, posOf(e)[1] - ey) <= st.splash! * CELL);
+        else if (st.chain) {
+          // Lightning jumps to the nearest enemy it hasn't hit yet.
+          while (hit.length < st.chain) {
+            const [lx, ly] = posOf(hit[hit.length - 1]);
+            const next = L.enemies
+              .filter((e) => e.hp > 0 && !hit.includes(e))
+              .map((e) => ({ e, dist: Math.hypot(posOf(e)[0] - lx, posOf(e)[1] - ly) }))
+              .filter((x) => x.dist <= 1.8 * CELL)
+              .sort((a, b) => a.dist - b.dist)[0];
+            if (!next) break;
+            hit.push(next.e);
+          }
         }
+        let from: [number, number] = [tx, ty];
+        hit.forEach((e, i) => {
+          const at = posOf(e);
+          L.shots.push({ x1: from[0], y1: from[1], x2: at[0], y2: at[1], until: now + 140, color });
+          if (st.chain) from = at;
+          e.hp -= st.chain && i > 0 ? st.dmg * 0.7 : st.dmg;
+          if (st.slow) e.slowUntil = now + 1500;
+          if (st.poison) {
+            e.poison = Math.max(e.poison, st.poison);
+            e.poisonUntil = now + 3000;
+          }
+          if (st.push) e.d = Math.max(0, e.d - st.push);
+        });
       }
+      const killed = L.enemies.filter((e) => e.hp <= 0 && !e.leaked).length;
       L.enemies = L.enemies.filter((e) => e.hp > 0);
       L.shots = L.shots.filter((sh) => sh.until > now);
       for (let k = 0; k < killed; k++) fire("defeat", ++defeats);
@@ -256,11 +324,13 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
       if (L.spawnLeft === 0 && L.enemies.length === 0) {
         stop();
         setRunning(false);
-        const bonus = 5 + n;
+        // Gold mines pay out for each wave cleared.
+        const mined = savedRef.current.towers.reduce((a, t) => a + (TOWERS[t.kind].mine ?? 0) * t.level, 0);
+        const bonus = 5 + n + mined;
         // Healing shrines restore a life for every wave cleared.
         const shrines = (M.devices ?? []).filter((d) => d.kind === "shrine").length;
         save((cur) => ({ ...cur, wave: n, bonus: cur.bonus + bonus, lives: Math.min(MAX_LIVES, cur.lives + shrines), best: Math.max(cur.best, n * 100 + cur.kills * 5) }));
-        say(`Wave ${n} cleared! +${bonus} coins${shrines ? ` · +${shrines} ❤️` : ""}`);
+        say(`Wave ${n} cleared! +${bonus} coins${mined ? ` (⛏️ ${mined})` : ""}${shrines ? ` · +${shrines} ❤️` : ""}`);
         fire("cleared", n);
       }
     };
@@ -335,6 +405,7 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
                   <span className="font-semibold">
                     {TOWERS[here.kind].icon} {TOWERS[here.kind].name} level {here.level}
                   </span>
+                  <span className="w-full text-xs text-muted sm:order-last">{TOWERS[here.kind].blurb}</span>
                   <button type="button" onClick={upgrade} className="rounded-full bg-accent px-3 py-1.5 font-semibold text-on-accent">
                     Upgrade 🪙{upgradeCost(here)}
                   </button>
@@ -343,18 +414,23 @@ export function TowerSiege({ view, act, earn }: PartyProps) {
                   </button>
                 </>
               ) : (
-                (Object.keys(TOWERS) as Kind[]).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    data-kind={k}
-                    onClick={onBuild}
-                    disabled={wallet < TOWERS[k].cost}
-                    className="flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 disabled:opacity-40"
-                  >
-                    {TOWERS[k].icon} {TOWERS[k].name} 🪙{TOWERS[k].cost}
-                  </button>
-                ))
+                <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3">
+                  {(Object.keys(TOWERS) as Kind[]).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      data-kind={k}
+                      onClick={onBuild}
+                      disabled={wallet < TOWERS[k].cost}
+                      className="flex flex-col items-start gap-0.5 rounded-xl border border-line px-3 py-2 text-left hover:border-accent disabled:opacity-40"
+                    >
+                      <span className="font-semibold">
+                        {TOWERS[k].icon} {TOWERS[k].name} <span className="font-normal text-muted">🪙{TOWERS[k].cost}</span>
+                      </span>
+                      <span className="text-xs leading-snug text-muted">{TOWERS[k].blurb}</span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           )}
@@ -378,7 +454,7 @@ function draw(
   canvas: HTMLCanvasElement | null,
   map: TowerMap,
   s: Saved,
-  L: { enemies: Enemy[]; shots: { x1: number; y1: number; x2: number; y2: number }[] },
+  L: { enemies: Enemy[]; shots: { x1: number; y1: number; x2: number; y2: number; color?: string }[] },
   now: number,
   selected: { x: number; y: number } | null = null,
 ) {
@@ -407,9 +483,9 @@ function draw(
       ctx.font = `${CELL * 0.7}px sans-serif`;
     }
   }
-  ctx.strokeStyle = "#fff";
   ctx.lineWidth = 2;
   for (const sh of L.shots) {
+    ctx.strokeStyle = sh.color ?? "#fff";
     ctx.beginPath();
     ctx.moveTo(sh.x1, sh.y1);
     ctx.lineTo(sh.x2, sh.y2);
@@ -421,7 +497,7 @@ function draw(
     ctx.fillText(e.icon, x, y);
     ctx.fillStyle = "#000";
     ctx.fillRect(x - 14, y - 22, 28, 4);
-    ctx.fillStyle = now < e.slowUntil ? "#38bdf8" : "#3ddc84";
+    ctx.fillStyle = now < e.poisonUntil ? "#a3e635" : now < e.slowUntil ? "#38bdf8" : "#3ddc84";
     ctx.fillRect(x - 14, y - 22, 28 * Math.max(0, e.hp / e.max), 4);
   }
 }
