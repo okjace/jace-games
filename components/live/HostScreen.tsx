@@ -9,6 +9,7 @@ import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/use
 import { ChatButton, ChatPanel, useChatShown } from "./ChatPanel";
 import { SnakeArenaHost } from "./SnakeArenaHost";
 import { MpBoard } from "./party/MemoryParty";
+import { VolumeButton } from "@/components/site/SeasonFx";
 import { HostReport } from "./HostReport";
 import { HtmlFrame } from "./HtmlFrame";
 import { Celebration, LiveAvatar, LiveName } from "./LiveAvatar";
@@ -162,6 +163,7 @@ export function HostScreen({ code }: { code: string }) {
               </button>
             )}
             {view.status !== "ended" && <ChatButton label className={secondary} />}
+            <VolumeButton className={secondary} />
             <FullscreenButton on={full.on} toggle={full.toggle} className="border border-line bg-panel" />
             {view.status !== "ended" && (
               <button type="button" onClick={() => confirm("End da game for evryone?") && act("end")} className={secondary}>

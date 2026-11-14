@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { PlayerView } from "@/lib/live/engine";
 import { MODES, type LiveMode } from "@/lib/live/types";
 import { GameQuestion, type AnswerResult } from "../fx/GameQuestion";
-import { Juice, MuteButton, useCountUp, useJuice } from "../fx/Juice";
+import { Juice, useCountUp, useJuice } from "../fx/Juice";
+import { VolumeButton } from "@/components/site/SeasonFx";
 import { sfx } from "../fx/sfx";
 import { BananaBonanza } from "./BananaBonanza";
 import { RareFinds } from "./RareFinds";
@@ -248,7 +249,7 @@ function Stage({ view, busy, act, chat, embedded = false }: { view: PlayerView; 
             </button>
           )}
           {chat && <ChatButton className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 text-lg text-white backdrop-blur" />}
-          <MuteButton />
+          <VolumeButton className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 text-lg text-white backdrop-blur hover:bg-black/40" />
           <FullscreenButton on={full.on} toggle={full.toggle} className="bg-black/25 backdrop-blur" />
           {view.solo && (
             <button

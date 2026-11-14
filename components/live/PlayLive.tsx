@@ -10,6 +10,7 @@ import { openRoomChannel } from "@/lib/realtime/client";
 import type { Avatar } from "@/lib/live/locker";
 import { Answer } from "./Answer";
 import { ChatButton, ChatPanel } from "./ChatPanel";
+import { VolumeButton } from "@/components/site/SeasonFx";
 import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
@@ -164,6 +165,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
         </span>
         <span className="flex items-center gap-3 text-sm">
           {!view.solo && view.chatOn && view.status !== "ended" && <ChatButton className="-my-2 text-lg text-muted hover:text-foreground" />}
+          <VolumeButton className="-my-2 text-lg text-muted hover:text-foreground" />
           <FullscreenButton on={full.on} toggle={full.toggle} className="-my-2 text-muted hover:text-foreground" />
           {view.solo && view.status === "playing" && (
             <button

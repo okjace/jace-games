@@ -256,8 +256,16 @@ export function SeasonBackdrop({ season }: { season: SeasonId }) {
   );
 }
 
-/** The menu bar's sound button: a little panel with volume sliders for sound effects and music. */
+/** The menu bar's sound button (with the theme's click sound as the test beep). */
 export function SoundToggle({ season }: { season: SeasonId }) {
+  return <VolumeButton onTest={() => clickSound(SEASON_FX[season].click)} />;
+}
+
+/**
+ * A sound button that opens volume sliders for sound effects and music.
+ * Used in the menu bar and inside games. `className` styles the button.
+ */
+export function VolumeButton({ className = "", onTest }: { className?: string; onTest?: () => void }) {
   const { sfx, music } = useAudio();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -292,16 +300,16 @@ export function SoundToggle({ season }: { season: SeasonId }) {
         aria-expanded={open}
         aria-label="Sound and music volume"
         title="sound n music"
-        className={`flex h-9 w-9 items-center justify-center rounded-full text-lg transition-[background-color,transform] hover:-rotate-12 hover:bg-foreground/[.06] ${music > 0 ? "jl-bob-small" : ""}`}
+        className={className || `flex h-9 w-9 items-center justify-center rounded-full text-lg transition-[background-color,transform] hover:-rotate-12 hover:bg-foreground/[.06] ${music > 0 ? "jl-bob-small" : ""}`}
       >
         {icon}
       </button>
       {open && (
-        <div className="jl-pop-in absolute right-0 top-11 z-50 flex w-64 flex-col gap-3 rounded-2xl border border-line bg-panel p-4 shadow-xl">
+        <div className="jl-pop-in absolute right-0 top-11 z-50 flex w-64 flex-col gap-3 rounded-2xl border border-line bg-panel p-4 text-left text-foreground shadow-xl">
           <p className="font-display text-lg font-extrabold">🔊 sound stuff</p>
           {slider("sound effects", "💥", sfx, (v) => {
             setAudio({ sfx: v });
-            if (v > 0) clickSound(SEASON_FX[season].click);
+            if (v > 0) (onTest ?? (() => clickSound("pop")))();
           })}
           {slider("music", "🎶", music, (v) => setAudio({ music: v }))}
           <div className="flex gap-2">

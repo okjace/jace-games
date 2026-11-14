@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { Fullscreen } from "@/components/Fullscreen";
 import { GAME_COMPONENTS } from "@/components/games";
-import { Juice, MuteButton } from "@/components/live/fx/Juice";
+import { Juice } from "@/components/live/fx/Juice";
+import { VolumeButton } from "@/components/site/SeasonFx";
 import { Leaderboard } from "@/components/Leaderboard";
 import { LocalPlay } from "@/components/room/LocalPlay";
 import { PlayWithFriends } from "@/components/room/PlayWithFriends";
@@ -76,7 +77,7 @@ export function PlayView({ gameId }: { gameId: string }) {
             ) : Game ? (
               <Juice>
                 <div className="mb-2 flex justify-end">
-                  <MuteButton className="!h-8 !w-8 border border-line !bg-panel !text-base !text-foreground" />
+                  <VolumeButton className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-panel text-base" />
                 </div>
                 <Game onFinish={onFinish} best={best?.score ?? null} />
               </Juice>
