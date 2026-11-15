@@ -72,6 +72,7 @@ export const TAP_COOLDOWN_MS: Record<LiveMode, number> = {
   stack: 0,
   snake: 0,
   mparty: 0,
+  sled: 0,
 };
 
 // ---------- Device modes ----------
@@ -82,6 +83,7 @@ export function reward(mode: LiveMode, streak: number, tap: boolean): number {
   if (mode === "snack") return tap ? 2 : 4 + Math.floor(Math.min(streak, 9) / 3);
   if (mode === "factory") return tap ? 5 : 15 + Math.min(streak, 10) * 3;
   if (mode === "custom") return tap ? 4 : 10 + Math.min(streak, 10) * 2;
+  if (mode === "sled") return tap ? 3 : 10 + Math.min(streak, 10) * 2;
   return 0;
 }
 
@@ -97,6 +99,7 @@ export function scoreCap(mode: LiveMode, bank: number, elapsedSec: number): numb
   if (mode === "snack") return Math.round(bank * 40); // the best upgraded price per item
   if (mode === "factory") return Math.round(bank * 0.3 * elapsedSec + bank * 20); // machines turn coins into gadgets per second
   if (mode === "custom") return Math.round(bank * CUSTOM_SCORE_PER_COIN); // Studio games: what's written in the Studio editor
+  if (mode === "sled") return Math.round(bank * 260 + 500); // a run costs 10 coins; a long run with gifts is a few thousand
   return 0;
 }
 

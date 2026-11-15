@@ -132,6 +132,7 @@ export const GAME_SONGS: Record<LiveMode, Song> = {
   stack: game(6, false, 124, "square", "four", UP, 0.6, false),
   snake: game(-1, true, 138, "sawtooth", "break", [0, 2, 3, 2, 1, 2, 3, 2], 0.5, false),
   mparty: game(2, false, 106, "sine", "shuffle", BOUNCE, 0.5, true, undefined, 0.2),
+  sled: game(5, false, 138, "square", "four", [0, 2, 3, 2, 1, 2, 3, 2], 0.6, true, [0, 5, 9, 7]),
 };
 
 // ---------- Melodies ----------

@@ -64,7 +64,7 @@ export const MAX_MINUTES = 24 * 60;
 /** The shortest timed game (minutes: 10 seconds). Minutes can have seconds in them (1.5 = 1:30). */
 export const MIN_MINUTES = 10 / 60;
 
-export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata" | "rare" | "territory" | "vault" | "king" | "memory" | "sweep" | "stack" | "snake" | "mparty";
+export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata" | "rare" | "territory" | "vault" | "king" | "memory" | "sweep" | "stack" | "snake" | "mparty" | "sled";
 
 export type ModeDef = {
   name: string;
@@ -271,6 +271,14 @@ export const MODES: Record<LiveMode, ModeDef> = {
     selfPaced: true,
     unit: (n) => `${num(n)} pts`,
   },
+  sled: {
+    name: "Sled Dash",
+    icon: "🛷",
+    blurb: "Ride a sled down a snowy hill: dodge trees, rocks n snowmen, grab gifts, and it keeps gettin faster! Right ansers = coins for runs n shields. Best run wins.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => `${num(n)} pts`,
+  },
   rare: {
     name: "Rare Finds",
     icon: "💎",
@@ -290,7 +298,7 @@ export const MODES: Record<LiveMode, ModeDef> = {
 };
 
 /** Modes whose mini-game runs on the player's device; the server caps their score by what they earned. */
-export const DEVICE_MODES: LiveMode[] = ["tower", "snack", "factory", "custom"];
+export const DEVICE_MODES: LiveMode[] = ["tower", "snack", "factory", "custom", "sled"];
 
 export const LIMITS = {
   title: 80,
