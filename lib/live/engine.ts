@@ -5,6 +5,7 @@ import { grantedOf, lockerStore, lookOf, statsOf } from "@/lib/db/liveLocker";
 import { chatStore, type ChatRow } from "@/lib/db/liveChat";
 import { mapStore } from "@/lib/db/liveMaps";
 import { submitBest, type BoardDetails } from "@/lib/db/liveBoards";
+import { cleanTeams, shuffledTeams, smallestTeam, teamIndex, teamScores, type TeamPick, type TeamScore, type TeamSettings } from "./teams";
 import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
 import { addGameToStats, cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar, type XpPart } from "./locker";
@@ -83,6 +84,8 @@ export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean; 
   public?: boolean;
   /** Solo: one player, no host screen. The player moves the game along. */
   solo?: boolean;
+  /** Teams (2–12), and how players get on one. */
+  teams?: TeamSettings | null;
   /** Solo: what was picked, so "Play again" can make the same game. */
   setId?: string | null;
   mapId?: string | null;
@@ -132,6 +135,8 @@ type PlayerData = PartyData & {
   goUntil?: number;
   /** Guests: the hash of their rejoin PIN. */
   pinHash?: string;
+  /** Which team they're on (games with teams). */
+  team?: number;
   /** Self-paced modes: every answer, for the review at the end. */
   log?: { qi: number; a: unknown; correct: boolean }[];
 };
@@ -288,6 +293,8 @@ export async function createLiveGame(
     // 0 = forever (until the host presses End); otherwise 10 seconds to 24 hours, to the second.
     minutes: Number(opts.settings.minutes) === 0 ? 0 : Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, Math.round((Number(opts.settings.minutes) || 5) * 60) / 60)),
     shuffle: !!opts.settings.shuffle,
+    // Teams (not in solo games, or Tug of War, which has its own two).
+    ...(!solo && mode !== "tug" && cleanTeams(opts.settings.teams) ? { teams: cleanTeams(opts.settings.teams) } : {}),
     ...(opts.settings.public === true && opts.settings.solo !== true ? { public: true } : {}),
     ...(solo
       ? {
@@ -397,7 +404,10 @@ export async function joinLiveGame(
   }
   // Guests get a rejoin PIN (signed-in players rejoin with their Jace account).
   const pin = session ? undefined : String(randomInt(1000, 10000));
-  await store.updatePlayer(g.id, added.id, { data: { avatar, ...(pin ? { pinHash: sha(`${pin}:${added.id}`) } : {}) } });
+  // Random teams: straight onto the smallest team. (Joining mid-game with any team setting does too.)
+  const t = (g.settings as GameSettings).teams;
+  const team = t && (t.pick === "random" || g.status !== "lobby") ? smallestTeam(t, players.map((p) => dataOf(p).team)) : undefined;
+  await store.updatePlayer(g.id, added.id, { data: { avatar, ...(pin ? { pinHash: sha(`${pin}:${added.id}`) } : {}), ...(team !== undefined ? { team } : {}) } });
   await push(g, "players");
   return { token, playerId: added.id, ...(pin ? { pin } : {}) };
 }
@@ -428,7 +438,7 @@ async function playAgain(g: LiveGameRow, rawMode: string) {
       correct: 0,
       answered: 0,
       finished_at: null,
-      data: { ...(d.avatar ? { avatar: d.avatar } : {}), ...(d.pinHash ? { pinHash: d.pinHash } : {}) },
+      data: { ...(d.avatar ? { avatar: d.avatar } : {}), ...(d.pinHash ? { pinHash: d.pinHash } : {}), ...(d.team !== undefined ? { team: d.team } : {}) },
     });
   }
   const now = Date.now();
@@ -447,16 +457,16 @@ async function playAgain(g: LiveGameRow, rawMode: string) {
 // ---------- Chat ----------
 
 /** Who's chatting: a player (by their key) or the host (signed in). */
-async function chatter(g: LiveGameRow, token: unknown, session: Session | null): Promise<{ playerId: string | null; name: string; host: boolean }> {
+async function chatter(g: LiveGameRow, token: unknown, session: Session | null): Promise<{ playerId: string | null; name: string; host: boolean; team: number | null }> {
   if (typeof token === "string" && token.length >= 20) {
     const p = await playerFor(g, token);
-    return { playerId: p.id, name: p.name, host: false };
+    return { playerId: p.id, name: p.name, host: false, team: teamIndex((g.settings as GameSettings).teams, dataOf(p).team) };
   }
-  if (session && session.user.id === g.host_id) return { playerId: null, name: session.user.displayName || session.user.username, host: true };
+  if (session && session.user.id === g.host_id) return { playerId: null, name: session.user.displayName || session.user.username, host: true, team: null };
   throw new LiveError("Join the game to chat.", 401);
 }
 
-const chatOut = (m: ChatRow, me: string | null): ChatMessage => ({ id: m.id, name: m.name, host: m.host, text: m.text, at: m.created_at, mine: !!me && m.player_id === me });
+const chatOut = (m: ChatRow, me: string | null): ChatMessage => ({ id: m.id, name: m.name, host: m.host, text: m.text, at: m.created_at, mine: !!me && m.player_id === me, team: m.team ?? null });
 
 /** The latest chat messages (and whether chat is on). */
 export async function chatList(code: string, token: unknown, session: Session | null, after?: string): Promise<{ on: boolean; messages: ChatMessage[] }> {
@@ -464,13 +474,15 @@ export async function chatList(code: string, token: unknown, session: Session | 
   const who = await chatter(g, token, session);
   const on = (g.settings as GameSettings).chat !== false;
   const rows = await chatStore().list(g.id, after && /^\d{4}-/.test(after) ? after : undefined);
-  return { on, messages: rows.map((m) => chatOut(m, who.playerId)) };
+  // Team messages: only that team sees them (and the host, who keeps an eye on every chat).
+  const mine = rows.filter((m) => m.team === null || m.team === undefined || who.host || m.team === who.team);
+  return { on, messages: mine.map((m) => chatOut(m, who.playerId)) };
 }
 
 const lastChat = new Map<string, number>();
 
 /** Send a chat message: cleaned, rate-limited, and shown to everyone right away. */
-export async function chatSend(code: string, token: unknown, session: Session | null, rawText: unknown): Promise<ChatMessage> {
+export async function chatSend(code: string, token: unknown, session: Session | null, rawText: unknown, toTeam = false): Promise<ChatMessage> {
   const g = await getGame(code);
   const who = await chatter(g, token, session);
   if ((g.settings as GameSettings).chat === false && !who.host) throw new LiveError("The host turned chat off.", 403);
@@ -480,8 +492,15 @@ export async function chatSend(code: string, token: unknown, session: Session | 
   const now = Date.now();
   if (now - (lastChat.get(key) ?? 0) < CHAT_GAP_MS) throw new LiveError("Slow down a little!", 429);
   lastChat.set(key, now);
-  const row = await chatStore().add({ game_id: g.id, player_id: who.playerId, name: who.name, host: who.host, text });
-  await broadcast(topicOf(g), "chat", { message: chatOut(row, null) }).catch(() => {});
+  if (toTeam && who.team === null) throw new LiveError("Ur not on a team yet.", 409);
+  const team = toTeam ? who.team : null;
+  const row = await chatStore().add({ game_id: g.id, player_id: who.playerId, name: who.name, host: who.host, text, team });
+  if (team === null) await broadcast(topicOf(g), "chat", { message: chatOut(row, null) }).catch(() => {});
+  else {
+    // Only that team's channel, plus the host's.
+    await broadcast(teamTopicOf(g, team), "chat", { message: chatOut(row, null) }).catch(() => {});
+    await broadcast(teamTopicOf(g, "host"), "chat", { message: chatOut(row, null) }).catch(() => {});
+  }
   return chatOut(row, who.playerId);
 }
 
@@ -550,7 +569,10 @@ export type HostView = {
   current: (Question & { index: number }) | null;
   counts: number[] | null;
   answeredCount: number;
-  players: { id: string; name: string; score: number; correct: number; answered: number; streak: number; finished: boolean; avatar: Avatar | null }[];
+  players: { id: string; name: string; score: number; correct: number; answered: number; streak: number; finished: boolean; avatar: Avatar | null; team: number | null }[];
+  /** Teams: each team's total and place (null without teams), and the channel with every team's chat. */
+  teams: TeamScore[] | null;
+  teamsTopic: string | null;
   /** Memory Party: the shared board for the big screen. */
   mp?: MpView;
   serverNow: number;
@@ -592,7 +614,9 @@ export async function hostView(code: string, session: Session): Promise<HostView
     current,
     counts,
     answeredCount,
-    players: players.map((p) => ({ id: p.id, name: p.name, score: p.score, correct: p.correct, answered: p.answered, streak: p.streak, finished: !!p.finished_at, avatar: avatarOf(p) })),
+    players: players.map((p) => ({ id: p.id, name: p.name, score: p.score, correct: p.correct, answered: p.answered, streak: p.streak, finished: !!p.finished_at, avatar: avatarOf(p), team: teamIndex((g.settings as GameSettings).teams, dataOf(p).team) })),
+    teams: teamsOf(g, players),
+    teamsTopic: (g.settings as GameSettings).teams ? teamTopicOf(g, "host") : null,
     ...(g.mode === "mparty" ? { mp: mpView(g.id, null, players, Date.now()) } : {}),
     serverNow: Date.now(),
   };
@@ -612,6 +636,8 @@ export type PlayerView = {
   me: { id: string; name: string; score: number; rank: number; streak: number; correct: number; answered: number; avatar: Avatar | null; xp: number | null; xpParts: XpPart[] };
   playerCount: number;
   top: { name: string; score: number; you: boolean; avatar: Avatar | null }[];
+  /** Teams: how they're picked, my team (null until I'm on one), every team's total, and my team's chat channel. */
+  teams: { pick: TeamPick; mine: number | null; scores: TeamScore[]; topic: string | null } | null;
   endsAt: number | null;
   /** Classic: the question being played (no answers), what I answered, and at reveal the right answer. */
   question: (PlayerQuestion & { index: number; total: number }) | null;
@@ -716,6 +742,12 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
     me: { id: me.id, name: me.name, score: me.score, rank, streak: me.streak, correct: me.correct, answered: me.answered, avatar: avatarOf(me), xp: d.xp ?? null, xpParts: d.xpParts ?? [] },
     playerCount: all.length,
     top: sorted.slice(0, 5).map((p) => ({ name: p.name, score: p.score, you: p.id === me.id, avatar: avatarOf(p) })),
+    teams: settings.teams
+      ? (() => {
+          const mine = teamIndex(settings.teams, d.team);
+          return { pick: settings.teams.pick, mine, scores: teamsOf(g, all)!, topic: mine !== null ? teamTopicOf(g, mine) : null };
+        })()
+      : null,
     endsAt: s.endsAt ?? null,
     question: classicQ ? { ...forPlayers(classicQ), index: s.q!, total: s.order!.length } : null,
     myAnswer: classicQ ? (d.answers?.[String(s.q)] ?? null) : null,
@@ -872,6 +904,10 @@ type HostAction =
   | { action: "public"; on: boolean }
   | { action: "again"; mode?: string }
   | { action: "chat"; on: boolean }
+  // Teams: change the setup (lobby only), put someone on a team, or shuffle everyone.
+  | { action: "teams"; teams: unknown }
+  | { action: "team-set"; playerId: string; team: number }
+  | { action: "teams-shuffle" }
   // Snake Arena: the host's screen runs the arena and reports everyone's longest snake.
   | { action: "snake-scores"; scores: Record<string, number> };
 
@@ -880,6 +916,32 @@ export async function hostAction(code: string, session: Session, body: HostActio
   if (g.host_id !== session.user.id) throw new LiveError("Only the host can do that.", 403);
   if (body.action === "chat") {
     await push(await bump(g, { settings: { ...(g.settings as GameSettings), chat: body.on === true } }), "chat-settings");
+    return;
+  }
+  if (body.action === "teams") {
+    if (g.status !== "lobby") throw new LiveError("Change teams before the game starts.", 409);
+    const teams = g.mode === "tug" ? null : cleanTeams(body.teams);
+    const next = await bump(g, { settings: { ...(g.settings as GameSettings), teams } });
+    // New setup: random teams get dealt out now; otherwise people pick (or get put) again.
+    const all = await liveStore().players(g.id);
+    if (teams?.pick === "random") await dealTeams(next, all);
+    else for (const p of all) if (dataOf(p).team !== undefined && (!teams || dataOf(p).team! >= teams.count)) await liveStore().updatePlayer(g.id, p.id, { data: { ...dataOf(p), team: undefined } });
+    await push(next, "players");
+    return;
+  }
+  if (body.action === "team-set") {
+    const t = (g.settings as GameSettings).teams;
+    const team = teamIndex(t, body.team);
+    const p = (await liveStore().players(g.id)).find((x) => x.id === body.playerId);
+    if (!p || team === null) throw new LiveError("Pick a team.");
+    await liveStore().updatePlayer(g.id, p.id, { data: { ...dataOf(p), team } });
+    await push(g, "players");
+    return;
+  }
+  if (body.action === "teams-shuffle") {
+    if (!(g.settings as GameSettings).teams) return;
+    await dealTeams(g, await liveStore().players(g.id));
+    await push(g, "players");
     return;
   }
   if (body.action === "again") {
@@ -916,7 +978,9 @@ async function step(g: LiveGameRow, action: string): Promise<void> {
   switch (action) {
     case "start": {
       if (g.status !== "lobby") return;
-      if ((await liveStore().players(g.id)).length === 0) throw new LiveError("Wait for someone to join.");
+      const joined = await liveStore().players(g.id);
+      if (joined.length === 0) throw new LiveError("Wait for someone to join.");
+      await fillTeams(g, joined);
       if (g.mode === "classic") {
         const order = qs.map((_, i) => i);
         if (settings.shuffle) for (let i = order.length - 1; i > 0; i--) { const j = randomInt(i + 1); [order[i], order[j]] = [order[j], order[i]]; }
@@ -977,6 +1041,37 @@ export async function startSoloGame(
   await step(await getGame(code), "start");
   return { code, token, ...(pin ? { pin } : {}) };
 }
+
+// ---------- Teams ----------
+
+/** Everyone spread evenly over the teams, in a random order. */
+async function dealTeams(g: LiveGameRow, all: LivePlayerRow[]) {
+  const t = (g.settings as GameSettings).teams;
+  if (!t) return;
+  const deal = shuffledTeams(t, all.map((p) => p.id));
+  for (const p of all) await liveStore().updatePlayer(g.id, p.id, { data: { ...dataOf(p), team: deal.get(p.id) } });
+}
+
+/** At the start: anyone still without a team goes on the smallest one. */
+async function fillTeams(g: LiveGameRow, all: LivePlayerRow[]) {
+  const t = (g.settings as GameSettings).teams;
+  if (!t) return;
+  const members = all.map((p) => teamIndex(t, dataOf(p).team));
+  for (let i = 0; i < all.length; i++) {
+    if (members[i] !== null) continue;
+    members[i] = smallestTeam(t, members);
+    await liveStore().updatePlayer(g.id, all[i].id, { data: { ...dataOf(all[i]), team: members[i]! } });
+  }
+}
+
+/** Team totals for a game with teams (null without). */
+function teamsOf(g: LiveGameRow, all: LivePlayerRow[]): TeamScore[] | null {
+  const t = (g.settings as GameSettings).teams;
+  return t ? teamScores(t, all.map((p) => ({ team: teamIndex(t, dataOf(p).team), score: p.score }))) : null;
+}
+
+/** The realtime channel only one team's players get (team chat). Not guessable from the game's own channel. */
+const teamTopicOf = (g: LiveGameRow, team: number | "host") => `jg-live:${sha(`${g.channel}:team:${team}`).slice(0, 24)}`;
 
 async function endGame(g: LiveGameRow, winner?: string) {
   const s = stateOf(g);
@@ -1202,6 +1297,8 @@ async function giveXp(g: LiveGameRow) {
 
 type PlayerAction =
   | { action: "answer"; answer: unknown }
+  // Teams: pick my team in the lobby.
+  | { action: "team"; team: number }
   | { action: "next" }
   | { action: "pick"; chest: number }
   | { action: "tap" }
@@ -1237,6 +1334,17 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
     // Re-read: ending the game may have changed this player (their XP).
     const all = await liveStore().players(g.id);
     return buildPlayerView(await getGame(code), all.find((p) => p.id === me.id) ?? me, all);
+  }
+  if (body.action === "team") {
+    // Players pick their own team in the lobby (when the host lets them).
+    const t = (g.settings as GameSettings).teams;
+    if (!t || t.pick !== "players") throw new LiveError("The host picks the teams in this game.", 403);
+    if (g.status !== "lobby") throw new LiveError("Teams are locked once the game starts.", 409);
+    const team = teamIndex(t, body.team);
+    if (team === null) throw new LiveError("Pick a team.");
+    me = (await store.updatePlayer(g.id, me.id, { data: { ...dataOf(me), team } }))!;
+    await push(g, "players");
+    return buildPlayerView(g, me, await store.players(g.id));
   }
   const s = stateOf(g);
   const now = Date.now();

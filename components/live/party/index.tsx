@@ -8,6 +8,7 @@ import { Juice, useCountUp, useJuice } from "../fx/Juice";
 import { VolumeButton } from "@/components/site/SeasonFx";
 import { sfx } from "../fx/sfx";
 import { clock } from "../ui";
+import { TeamBadge } from "../TeamSetup";
 import { BananaBonanza } from "./BananaBonanza";
 import { RareFinds } from "./RareFinds";
 import { BossBattle, DragonHatchery, LastStanding, PinataParty, SummitClimb, TugOfWar } from "./MoreModes";
@@ -238,6 +239,12 @@ function Stage({ view, busy, act, chat, embedded = false }: { view: PlayerView; 
         <div className="flex items-center gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-black/25 py-1.5 pl-2 pr-4 backdrop-blur">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-xl">{def.icon}</span>
+            {view.teams && view.teams.mine !== null && (
+              <span className="shrink-0" title="Ur team (and its place)">
+                <TeamBadge team={view.teams.mine} small />
+                <span className="ml-1 text-xs font-bold">#{view.teams.scores.find((t) => t.team === view.teams!.mine)?.rank}</span>
+              </span>
+            )}
             <span className="truncate font-mono text-xl font-black tabular-nums">{def.unit(score)}</span>
           </div>
           {view.me.streak >= 2 && <span className="rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-3 py-2 text-sm font-black">🔥{view.me.streak}</span>}

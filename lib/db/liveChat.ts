@@ -3,7 +3,8 @@ import { supabase, usingSupabase } from "./rooms";
 
 /** Chat messages in Live games (supabase/migrations/019_live_chat.sql); in memory during development without Supabase. */
 
-export type ChatRow = { id: string; game_id: string; player_id: string | null; name: string; host: boolean; text: string; created_at: string };
+/** `team`: a team-only message (null = everyone). */
+export type ChatRow = { id: string; game_id: string; player_id: string | null; name: string; host: boolean; text: string; team?: number | null; created_at: string };
 
 export interface ChatStore {
   add(m: Omit<ChatRow, "id" | "created_at">): Promise<ChatRow>;
@@ -14,7 +15,9 @@ export interface ChatStore {
 
 const supabaseStore: ChatStore = {
   async add(m) {
-    const res = await supabase().from("live_chat").insert(m).select().single();
+    // Everyone-messages leave `team` out, so they still save before migration 028 adds the column.
+    const { team, ...rest } = m;
+    const res = await supabase().from("live_chat").insert(team === null || team === undefined ? rest : m).select().single();
     if (res.error) throw new Error(res.error.message);
     return res.data as ChatRow;
   },

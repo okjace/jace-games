@@ -7,7 +7,8 @@
 export const CHAT_MAX = 200;
 export const CHAT_GAP_MS = 2000;
 
-export type ChatMessage = { id: string; name: string; host: boolean; text: string; at: string; mine?: boolean };
+/** `team`: sent to one team only (null = everyone). */
+export type ChatMessage = { id: string; name: string; host: boolean; text: string; at: string; mine?: boolean; team?: number | null };
 
 const RUDE = ["damn", "hell", "crap", "stupid", "idiot", "dumb", "shut up", "loser", "sucks", "wtf", "stfu", "fuck", "shit", "bitch", "ass", "bastard", "piss"];
 const rudeRe = new RegExp(`\\b(${RUDE.map((w) => w.replace(/ /g, "\\s+")).join("|")})\\b`, "gi");

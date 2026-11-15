@@ -26,9 +26,9 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/live/games/
   const token = req.headers.get("x-live-token");
   const session = token ? null : await getSession();
   if (!allow(`live-chat:${token ?? session?.user.id ?? "anon"}`, 15, 60_000)) return NextResponse.json({ error: "Slow down a little!" }, { status: 429 });
-  const body = ((await req.json().catch(() => null)) ?? {}) as { text?: unknown };
+  const body = ((await req.json().catch(() => null)) ?? {}) as { text?: unknown; team?: unknown };
   try {
-    return NextResponse.json({ message: await chatSend(code, token, session, body.text) });
+    return NextResponse.json({ message: await chatSend(code, token, session, body.text, body.team === true) });
   } catch (e) {
     return liveError(e);
   }

@@ -11,6 +11,8 @@ import type { Avatar } from "@/lib/live/locker";
 import { Answer } from "./Answer";
 import { ChatButton, ChatPanel } from "./ChatPanel";
 import { GlobalBoardOptIn } from "./GlobalBoardOptIn";
+import { PlayerTeamPicker, TeamBoard } from "./HostTeams";
+import { TeamBadge } from "./TeamSetup";
 import { VolumeButton } from "@/components/site/SeasonFx";
 import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
@@ -154,7 +156,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           busy={busy}
           act={act}
           embedded={embedded}
-          chat={view.solo || !view.chatOn ? null : <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} tone="stage" className="h-72 lg:h-[calc(100vh-8rem)]" />}
+          chat={view.solo || !view.chatOn ? null : <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} teamTopic={view.teams?.topic ?? null} myTeam={view.teams?.mine ?? null} tone="stage" className="h-72 lg:h-[calc(100vh-8rem)]" />}
         />
       </>
     );
@@ -167,6 +169,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
         <span className="flex min-w-0 items-center gap-2">
           <LiveAvatar avatar={view.me.avatar} size={30} />
           <LiveName name={view.me.name} avatar={view.me.avatar} className="font-semibold" />
+          {view.teams && <TeamBadge team={view.teams.mine} small />}
         </span>
         <span className="flex items-center gap-3 text-sm">
           {!view.solo && view.chatOn && view.status !== "ended" && <ChatButton className="-my-2 text-lg text-muted hover:text-foreground" />}
@@ -197,6 +200,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           <p className="text-xl font-bold">Ur in!</p>
           <p className="text-muted">Watch the big screen. The game starts soon.</p>
           <p className="text-sm text-muted">{view.playerCount} playing</p>
+          {view.teams && <PlayerTeamPicker teams={view.teams} busy={busy} onPick={(team) => void act({ action: "team", team })} />}
           <RejoinPin code={view.code} />
         </Centered>
       )}
@@ -215,6 +219,11 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           <p className="text-muted">
             {score(view, view.me.score)} · {view.me.correct}/{view.me.answered} right
           </p>
+          {view.teams && (
+            <div className="w-full">
+              <TeamBoard teams={view.teams.scores} big mine={view.teams.mine} />
+            </div>
+          )}
           <XpGained view={view} />
           <GlobalBoardOptIn code={code} token={token} view={view} />
           <Review view={view} />
@@ -224,7 +233,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           </Link>
         </Centered>
       )}
-      {!view.solo && view.chatOn && view.status !== "ended" && <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} className="h-72" />}
+      {!view.solo && view.chatOn && view.status !== "ended" && <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} teamTopic={view.teams?.topic ?? null} myTeam={view.teams?.mine ?? null} className="h-72" />}
     </div>
     </div>
   );

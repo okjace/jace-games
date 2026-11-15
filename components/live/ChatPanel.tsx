@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { TEAMS } from "@/lib/live/teams";
 import { CHAT_MAX, type ChatMessage } from "@/lib/live/chat";
 import { openRoomChannel } from "@/lib/realtime/client";
 
@@ -92,12 +93,18 @@ export function ChatPanel({
   on,
   tone = "panel",
   className = "",
+  teamTopic = null,
+  myTeam = null,
 }: {
   code: string;
   topic: string;
   token: string | null;
   host?: boolean;
   on: boolean;
+  /** Team games: the team chat channel (a player's own team; the host's has every team). */
+  teamTopic?: string | null;
+  /** A player's team (they get an "everyone / my team" switch). */
+  myTeam?: number | null;
   tone?: "panel" | "stage";
   className?: string;
 }) {
@@ -106,6 +113,8 @@ export function ChatPanel({
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [chatOn, setChatOn] = useState(on);
+  const [toTeam, setToTeam] = useState(false);
+  const teamChat = !host && myTeam !== null;
   const shownRef = useRef(shown);
   const seen = useRef<Set<string> | null>(null);
   const listRef = useRef<HTMLOListElement>(null);
@@ -160,11 +169,21 @@ export function ChatPanel({
       }),
       ch.on("chat-settings", () => void load()),
     ];
+    // Team messages come on the team's own channel.
+    const tc = teamTopic ? openRoomChannel(teamTopic, null) : null;
+    const offTeam = tc?.on("chat", (p) => {
+      const m = (p as { message?: ChatMessage }).message;
+      if (!m) return;
+      setMessages((cur) => (cur.some((c) => c.id === m.id) ? cur : [...cur, m].slice(-80)));
+      arrived([m.id]);
+    });
     return () => {
       offs.forEach((off) => off());
+      offTeam?.();
       ch.close();
+      tc?.close();
     };
-  }, [topic, load, arrived]);
+  }, [topic, teamTopic, load, arrived]);
 
   useEffect(() => {
     if (shown) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -173,7 +192,7 @@ export function ChatPanel({
   const send = async () => {
     if (!text.trim()) return;
     setError(null);
-    const res = await fetch(`/api/live/games/${code}/chat`, { method: "POST", headers: headers(), body: JSON.stringify({ text }) }).catch(() => null);
+    const res = await fetch(`/api/live/games/${code}/chat`, { method: "POST", headers: headers(), body: JSON.stringify({ text, team: teamChat && toTeam }) }).catch(() => null);
     const body = await res?.json().catch(() => null);
     if (!res?.ok) return setError(body?.error ?? "Couldn't send.");
     setText("");
@@ -193,6 +212,8 @@ export function ChatPanel({
 
   if ((!chatOn && !host) || !shown) return null;
 
+  // Players see one chat at a time: everyone's, or their team's.
+  const visible = teamChat ? messages.filter((m) => (toTeam ? m.team === myTeam : m.team === null || m.team === undefined)) : messages;
   const stage = tone === "stage";
   const muted = stage ? "text-white/70" : "text-muted";
   const shell = stage ? "border-white/15 bg-black/30 text-white backdrop-blur" : "border-line bg-panel text-foreground";
@@ -213,13 +234,34 @@ export function ChatPanel({
           ✕
         </button>
       </div>
+      {teamChat && (
+        <div className={`flex gap-1 border-b p-1.5 text-xs font-bold ${line}`} role="tablist" aria-label="Which chat">
+          {[false, true].map((t) => (
+            <button
+              key={String(t)}
+              type="button"
+              role="tab"
+              aria-selected={toTeam === t}
+              onClick={() => setToTeam(t)}
+              className={`flex-1 rounded-full px-2 py-1 ${toTeam === t ? "bg-accent text-on-accent" : "hover:bg-foreground/[.08]"}`}
+            >
+              {t ? `${TEAMS[myTeam!]?.icon ?? "👥"} my team` : "🌍 evryone"}
+            </button>
+          ))}
+        </div>
+      )}
           <ol ref={listRef} className="flex min-h-40 flex-1 flex-col gap-1.5 overflow-y-auto p-3 text-sm" aria-live="polite">
-            {messages.length === 0 && <li className={`m-auto text-center text-xs ${muted}`}>No messages yet. Say hi! 👋</li>}
-            {messages.map((m) => (
+            {visible.length === 0 && <li className={`m-auto text-center text-xs ${muted}`}>{teamChat && toTeam ? "Just ur team sees this chat. Make a plan! 🤫" : "No messages yet. Say hi! 👋"}</li>}
+            {visible.map((m) => (
               <li key={m.id} className={`group flex flex-col ${m.mine ? "items-end" : "items-start"}`}>
                 <span className={`text-[11px] ${muted}`}>
                   {m.host && "👑 "}
                   {m.name}
+                  {host && m.team !== null && m.team !== undefined && TEAMS[m.team] && (
+                    <span className="ml-1 rounded-full px-1.5 font-bold text-white" style={{ background: TEAMS[m.team].color }}>
+                      {TEAMS[m.team].icon} team only
+                    </span>
+                  )}
                 </span>
                 <span
                   className={`max-w-[85%] break-words rounded-2xl px-3 py-1.5 ${
@@ -247,7 +289,7 @@ export function ChatPanel({
               <input
                 value={text}
                 onChange={(e) => setText(e.target.value.slice(0, CHAT_MAX))}
-                placeholder={chatOn ? "Say somthing nice…" : "Chat is off (only u can send)"}
+                placeholder={!chatOn ? "Chat is off (only u can send)" : teamChat && toTeam ? "Message ur team…" : "Say somthing nice…"}
                 aria-label="Chat message"
                 className={`h-10 min-w-0 flex-1 rounded-full border px-3 text-sm outline-none focus:border-accent ${stage ? "border-white/25 bg-white/10 text-white placeholder:text-white/50" : "border-line bg-background"}`}
               />

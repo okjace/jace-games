@@ -17,6 +17,7 @@ import { Markdown, QuestionMediaView } from "./Markdown";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
 import { PlayLive } from "./PlayLive";
 import { ask } from "@/components/site/ConfirmBox";
+import { HostTeamLobby, TeamBoard } from "./HostTeams";
 import { clock } from "./ui";
 import { useGameMusic } from "@/lib/gameMusic";
 
@@ -180,7 +181,12 @@ export function HostScreen({ code }: { code: string }) {
         <div className="flex min-w-0 flex-1 flex-col gap-4">
         {showPlayers && <PlayerList view={view} onKick={(id) => act("kick", { playerId: id })} onClose={() => setShowPlayers(false)} />}
 
-        {view.status === "lobby" && <Lobby view={view} busy={busy} onStart={() => act("start")} onKick={(id) => act("kick", { playerId: id })} />}
+        {view.status === "lobby" && (
+          <Lobby view={view} busy={busy} onStart={() => act("start")} onKick={(id) => act("kick", { playerId: id })}>
+            <HostTeamLobby view={view} act={(a, extra) => void act(a, extra)} onKick={(id, name) => void ask(`Remove ${name} from the game?`).then((ok) => { if (ok) void act("kick", { playerId: id }); })} />
+          </Lobby>
+        )}
+        {view.status === "playing" && view.teams && <TeamBoard teams={view.teams} />}
 
         {view.status === "playing" && view.mode === "classic" && view.current && (
           <Classic view={view} secondsLeft={secondsLeft ?? 0} busy={busy} onReveal={() => act("reveal")} onNext={() => act("next")} />
@@ -214,6 +220,7 @@ export function HostScreen({ code }: { code: string }) {
         )}
         {view.status === "playing" && view.mode !== "classic" && view.mode !== "snake" && view.mode !== "mparty" && <SelfPaced view={view} secondsLeft={secondsLeft} />}
 
+        {view.status === "ended" && view.teams && <TeamBoard teams={view.teams} big />}
         {view.status === "ended" && <Podium view={view} />}
         {view.status === "ended" && <PlayAgain view={view} busy={busy} onAgain={(m) => act("again", { mode: m })} />}
 
@@ -221,7 +228,7 @@ export function HostScreen({ code }: { code: string }) {
         </div>
         {view.status !== "ended" && (
           <aside className={chatShown ? "lg:sticky lg:top-4 lg:w-80 lg:shrink-0" : "hidden"}>
-            <ChatPanel code={view.code} topic={view.topic} token={null} host on={view.settings.chat !== false} className="h-80 lg:h-[calc(100vh-11rem)]" />
+            <ChatPanel code={view.code} topic={view.topic} token={null} host on={view.settings.chat !== false} teamTopic={view.teamsTopic} className="h-80 lg:h-[calc(100vh-11rem)]" />
           </aside>
         )}
         </div>
@@ -307,7 +314,7 @@ function HostBar({
   );
 }
 
-function Lobby({ view, busy, onStart, onKick }: { view: HostView; busy: boolean; onStart: () => void; onKick: (id: string) => void }) {
+function Lobby({ view, busy, onStart, onKick, children }: { view: HostView; busy: boolean; onStart: () => void; onKick: (id: string) => void; children?: React.ReactNode }) {
   return (
     <div className={`${card} flex flex-col items-center gap-5 py-10 text-center`}>
       <p className="text-sm text-muted">Game code</p>
@@ -315,7 +322,7 @@ function Lobby({ view, busy, onStart, onKick }: { view: HostView; busy: boolean;
       <p className="text-muted">
         {view.players.length === 0 ? "Waitin for playas…" : `${view.players.length} player${view.players.length === 1 ? "" : "s"} in`}
       </p>
-      <ul className="flex max-w-3xl flex-wrap justify-center gap-2">
+      {view.teams ? children : <ul className="flex max-w-3xl flex-wrap justify-center gap-2">
         {view.players.map((p) => (
           <li key={p.id}>
             <button
@@ -329,7 +336,7 @@ function Lobby({ view, busy, onStart, onKick }: { view: HostView; busy: boolean;
             </button>
           </li>
         ))}
-      </ul>
+      </ul>}
       <button type="button" onClick={onStart} disabled={busy || view.players.length === 0} className={`${primary} h-14 px-10 text-lg`}>
         Start
       </button>

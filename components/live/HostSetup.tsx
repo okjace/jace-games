@@ -8,6 +8,8 @@ import { signInHref } from "@/components/site/SiteHeader";
 import { MAX_MINUTES, MIN_MINUTES, MODES, type LiveMode, type SetSummary } from "@/lib/live/types";
 import { guestAvatar } from "./LiveAvatar";
 import { RejoinBanner } from "./RejoinBanner";
+import { TeamSetup } from "./TeamSetup";
+import type { TeamSettings } from "@/lib/live/teams";
 import { MapCard, type MapSummaryView } from "./MapList";
 import { card, primary, secondary, setPin, setToken } from "./ui";
 
@@ -38,6 +40,7 @@ export function HostSetup() {
   const [customTime, setCustomTime] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [listed, setListed] = useState(false);
+  const [teams, setTeams] = useState<TeamSettings | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,7 +82,7 @@ export function HostSetup() {
   // Classic needs questions, so with them off it becomes Gold Rush.
   const mode = noSet && MODES[pickedMode].needsSet ? "gold" : pickedMode === "rare" && !chosen?.rare ? "classic" : pickedMode;
 
-  const picks = () => ({ setId: noSet ? null : setId, mode, settings: { minutes, shuffle, public: listed, mapId: mode === "tower" ? mapId : null, gameId: mode === "custom" ? gameId : null } });
+  const picks = () => ({ setId: noSet ? null : setId, mode, settings: { minutes, shuffle, public: listed, teams: mode === "tug" ? null : teams, mapId: mode === "tower" ? mapId : null, gameId: mode === "custom" ? gameId : null } });
 
   const playSolo = async () => {
     setBusy(true);
@@ -290,6 +293,11 @@ export function HostSetup() {
               <input type="checkbox" checked={shuffle} onChange={(e) => setShuffle(e.target.checked)} />
               Shuffle question order
             </label>
+          )}
+          {!soloFirst && user && mode !== "tug" && (
+            <div className="w-full">
+              <TeamSetup value={teams} onChange={setTeams} />
+            </div>
           )}
           {!soloFirst && user && (
             <label className="flex items-center gap-2" title="Anyone can find this game on the Discover page and join it">
