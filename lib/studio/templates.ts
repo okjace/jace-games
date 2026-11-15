@@ -19,13 +19,16 @@ export type Template = {
   liveMode?: boolean;
 };
 
+/** What "New game" offers: Jace Live is only Live, so only Live starters. (The others stay for old links.) */
+export const LIVE_TEMPLATE_IDS: TemplateId[] = ["live", "blank"];
+
 export const TEMPLATES: Template[] = [
   { id: "arcade", name: "Dodge", icon: "☄️", description: "Arcade: move left and right to dodge falling rocks.", multiplayer: null },
   { id: "puzzle", name: "Lights Out", icon: "💡", description: "Puzzle: turn every light off. Each tap flips a light and its neighbours.", multiplayer: null },
   { id: "clicker", name: "Cookie Rush", icon: "🍪", description: "Clicker: tap the cookie, buy helpers, bake as much as you can in 60 seconds.", multiplayer: null },
   { id: "duel", name: "Paddle Duel", icon: "🏓", description: "2 players: first to 5 points wins. Uses jace.room to play online.", multiplayer: { mode: "live", min: 2, max: 2 } },
   { id: "live", name: "Star Garden", icon: "🌟", description: "Live mode: spend coins from right answers on flowers that grow stars. Uses jace.live.", multiplayer: null, liveMode: true },
-  { id: "blank", name: "Blank", icon: "🎮", description: "An empty canvas and a game loop.", multiplayer: null },
+  { id: "blank", name: "Blank Live mode", icon: "🎮", description: "An empty canvas, a game loop, ur coins from right answers and an earn button. Build anything!", multiplayer: null, liveMode: true },
 ];
 
 const BASE_STYLE = `<style>
@@ -533,23 +536,58 @@ requestAnimationFrame(frame);
 </script>
 `;
 
-const BLANK = `${BASE_STYLE}
+const BLANK = `<style>
+  html, body { margin: 0; height: 100%; background: var(--jl-bg, #111317); color: var(--jl-text, #e6e8eb); overflow: hidden;
+    font-family: system-ui, sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; width: 100vw; height: 100vh; object-fit: contain; }
+</style>
 <canvas id="game" width="480" height="360"></canvas>
 <script>
-// Your game starts here. The canvas is 480x360 and scales to fit.
-// jace.submitScore(n) saves a score; jace.gameOver() ends the round.
+// A Jace Live mode. Players earn coins by answering questions:
+// jace.live.coins is everything they've earned (it only goes up), so keep
+// track of what ur game spends. jace.live.earn() opens the questions.
+// jace.submitScore(n) is their score; jace.theme has the site's colours.
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const theme = jace.theme;
+const live = jace.live; // null when u test it outside of Live
+let earned = live ? live.coins : 50;
+let spent = 0;
 let t = 0;
+if (live) live.onCoins((total) => { earned = total; });
+
+canvas.addEventListener("pointerdown", (e) => {
+  const r = canvas.getBoundingClientRect();
+  const x = ((e.clientX - r.left) / r.width) * 480;
+  const y = ((e.clientY - r.top) / r.height) * 360;
+  // The "earn coins" button in the corner.
+  if (x > 360 && y < 44) { if (live) live.earn(); return; }
+  // Tap anywhere else: spend 5 coins for 1 point.
+  if (earned - spent >= 5) { spent += 5; jace.submitScore(spent / 5); }
+});
 
 function frame() {
   t += 1 / 60;
-  ctx.fillStyle = "#111317";
+  ctx.fillStyle = theme.background;
   ctx.fillRect(0, 0, 480, 360);
-  ctx.fillStyle = "#3ddc84";
+  // Coins and the earn button.
+  ctx.fillStyle = theme.panel;
+  ctx.fillRect(360, 8, 112, 30);
+  ctx.fillStyle = theme.accent;
+  ctx.font = "bold 14px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("🪙 earn coins", 416, 28);
+  ctx.textAlign = "left";
+  ctx.fillStyle = theme.text;
+  ctx.fillText("🪙 " + (earned - spent), 12, 28);
+  // Ur game goes here!
+  ctx.fillStyle = theme.accent;
   ctx.font = "bold 28px system-ui";
   ctx.textAlign = "center";
   ctx.fillText("Hello, " + jace.player.name + "!", 240, 180 + Math.sin(t * 3) * 20);
+  ctx.fillStyle = theme.muted;
+  ctx.font = "14px system-ui";
+  ctx.fillText("tap to spend 5 coins for a point", 240, 230);
   requestAnimationFrame(frame);
 }
 frame();
@@ -557,7 +595,7 @@ frame();
 `;
 
 const LIVE = `<style>
-  html, body { margin: 0; height: 100%; background: #10162b; color: #fff; font-family: system-ui, sans-serif; overflow: hidden; user-select: none; }
+  html, body { margin: 0; height: 100%; background: var(--jl-bg, #10162b); color: var(--jl-text, #fff); font-family: system-ui, sans-serif; overflow: hidden; user-select: none; }
   canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 </style>
 <canvas id="c" width="480" height="360"></canvas>
@@ -608,32 +646,32 @@ function frame(now) {
   }
   if (Math.floor(stars) !== reported) { reported = Math.floor(stars); jace.submitScore(reported); }
 
-  ctx.fillStyle = "#10162b";
+  ctx.fillStyle = jace.theme.background;
   ctx.fillRect(0, 0, 480, 360);
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = jace.theme.text;
   ctx.font = "bold 18px system-ui";
   ctx.textAlign = "left";
   ctx.fillText("🌟 " + Math.floor(stars) + "   🪙 " + coins(), 14, 30);
-  ctx.fillStyle = "#facc15";
+  ctx.fillStyle = jace.theme.accent;
   ctx.beginPath(); ctx.roundRect(340, 10, 128, 32, 16); ctx.fill();
-  ctx.fillStyle = "#000";
+  ctx.fillStyle = "#fff";
   ctx.font = "bold 14px system-ui";
   ctx.textAlign = "center";
   ctx.fillText("Earn coins ❓", 404, 31);
   for (const p of plots) {
-    ctx.fillStyle = "#2b3a1f";
+    ctx.fillStyle = jace.theme.line;
     ctx.beginPath(); ctx.ellipse(p.x, p.y + 30, 44, 12, 0, 0, Math.PI * 2); ctx.fill();
     ctx.font = (24 + p.level * 8) + "px system-ui";
     ctx.fillText(["🌱", "🌷", "🌻", "🌺", "🌟"][p.level], p.x, p.y + 10 + Math.sin(now / 400 + p.x) * 2);
     ctx.font = "12px system-ui";
-    ctx.fillStyle = "#cbd5e1";
+    ctx.fillStyle = jace.theme.muted;
     ctx.fillText(p.level >= 4 ? "max" : "🪙 " + cost(p), p.x, p.y + 52);
     ctx.fillStyle = "#000";
   }
   if (flash) {
     flash.t -= dt;
     ctx.globalAlpha = Math.max(0, Math.min(1, flash.t));
-    ctx.fillStyle = "#facc15";
+    ctx.fillStyle = jace.theme.accent;
     ctx.font = "bold 20px system-ui";
     ctx.fillText(flash.text, 240, 90);
     ctx.globalAlpha = 1;

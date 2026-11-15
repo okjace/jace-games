@@ -14,7 +14,7 @@ import { BLOCK_RUNTIME } from "./blockRuntime";
 type B = typeof BlocklyType;
 type JsModule = typeof import("blockly/javascript");
 
-const C = { events: "#d4a017", sprites: "#4c97ff", sensing: "#2ca5c9", game: "#2fa86b", multi: "#9966ff" };
+const C = { events: "#d4a017", sprites: "#4c97ff", sensing: "#2ca5c9", game: "#2fa86b", multi: "#9966ff", live: "#e8590c" };
 
 const KEYS = [
   ["← left", "left"],
@@ -130,6 +130,13 @@ export const BLOCKS = [
   },
 
   // Multiplayer
+  // Jace Live: coins from right answers.
+  hat("jg_on_coins", "when I get coins", [], "Runs each time the player earns coins by answering questions."),
+  value("jg_coins", "coins I have", [], "Number", C.live, "Coins earned from right answers, minus what this game spent."),
+  value("jg_coins_gained", "coins just earned", [], "Number", C.live, "How many coins came in last time (use it in 'when I get coins')."),
+  step("jg_spend", "spend %1 coins", [num("AMOUNT")], C.live, "Takes the coins away (only if the player has that many)."),
+  value("jg_can_spend", "have %1 coins?", [num("AMOUNT")], "Boolean", C.live, "True if the player has at least that many coins."),
+  step("jg_earn", "go answer questions", [], C.live, "Opens the questions so the player can earn more coins."),
   hat("jg_on_message", "when message %1 received", [{ type: "field_input", name: "NAME", text: "hello" }], "Runs when another player sends this message."),
   step("jg_send", "send message %1 with %2", [{ type: "field_input", name: "NAME", text: "hello" }, any("VALUE")], C.multi, "Sends a message to the other players."),
   value("jg_message_value", "message value", [], null, C.multi, "What came with the message."),
@@ -144,8 +151,9 @@ export const BLOCKS = [
 
 // Hats are colored like events but the multiplayer one belongs with its friends.
 (BLOCKS.find((b) => b.type === "jg_on_message") as { colour: string }).colour = C.multi;
+(BLOCKS.find((b) => b.type === "jg_on_coins") as { colour: string }).colour = C.live;
 
-export const HATS = new Set(["jg_on_start", "jg_on_key", "jg_on_tap", "jg_on_sprite_tap", "jg_on_tick", "jg_every", "jg_on_message"]);
+export const HATS = new Set(["jg_on_start", "jg_on_key", "jg_on_tap", "jg_on_sprite_tap", "jg_on_tick", "jg_every", "jg_on_message", "jg_on_coins"]);
 
 const shadowNum = (n: number) => ({ shadow: { type: "math_number", fields: { NUM: n } } });
 const shadowText = (t: string) => ({ shadow: { type: "text", fields: { TEXT: t } } });
@@ -204,15 +212,20 @@ export const TOOLBOX = {
         { kind: "block", type: "math_random_int", inputs: { FROM: shadowNum(1), TO: shadowNum(10) } },
       ],
     },
+    // Every Studio game is a Jace Live mode, so the Live blocks replace the old multiplayer ones
+    // (games that already use those still run).
     {
       kind: "category",
-      name: "Multiplayer",
-      colour: C.multi,
+      name: "Live",
+      colour: C.live,
       contents: [
-        { kind: "block", type: "jg_on_message" },
-        { kind: "block", type: "jg_send", inputs: { VALUE: shadowNum(0) } },
-        ...["jg_message_value", "jg_message_from", "jg_is_host", "jg_online", "jg_my_number", "jg_player_count", "jg_my_name"].map((type) => ({ kind: "block", type })),
-        { kind: "block", type: "jg_game_over_winner", inputs: { WINNER: shadowNum(1) } },
+        { kind: "block", type: "jg_on_coins" },
+        { kind: "block", type: "jg_coins" },
+        { kind: "block", type: "jg_coins_gained" },
+        { kind: "block", type: "jg_spend", inputs: { AMOUNT: shadowNum(10) } },
+        { kind: "block", type: "jg_can_spend", inputs: { AMOUNT: shadowNum(10) } },
+        { kind: "block", type: "jg_earn" },
+        { kind: "block", type: "jg_my_name" },
       ],
     },
     { kind: "sep" },
@@ -277,6 +290,12 @@ function defineGenerators(js: JsModule) {
   });
   set("jg_on_tick", (b, g) => `$g.onTick(function () {\n${body(b, g)}});\n`);
   set("jg_every", (b, g) => `$g.every(${Number(b.getFieldValue("SECS")) || 1}, function () {\n${body(b, g)}});\n`);
+  set("jg_on_coins", (b, g) => `$g.onCoins(function () {\n${body(b, g)}});\n`);
+  set("jg_coins", () => ["$g.coins()", Order.FUNCTION_CALL]);
+  set("jg_coins_gained", () => ["$g.coinsGained()", Order.FUNCTION_CALL]);
+  set("jg_spend", (b, g) => `$g.spend(${v(b, g, "AMOUNT", "0")});\n`);
+  set("jg_can_spend", (b, g) => [`$g.canSpend(${v(b, g, "AMOUNT", "0")})`, Order.FUNCTION_CALL]);
+  set("jg_earn", () => "$g.earn();\n");
   set("jg_on_message", (b, g) => `$g.onMessage(${f(b, "NAME")}, function () {\n${body(b, g)}});\n`);
 
   set("jg_new_emoji", (b, g) => [`$g.sprite(${f(b, "LOOK")}, ${v(b, g, "X", "240")}, ${v(b, g, "Y", "180")}, ${v(b, g, "SIZE", "40")})`, Order.FUNCTION_CALL]);

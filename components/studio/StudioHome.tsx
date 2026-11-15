@@ -7,7 +7,7 @@ import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import { timeAgo } from "@/lib/format";
 import { blockTemplate } from "@/lib/studio/blockTemplates";
-import { TEMPLATES, templateHtml, type Template } from "@/lib/studio/templates";
+import { LIVE_TEMPLATE_IDS, TEMPLATES, templateHtml, type Template } from "@/lib/studio/templates";
 import { api, card, primary, secondary } from "./ui";
 
 type Summary = {
@@ -81,7 +81,8 @@ export function StudioHome() {
     }
   }
 
-  const templates = TEMPLATES.filter((t) => kind === "code" || blockTemplate(t.id));
+  // Live starters only (blocks: the blank one, with the Live blocks to build on).
+  const templates = TEMPLATES.filter((t) => LIVE_TEMPLATE_IDS.includes(t.id) && (kind === "code" || blockTemplate(t.id)));
 
   return (
     <div className="flex flex-col gap-6">

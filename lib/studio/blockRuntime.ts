@@ -7,7 +7,7 @@
  */
 
 export const BLOCK_RUNTIME = `<style>
-  html, body { margin: 0; height: 100%; background: #111317; overflow: hidden; touch-action: none;
+  html, body { margin: 0; height: 100%; background: var(--jl-bg, #111317); overflow: hidden; touch-action: none;
     user-select: none; -webkit-user-select: none; }
   canvas { display: block; width: 100vw; height: 100vh; object-fit: contain; }
 </style>
@@ -22,7 +22,9 @@ var $g = (function () {
   var COLORS = { green: "#3ddc84", blue: "#60a5fa", red: "#f87171", yellow: "#fbbf24", white: "#e6e8eb", grey: "#8b919c", purple: "#a78bfa", orange: "#fb923c", black: "#111317", navy: "#1e3a5f" };
   var on = { start: [], tick: [], tap: [], key: {}, spriteTap: [], every: [], msg: {} };
   var sprites = [], timers = [], down = {};
-  var score = 0, scoreShown = false, over = false, background = "#111317", text = "", time = 0;
+  var score = 0, scoreShown = false, over = false, background = (jace.theme && jace.theme.background) || "#111317", text = "", time = 0;
+  // Testing outside Live: 50 pretend coins to try spending.
+  var live = { earned: jace.live ? jace.live.coins : 50, spent: 0, gained: 0 };
   var pointer = { x: W / 2, y: H / 2, down: false };
   var message = { value: null, from: -1 };
   var steps = 0;
@@ -78,7 +80,7 @@ var $g = (function () {
   addEventListener("pointercancel", function () { pointer.down = false; });
 
   function start() {
-    sprites = []; timers = []; score = 0; scoreShown = false; over = false; text = ""; time = 0; background = "#111317";
+    sprites = []; timers = []; score = 0; scoreShown = false; over = false; text = ""; time = 0; background = (jace.theme && jace.theme.background) || "#111317";
     on.every.forEach(function (e) { e.next = e.secs; });
     on.start.forEach(function (fn) { run(fn); });
   }
@@ -160,6 +162,16 @@ var $g = (function () {
     onKey: function (k, fn) { (on.key[k] = on.key[k] || []).push(fn); },
     onSpriteTap: function (sprite, fn) { on.spriteTap.push({ sprite: sprite, fn: fn }); },
     every: function (secs, fn) { secs = Math.max(0.05, num(secs)); on.every.push({ secs: secs, next: secs, fn: fn }); },
+    // Jace Live: coins from right answers (earned in total, minus what this game spent).
+    onCoins: function (fn) {
+      if (!jace.live) return;
+      jace.live.onCoins(function (total, gained) { live.earned = total; live.gained = gained; if (!over) run(fn); });
+    },
+    coins: function () { return Math.max(0, (jace.live ? Math.max(live.earned, jace.live.coins) : live.earned) - live.spent); },
+    coinsGained: function () { return live.gained; },
+    spend: function (n) { n = Math.max(0, Math.round(num(n))); var have = (jace.live ? Math.max(live.earned, jace.live.coins) : live.earned) - live.spent; if (have >= n) live.spent += n; },
+    canSpend: function (n) { return ((jace.live ? Math.max(live.earned, jace.live.coins) : live.earned) - live.spent) >= Math.max(0, num(n)); },
+    earn: function () { if (jace.live) jace.live.earn(); },
     onMessage: function (name, fn) {
       if (!room) return;
       room.on(String(name), function (data, from) { message.value = data; message.from = from; if (!over) run(fn); });

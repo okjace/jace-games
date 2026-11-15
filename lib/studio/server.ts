@@ -1,10 +1,10 @@
 import "server-only";
 import { NextResponse } from "next/server";
-import { studioStore, type CommunityGameRow, type GameSummary, type Multiplayer } from "@/lib/db/studio";
+import { studioStore, type CommunityGameRow, type GameSummary } from "@/lib/db/studio";
 import { JaceUnauthorized, getUserInfo } from "@/lib/jace";
 import { allow } from "@/lib/rateLimit";
 import type { Session } from "@/lib/session";
-import { MAX_DESCRIPTION, MAX_GAME_BYTES, MAX_PLAYERS, MAX_REPORT, MAX_SCORE, MAX_TITLE, gameBytes } from "./limits";
+import { MAX_DESCRIPTION, MAX_GAME_BYTES, MAX_REPORT, MAX_SCORE, MAX_TITLE, gameBytes } from "./limits";
 
 /**
  * The Game Studio's rules: who can see, change, publish and take down a
@@ -127,17 +127,6 @@ function cleanIcon(v: unknown): string {
   return s;
 }
 
-function cleanMultiplayer(v: unknown): Multiplayer | null {
-  if (v === null || v === undefined || v === false) return null;
-  const m = v as Partial<Multiplayer>;
-  if (typeof m !== "object" || (m.mode !== "race" && m.mode !== "live")) throw new StudioError("Multiplayer mode must be race or live.");
-  const min = Number(m.min);
-  const max = Number(m.max);
-  if (!Number.isInteger(min) || !Number.isInteger(max) || min < 2 || max < min || max > MAX_PLAYERS) {
-    throw new StudioError(`Players must be between 2 and ${MAX_PLAYERS}, with the minimum no more than the maximum.`);
-  }
-  return { mode: m.mode, min, max };
-}
 
 function cleanCode(html: unknown, blocks: unknown, kind: CommunityGameRow["kind"]): { html: string; blocks_json: unknown } {
   if (typeof html !== "string") throw new StudioError("Send the game's html.");
@@ -178,7 +167,8 @@ export async function createGame(session: Session, input: GameInput): Promise<Co
     icon: input.icon === undefined ? "🎮" : cleanIcon(input.icon),
     kind,
     ...code,
-    multiplayer: cleanMultiplayer(input.multiplayer),
+    // Live only: no separate multiplayer rooms (a Live game is already everyone together).
+    multiplayer: null,
     // Jace Live is only Live: every Studio game can be hosted as a Live mode.
     live_mode: true,
   });
@@ -194,7 +184,8 @@ export async function saveGame(session: Session, id: string, input: GameInput): 
   if (input.title !== undefined) patch.title = cleanTitle(input.title);
   if (input.description !== undefined) patch.description = cleanDescription(input.description);
   if (input.icon !== undefined) patch.icon = cleanIcon(input.icon);
-  if (input.multiplayer !== undefined) patch.multiplayer = cleanMultiplayer(input.multiplayer);
+  // Live only: no separate multiplayer rooms.
+  patch.multiplayer = null;
   // Every Studio game is a Live mode now (saving turns it on for older games too).
   patch.live_mode = true;
   if (input.kind === "code" && row.kind === "blocks") patch.kind = "code"; // "Convert to code" is one-way

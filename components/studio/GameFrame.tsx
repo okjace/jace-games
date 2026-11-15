@@ -1,5 +1,6 @@
 "use client";
 
+import type { SandboxTheme } from "@/lib/studio/sandbox";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SDK_LIMITS, buildSrcdoc, type SandboxInit, type SandboxPlayer } from "@/lib/studio/sandbox";
 
@@ -72,6 +73,7 @@ export function GameFrame({
 
   // Live coins: told to the game after it loads and whenever they change (never restarts it).
   const isLive = liveCoins !== null;
+  const theme = useSiteColors();
   const coinsRef = useRef(liveCoins);
   const sendCoins = () => {
     if (coinsRef.current !== null) frameRef.current?.contentWindow?.postMessage({ __jace: 1, type: "coins", coins: coinsRef.current }, "*");
@@ -83,10 +85,11 @@ export function GameFrame({
 
   // The game only restarts when what it was told at the start changes.
   const roomKey = room ? JSON.stringify({ mode: room.mode, isHost: room.isHost, mySeat: room.mySeat, players: room.players }) : "";
+  const themeKey = theme ? JSON.stringify(theme) : "";
   const srcdoc = useMemo(() => {
-    const init: SandboxInit = { player: { name: playerName }, seed, room: roomKey ? JSON.parse(roomKey) : null, live: isLive ? { coins: 0 } : null };
+    const init: SandboxInit = { player: { name: playerName }, seed, room: roomKey ? JSON.parse(roomKey) : null, live: isLive ? { coins: 0 } : null, theme: themeKey ? JSON.parse(themeKey) : null };
     return buildSrcdoc(html, init);
-  }, [html, playerName, seed, roomKey, isLive]);
+  }, [html, playerName, seed, roomKey, isLive, themeKey]);
 
   const frameKey = useMemo(() => `${runKey}:${hash(srcdoc)}`, [runKey, srcdoc]);
 
@@ -174,13 +177,13 @@ export function GameFrame({
   }, [room]);
 
   return (
-    <div className={`relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-black ${className}`}>
+    <div className={`relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-line bg-background ${className}`}>
       {left ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm text-white/80">
           <p className="text-3xl">🚧</p>
           <p>{left}</p>
         </div>
-      ) : (
+      ) : !themeKey ? null : (
         <iframe
           key={frameKey}
           ref={frameRef}
@@ -209,4 +212,41 @@ function hash(s: string): string {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
   return (h >>> 0).toString(36);
+}
+
+/**
+ * The site's colours as real values (the theme's CSS can be colour-mixes,
+ * so they're read off a hidden element), updated when the theme or light/dark
+ * look changes.
+ */
+function useSiteColors(): SandboxTheme | null {
+  const [colors, setColors] = useState<SandboxTheme | null>(null);
+  useEffect(() => {
+    const read = () => {
+      const probe = document.createElement("span");
+      probe.style.display = "none";
+      document.body.appendChild(probe);
+      const get = (v: string) => {
+        probe.style.color = `var(${v})`;
+        return getComputedStyle(probe).color;
+      };
+      const next: SandboxTheme = {
+        background: get("--background"),
+        panel: get("--panel"),
+        accent: get("--accent"),
+        accent2: get("--accent2"),
+        text: get("--foreground"),
+        muted: get("--muted"),
+        line: get("--line"),
+        dark: document.documentElement.dataset.theme === "dark",
+      };
+      probe.remove();
+      setColors((cur) => (cur && JSON.stringify(cur) === JSON.stringify(next) ? cur : next));
+    };
+    read();
+    const watch = new MutationObserver(read);
+    watch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-season", "class"] });
+    return () => watch.disconnect();
+  }, []);
+  return colors;
 }

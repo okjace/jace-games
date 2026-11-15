@@ -28,7 +28,14 @@ export type SandboxInit = {
   room: { mode: "race" | "live"; isHost: boolean; mySeat: number; players: SandboxPlayer[] } | null;
   /** Set when the game runs as a Jace Live mode. Coins arrive by message after it loads. */
   live?: { coins: number } | null;
+  /** The site's colours right now (its theme, light or dark), so games can match Jace Live. */
+  theme?: SandboxTheme | null;
 };
+
+export type SandboxTheme = { background: string; panel: string; accent: string; accent2: string; text: string; muted: string; line: string; dark: boolean };
+
+/** A colour value safe to drop into CSS (hex, rgb()/hsl(), or a colour name). */
+const safeColor = (c: string) => (/^(#[0-9a-f]{3,8}|(rgb|hsl)a?\([0-9.,%\s/-]+\)|color\(srgb[0-9.\s/%-]+\)|[a-z]{3,20})$/i.test(c.trim()) ? c.trim() : "#111317");
 
 /** Limits the page enforces on messages from a game. */
 export const SDK_LIMITS = {
@@ -110,7 +117,8 @@ var jace = {
     else setTimeout(function(){ cb(jace); }, 0);
   },
   room: room,
-  live: live
+  live: live,
+  theme: Object.freeze(init.theme || { background: "#111317", panel: "#1b1e24", accent: "#38bdf8", accent2: "#a78bfa", text: "#e6e8eb", muted: "#9aa1ab", line: "#2a2e36", dark: true })
 };
 Object.defineProperty(window, "jace", { value: Object.freeze(jace), writable: false, configurable: false });
 })();`;
@@ -127,6 +135,11 @@ export function buildSrcdoc(html: string, init: SandboxInit): string {
     `<meta http-equiv="Content-Security-Policy" content="${GAME_CSP}">` +
     `<meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<script>${sdk}</script>` +
+    // The site's theme as CSS variables (--jl-bg, --jl-panel, --jl-accent…) and the page's default look.
+    // The game's own styles come after, so it can still pick its own.
+    (init.theme
+      ? `<style>:root{--jl-bg:${safeColor(init.theme.background)};--jl-panel:${safeColor(init.theme.panel)};--jl-accent:${safeColor(init.theme.accent)};--jl-accent2:${safeColor(init.theme.accent2)};--jl-text:${safeColor(init.theme.text)};--jl-muted:${safeColor(init.theme.muted)};--jl-line:${safeColor(init.theme.line)};color-scheme:${init.theme.dark ? "dark" : "light"}}html,body{background:var(--jl-bg);color:var(--jl-text)}</style>`
+      : "") +
     html
   );
 }

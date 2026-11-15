@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import { timeAgo } from "@/lib/format";
-import { MAX_GAME_BYTES, MAX_PLAYERS, gameBytes } from "@/lib/studio/limits";
+import { MAX_GAME_BYTES, gameBytes } from "@/lib/studio/limits";
 import { GameFrame, type LogEntry, type RoomLink } from "./GameFrame";
 import { api, card, input, primary, secondary, small } from "./ui";
 import { ask } from "@/components/site/ConfirmBox";
@@ -56,7 +56,8 @@ export function Editor({ id }: { id: string }) {
   const [previewHtml, setPreviewHtml] = useState("");
   const [autoRun, setAutoRun] = useState(true);
   const [runKey, setRunKey] = useState(0);
-  const [twoPlayer, setTwoPlayer] = useState(false);
+  // Live only now: no two-copy room test (kept off).
+  const twoPlayer = false;
   const [logs, setLogs] = useState<(LogEntry & { n: number; who?: string })[]>([]);
   const logN = useRef(0);
 
@@ -356,9 +357,6 @@ export function Editor({ id }: { id: string }) {
                 <input type="checkbox" checked={autoRun} onChange={(e) => setAutoRun(e.target.checked)} /> Auto-run
               </label>
             )}
-            <label className="flex items-center gap-1.5 text-xs text-muted" title="Two copies of da game, connected to each other, to try jace.room">
-              <input type="checkbox" checked={twoPlayer} onChange={(e) => setTwoPlayer(e.target.checked)} /> 2 players
-            </label>
             <button
               type="button"
               className={small}
@@ -444,7 +442,6 @@ function Settings({
   published: boolean;
   onUnpublish: () => void;
 }) {
-  const mp = meta.multiplayer;
   return (
     <div className={`${card} grid gap-4 p-4 sm:grid-cols-2`}>
       <label className="flex flex-col gap-1 text-sm">
@@ -464,51 +461,6 @@ function Settings({
           onChange={(e) => setMeta({ ...meta, description: e.target.value })}
         />
       </label>
-      <fieldset className="flex flex-col gap-2 text-sm sm:col-span-2">
-        <legend className="mb-1 font-medium">Playas</legend>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              [null, "Single player"],
-              ["race", "Race (everyone plays, best score wins)"],
-              ["live", "Live (the host's game is shared)"],
-            ] as const
-          ).map(([mode, label]) => (
-            <label key={String(mode)} className="flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5">
-              <input
-                type="radio"
-                name="mp"
-                checked={(mp?.mode ?? null) === mode}
-                onChange={() => setMeta({ ...meta, multiplayer: mode ? { mode, min: mp?.min ?? 2, max: mp?.max ?? (mode === "live" ? 2 : 4) } : null })}
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-        {mp && (
-          <div className="flex items-center gap-2 text-sm">
-            <span>From</span>
-            <input
-              type="number"
-              className={`${input} w-20`}
-              min={2}
-              max={MAX_PLAYERS}
-              value={mp.min}
-              onChange={(e) => setMeta({ ...meta, multiplayer: { ...mp, min: Math.max(2, Math.min(MAX_PLAYERS, Number(e.target.value) || 2)) } })}
-            />
-            <span>to</span>
-            <input
-              type="number"
-              className={`${input} w-20`}
-              min={2}
-              max={MAX_PLAYERS}
-              value={mp.max}
-              onChange={(e) => setMeta({ ...meta, multiplayer: { ...mp, max: Math.max(2, Math.min(MAX_PLAYERS, Number(e.target.value) || 2)) } })}
-            />
-            <span>playas</span>
-          </div>
-        )}
-      </fieldset>
       <label className="flex items-start gap-2 text-sm sm:col-span-2">
         <span aria-hidden="true" className="mt-0.5">📺</span>
         <span>
