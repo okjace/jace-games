@@ -6,6 +6,8 @@ import { chatStore, type ChatRow } from "@/lib/db/liveChat";
 import { mapStore } from "@/lib/db/liveMaps";
 import { submitBest, type BoardDetails } from "@/lib/db/liveBoards";
 import { cleanTournament, pointsFor, type Tournament } from "./tournament";
+import { REPLAY_MAX_BYTES, cleanReplay } from "./replay";
+import { saveReplay } from "@/lib/db/liveReplays";
 import { TEAMS, cleanTeams, shuffledTeams, smallestTeam, teamIndex, teamScores, type TeamPick, type TeamScore, type TeamSettings } from "./teams";
 import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
@@ -89,6 +91,8 @@ export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean; 
   teams?: TeamSettings | null;
   /** A tournament: modes played back to back, with points by place after each round. */
   tournament?: Tournament | null;
+  /** The saved replay of the last finished game (its id). */
+  replay?: string | null;
   /** Solo: what was picked, so "Play again" can make the same game. */
   setId?: string | null;
   mapId?: string | null;
@@ -436,6 +440,11 @@ async function playAgain(g: LiveGameRow, rawMode: string, nextRound = false) {
   if (g.status !== "ended") throw new LiveError("Finish this game first.", 409);
   const mode = (rawMode in MODES ? rawMode : g.mode) as LiveMode;
   let settings = g.settings as GameSettings;
+  // The next game gets its own replay.
+  if (settings.replay) {
+    settings = { ...settings, replay: null };
+    g = await bump(g, { settings });
+  }
   // A plain "Play again" ends a tournament: no more rounds, points cleared.
   const endTournament = !nextRound && !!settings.tournament;
   if (endTournament) {
@@ -591,6 +600,7 @@ export type HostView = {
   teams: TeamScore[] | null;
   teamsTopic: string | null;
   tournament: TournamentView | null;
+  replay: string | null;
   /** Memory Party: the shared board for the big screen. */
   mp?: MpView;
   serverNow: number;
@@ -636,6 +646,7 @@ export async function hostView(code: string, session: Session): Promise<HostView
     teams: teamsOf(g, players),
     teamsTopic: (g.settings as GameSettings).teams ? teamTopicOf(g, "host") : null,
     tournament: tournamentOf(g, players),
+    replay: (g.settings as GameSettings).replay ?? null,
     ...(g.mode === "mparty" ? { mp: mpView(g.id, null, players, Date.now()) } : {}),
     serverNow: Date.now(),
   };
@@ -658,6 +669,8 @@ export type PlayerView = {
   /** Teams: how they're picked, my team (null until I'm on one), every team's total, and my team's chat channel. */
   teams: { pick: TeamPick; mine: number | null; scores: TeamScore[]; topic: string | null } | null;
   tournament: TournamentView | null;
+  /** The finished game's replay, once saved. */
+  replay: string | null;
   endsAt: number | null;
   /** Classic: the question being played (no answers), what I answered, and at reveal the right answer. */
   question: (PlayerQuestion & { index: number; total: number }) | null;
@@ -769,6 +782,7 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
         })()
       : null,
     tournament: tournamentOf(g, all, me.id),
+    replay: g.status === "ended" ? (settings.replay ?? null) : null,
     endsAt: s.endsAt ?? null,
     question: classicQ ? { ...forPlayers(classicQ), index: s.q!, total: s.order!.length } : null,
     myAnswer: classicQ ? (d.answers?.[String(s.q)] ?? null) : null,
@@ -1071,6 +1085,38 @@ export async function startSoloGame(
   const { token, pin } = await joinLiveGame(code, session ? session.user.displayName || session.user.username : "You", session, avatar);
   await step(await getGame(code), "start");
   return { code, token, ...(pin ? { pin } : {}) };
+}
+
+// ---------- Replays ----------
+
+/**
+ * Saves a finished game's replay, recorded by the host's screen (or the
+ * player's, in a solo game). Once per game; names, looks and teams come from
+ * the game itself, not from the recording.
+ */
+export async function saveGameReplay(code: string, session: Session | null, token: unknown, raw: unknown): Promise<string> {
+  const g = await getGame(code);
+  const settings = g.settings as GameSettings;
+  const isHost = !!session && session.user.id === g.host_id;
+  const soloPlayer = settings.solo && typeof token === "string" ? await playerFor(g, token).catch(() => null) : null;
+  if (!isHost && !soloPlayer) throw new LiveError("Only the host saves the replay.", 403);
+  if (g.status !== "ended") throw new LiveError("Finish the game first.", 409);
+  if (settings.replay) return settings.replay;
+  const all = await liveStore().players(g.id);
+  const data = cleanReplay(raw, {
+    code: g.code,
+    mode: g.mode,
+    setTitle: g.set_title,
+    host: settings.solo ? "solo" : g.host_name,
+    teams: settings.teams?.count ?? null,
+    players: all.map((p) => ({ id: p.id, name: p.name, avatar: avatarOf(p), team: teamIndex(settings.teams, dataOf(p).team) })),
+  });
+  if (!data || data.frames.length === 0) throw new LiveError("That replay is empty.");
+  if (JSON.stringify(data).length > REPLAY_MAX_BYTES) throw new LiveError("That replay is too big to save.", 413);
+  const id = await saveReplay({ code: g.code, host_id: g.host_id, mode: g.mode, data });
+  const latest = await getGame(code);
+  await push(await bump(latest, { settings: { ...(latest.settings as GameSettings), replay: id } }), "replay", { replay: id });
+  return id;
 }
 
 // ---------- Tournaments ----------

@@ -5,6 +5,7 @@ import { ARENA, Arena, BASE_SPEED, BOOST_SPEED, SPACING, START_LEN, TURN_RATE, a
 import { openRoomChannel } from "@/lib/realtime/client";
 import { useJuice } from "../fx/Juice";
 import { sfx } from "../fx/sfx";
+import { recordSnake } from "../ReplayRecorder";
 import type { StageProps } from "./index";
 
 /**
@@ -84,6 +85,7 @@ export function SnakeArena({ view, act, earn }: StageProps) {
         local.current.steer(myId, inp.a, inp.b);
         local.current.step(dt, Date.now());
         snapRef.current = local.current.snapshot(Date.now());
+        recordSnake(snapRef.current);
         if (now - lastReport > 5000) {
           lastReport = now;
           const sn = local.current.snakes.get(myId);

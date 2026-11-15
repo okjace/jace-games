@@ -14,6 +14,7 @@ import { GlobalBoardOptIn } from "./GlobalBoardOptIn";
 import { PlayerTeamPicker, TeamBoard } from "./HostTeams";
 import { TeamBadge } from "./TeamSetup";
 import { TournamentBoard } from "./Tournament";
+import { ReplayRecorder } from "./ReplayRecorder";
 import { VolumeButton } from "@/components/site/SeasonFx";
 import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
@@ -73,6 +74,8 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
     const ch = openRoomChannel(topic, null);
     const offs = [
       ch.on("phase", () => void load()),
+      // The finished game's replay got saved.
+      ch.on("replay", () => void load()),
       // The host turned chat on or off.
       ch.on("chat-settings", () => void load()),
       ch.on("kicked", (p) => {
@@ -147,10 +150,24 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
   if (!token) return <JoinForm code={code} defaultName={user?.displayName || user?.username || ""} note={error} onJoined={(t) => (setToken(code, t), setTok(t))} />;
   if (!view) return <Centered>{error ? <p className="text-muted">{error}</p> : <p className="animate-pulse text-muted">Joining…</p>}</Centered>;
 
+  // Solo games: no host screen, so this one records the replay.
+  const soloRec = view.solo ? (
+    <ReplayRecorder
+      code={code}
+      status={view.status}
+      players={[{ id: view.me.id, name: view.me.name, score: view.me.score, streak: view.me.streak, team: null }]}
+      teams={null}
+      question={null}
+      token={token}
+      saved={!!view.replay}
+    />
+  ) : null;
+
   // Self-paced modes play full screen on their own stage, with their own HUD.
   if (view.status === "playing" && PARTY_MODES.includes(view.mode)) {
     return (
       <>
+        {soloRec}
         {error && <p className="fixed inset-x-0 top-20 z-[60] mx-auto w-fit rounded-full bg-red-500 px-4 py-1.5 text-sm font-bold text-white shadow-lg">{error}</p>}
         <PartyPlay
           view={view}
@@ -165,6 +182,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
 
   return (
     <div ref={playRef} className={full.on ? `${FULLSCREEN_CLASS} bg-background p-4` : ""}>
+    {soloRec}
     <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
       <div className="flex items-center justify-between rounded-2xl border border-line bg-panel px-4 py-3">
         <span className="flex min-w-0 items-center gap-2">
@@ -229,6 +247,11 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
             <div className="w-full">
               <TeamBoard teams={view.teams.scores} big mine={view.teams.mine} />
             </div>
+          )}
+          {view.replay && (
+            <a href={`/replay/${view.replay}`} target="_blank" rel="noopener" className="rounded-full border border-line px-4 py-2 font-semibold hover:bg-accent/10">
+              🎬 watch the replay
+            </a>
           )}
           <XpGained view={view} />
           <GlobalBoardOptIn code={code} token={token} view={view} />
@@ -440,6 +463,11 @@ function SoloResults({ view, code, token }: { view: PlayerView; code: string; to
       <Celebration effect={view.me.avatar?.effect} />
       <p className="text-2xl font-bold">Nice run!</p>
       <p className="text-4xl font-black tabular-nums">{score(view, view.me.score)}</p>
+      {view.replay && (
+        <a href={`/replay/${view.replay}`} target="_blank" rel="noopener" className="rounded-full border border-line px-4 py-2 font-semibold hover:bg-accent/10">
+          🎬 watch ur replay
+        </a>
+      )}
       <p className="text-muted">
         {def.name}
         {view.me.answered > 0 && !view.noSet ? ` · ${view.me.correct}/${view.me.answered} right` : ""}

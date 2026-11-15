@@ -149,10 +149,15 @@ export function Music({ season }: { season: SeasonId }) {
     };
     const focus = () => engine.current && claim();
     // Leaving the tab (or window) pauses the music, so two tabs never play over each other.
+    // Clicking into a game on the page (a Studio game's frame) also "blurs" the window,
+    // but the page still has focus then, so the music keeps going.
     const blur = () => {
-      const e = engine.current;
-      if (e) void e.ctx.suspend();
-      e?.track?.el.pause();
+      setTimeout(() => {
+        if (document.hasFocus() || document.activeElement?.tagName === "IFRAME") return;
+        const e = engine.current;
+        if (e) void e.ctx.suspend();
+        e?.track?.el.pause();
+      }, 0);
     };
     window.addEventListener("pointerdown", start);
     window.addEventListener("keydown", start);

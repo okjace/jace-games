@@ -20,6 +20,7 @@ import { ask } from "@/components/site/ConfirmBox";
 import { HostTeamLobby, TeamBoard } from "./HostTeams";
 import { JoinLink } from "./JoinLink";
 import { TournamentBoard } from "./Tournament";
+import { ReplayRecorder } from "./ReplayRecorder";
 import { clock } from "./ui";
 import { useGameMusic } from "@/lib/gameMusic";
 
@@ -80,7 +81,7 @@ export function HostScreen({ code }: { code: string }) {
     if (!topic) return;
     const ch = openRoomChannel(topic, null);
     // "mp": someone flipped a card in Memory Party.
-    const offs = ["phase", "players", "answered", "mp"].map((ev) => ch.on(ev, () => void load()));
+    const offs = ["phase", "players", "answered", "mp", "replay"].map((ev) => ch.on(ev, () => void load()));
     return () => {
       offs.forEach((off) => off());
       ch.close();
@@ -127,6 +128,30 @@ export function HostScreen({ code }: { code: string }) {
   const hasQuestions = !view.settings.noSet && view.questionCount > 0;
   const secondsLeft = view.state.endsAt ? Math.max(0, Math.ceil((view.state.endsAt - now) / 1000)) : null;
   const joinUrl = typeof window !== "undefined" ? `${window.location.host}/live` : "/live";
+
+  const cur = view.current;
+  const recorder = (
+    <ReplayRecorder
+      code={view.code}
+      status={view.status}
+      players={view.players.map((p) => ({ id: p.id, name: p.name, score: p.score, streak: p.streak, team: p.team }))}
+      teams={view.teams}
+      saved={!!view.replay}
+      question={
+        cur
+          ? {
+              index: cur.index,
+              reveal: view.state.phase === "reveal",
+              prompt: cur.prompt || "(picture question)",
+              choices: cur.type === "choice" || cur.type === "truefalse" ? (cur.choices ?? []) : null,
+              counts: view.counts,
+              right: cur.type === "choice" || cur.type === "truefalse" ? (cur.correct ?? []).map((i) => cur.choices?.[i]).filter(Boolean).join(" / ") : (cur.accepted ?? []).join(" / "),
+              answered: view.answeredCount,
+            }
+          : null
+      }
+    />
+  );
 
   const hostScreen = (
     <div ref={hostRef} className={`bg-background ${full.on ? `${FULLSCREEN_CLASS} p-6` : ""}`}>
@@ -236,6 +261,14 @@ export function HostScreen({ code }: { code: string }) {
         )}
         {view.status === "playing" && view.mode !== "classic" && view.mode !== "snake" && view.mode !== "mparty" && <SelfPaced view={view} secondsLeft={secondsLeft} />}
 
+        {recorder}
+        {view.status === "ended" && view.replay && (
+          <a href={`/replay/${view.replay}`} target="_blank" rel="noopener" className={`${card} flex items-center gap-3 font-semibold hover:bg-accent/10`}>
+            <span className="text-3xl">🎬</span>
+            <span className="flex-1">watch the replay of this game</span>
+            <span className="text-muted">↗</span>
+          </a>
+        )}
         {view.status === "ended" && view.tournament && <TournamentBoard t={view.tournament} busy={busy} onNext={() => void act("next-round")} />}
         {view.status === "ended" && view.teams && <TeamBoard teams={view.teams} big />}
         {view.status === "ended" && <Podium view={view} />}

@@ -5,6 +5,7 @@ import type { HostView } from "@/lib/live/engine";
 import { Arena, drawArena, type Snapshot } from "@/lib/live/snake";
 import { openRoomChannel } from "@/lib/realtime/client";
 import { card, clock } from "./ui";
+import { recordSnake } from "./ReplayRecorder";
 
 /**
  * Snake Arena on the host's big screen: this runs the arena for everyone,
@@ -70,6 +71,7 @@ export function SnakeArenaHost({ view, secondsLeft, onScores }: { view: HostView
         a.step(dt, Date.now());
       }
       latest = a.snapshot(Date.now());
+      recordSnake(latest);
       if (now - lastSent > 50) {
         lastSent = now;
         ch.send("snake-state", latest);
