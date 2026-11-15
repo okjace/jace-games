@@ -2,6 +2,7 @@
 
 import { SEASONS } from "@/lib/seasons";
 import { EffectsToggle } from "./Seasonal";
+import { LookToggle } from "./LookToggle";
 import { SPECIAL_MODES, toggleMode, useModes, useSeason } from "./ThemeContext";
 
 /** In account settings: special modes and the falling-stuff switch (saved to ur account). */
@@ -10,6 +11,10 @@ export function SpecialModesCard() {
   const season = useSeason();
   return (
     <section className="rounded-3xl border border-line bg-panel p-5 shadow-[0_10px_30px_-18px_rgba(30,20,10,0.25)]">
+      <h2 className="mb-2 font-display text-xl font-bold">🌗 light or dark</h2>
+      <div className="mb-4 max-w-sm">
+        <LookToggle />
+      </div>
       <h2 className="mb-1 font-display text-xl font-bold">✨ special modes</h2>
       <p className="mb-3 text-xs text-muted">saved to ur account, so they follow u to any device.</p>
       <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

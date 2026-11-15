@@ -13,6 +13,9 @@ import { cleanTheme, registerCustom, themeCss, type ThemeData, type ThemeSummary
 
 export const MY_THEME_KEY = "jace-live:my-theme";
 export const MY_MODES_KEY = "jace-live:modes";
+/** Light, dark or auto (follows the computer). */
+export const LOOK_KEY = "jace-live:look";
+export type Look = "light" | "dark" | "auto";
 /** The custom theme in use ({ id, data }) and its CSS, kept so the page can show it before anything loads. */
 const CUSTOM_KEY = "jace-live:custom-theme";
 const CUSTOM_CSS_KEY = "jace-live:custom-css";
@@ -28,7 +31,7 @@ export const SPECIAL_MODES = [
 export type SpecialMode = (typeof SPECIAL_MODES)[number]["id"];
 
 /** Runs in <head> before anything draws. */
-export const HEAD_SCRIPT = `try{var d=document.documentElement,t=localStorage.getItem("${MY_THEME_KEY}");if(t&&t.indexOf("custom:")===0){var c=localStorage.getItem("${CUSTOM_CSS_KEY}");if(c){var s=document.createElement("style");s.id="jl-custom-css";s.textContent=c;document.head.appendChild(s);d.dataset.season="custom"}}else if(t&&t!=="site")d.dataset.season=t;JSON.parse(localStorage.getItem("${MY_MODES_KEY}")||"[]").forEach(function(m){d.classList.add("jl-mode-"+m)})}catch(e){}`;
+export const HEAD_SCRIPT = `try{var d=document.documentElement,l=localStorage.getItem("${LOOK_KEY}");if(l==="dark"||(l==="auto"&&matchMedia("(prefers-color-scheme: dark)").matches))d.dataset.theme="dark";var t=localStorage.getItem("${MY_THEME_KEY}");if(t&&t.indexOf("custom:")===0){var c=localStorage.getItem("${CUSTOM_CSS_KEY}");if(c){var s=document.createElement("style");s.id="jl-custom-css";s.textContent=c;document.head.appendChild(s);d.dataset.season="custom"}}else if(t&&t!=="site")d.dataset.season=t;JSON.parse(localStorage.getItem("${MY_MODES_KEY}")||"[]").forEach(function(m){d.classList.add("jl-mode-"+m)})}catch(e){}`;
 
 const subs = new Set<() => void>();
 const notify = () => subs.forEach((f) => f());
@@ -51,6 +54,42 @@ function readModes(): SpecialMode[] {
     if (raw !== modesCache.raw) modesCache = { raw, list: (JSON.parse(raw) as string[]).filter((m): m is SpecialMode => SPECIAL_MODES.some((s) => s.id === m)) };
   } catch {}
   return modesCache.list;
+}
+
+// ---------- Light / dark ----------
+
+function readLook(): Look {
+  try {
+    const v = localStorage.getItem(LOOK_KEY);
+    return v === "dark" || v === "auto" ? v : "light";
+  } catch {
+    return "light";
+  }
+}
+function applyLook(look: Look) {
+  const dark = look === "dark" || (look === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+}
+export function setLook(look: Look) {
+  try {
+    localStorage.setItem(LOOK_KEY, look);
+  } catch {}
+  applyLook(look);
+  notify();
+  pushPrefs();
+}
+export function useLook(): Look {
+  const look = useSyncExternalStore(subscribe, readLook, () => "light" as Look);
+  // "Auto" follows the computer, even when it switches while the page is open.
+  useEffect(() => {
+    applyLook(look);
+    if (look !== "auto") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const change = () => applyLook("auto");
+    mq.addEventListener("change", change);
+    return () => mq.removeEventListener("change", change);
+  }, [look]);
+  return look;
 }
 
 // ---------- Custom themes ----------
@@ -124,7 +163,7 @@ export function onPrefsLoaded(fn: () => void) {
 /** Saves this device's theme settings to ur account (ignored when signed out). */
 export function pushPrefs() {
   try {
-    const body = { theme: readTheme(), modes: readModes(), effectsOff: localStorage.getItem(EFFECTS_KEY) === "1" };
+    const body = { theme: readTheme(), modes: readModes(), effectsOff: localStorage.getItem(EFFECTS_KEY) === "1", look: readLook() };
     void fetch("/api/me/prefs", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {});
   } catch {}
 }
@@ -133,7 +172,7 @@ export function pushPrefs() {
 export async function loadPrefs() {
   const res = await fetch("/api/me/prefs", { cache: "no-store" }).catch(() => null);
   if (!res?.ok) return;
-  const { prefs } = (await res.json().catch(() => ({}))) as { prefs?: { theme?: string; modes?: string[]; effectsOff?: boolean } | null };
+  const { prefs } = (await res.json().catch(() => ({}))) as { prefs?: { theme?: string; modes?: string[]; effectsOff?: boolean; look?: Look } | null };
   if (!prefs) return pushPrefs();
   // A custom theme from the account: fetch it (it may have changed since this device last saw it).
   if (typeof prefs.theme === "string" && prefs.theme.startsWith("custom:")) {
@@ -154,6 +193,10 @@ export async function loadPrefs() {
       for (const m of SPECIAL_MODES) document.documentElement.classList.toggle(`jl-mode-${m.id}`, prefs.modes.includes(m.id));
     }
     if (typeof prefs.effectsOff === "boolean") localStorage.setItem(EFFECTS_KEY, prefs.effectsOff ? "1" : "0");
+    if (prefs.look === "light" || prefs.look === "dark" || prefs.look === "auto") {
+      localStorage.setItem(LOOK_KEY, prefs.look);
+      applyLook(prefs.look);
+    }
   } catch {}
   notify();
   prefsListeners.forEach((f) => f());

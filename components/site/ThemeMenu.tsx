@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { SEASONS, SEASON_IDS, type ThemeChoice } from "@/lib/seasons";
 import { EffectsToggle } from "./Seasonal";
 import { MyThemeChips } from "./MyThemeChips";
+import { LookToggle } from "./LookToggle";
 import { SPECIAL_MODES, setMyTheme, toggleMode, useModes, useMyThemeChoice, useSeason, useSiteSeason } from "./ThemeContext";
 
 /** The menu bar's theme button: pick ur own theme (or follow the site's), moving decorations, and special modes. */
@@ -75,6 +76,7 @@ export function ThemeMenu() {
       </button>
       {open && (
         <div className="jl-pop-in absolute right-0 top-11 z-50 flex max-h-[75vh] w-80 flex-col gap-3 overflow-y-auto rounded-2xl border border-line bg-panel p-4 text-foreground shadow-xl">
+          <LookToggle />
           {admin && (
             <div className="flex rounded-full border border-line p-1 text-sm font-bold" role="radiogroup" aria-label="Whose theme">
               {(["me", "everyone"] as const).map((sc) => (

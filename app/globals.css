@@ -326,3 +326,25 @@ body {
 @keyframes jl-rainbow-mode { to { filter: hue-rotate(360deg); } }
 .jl-mode-bigtext { font-size: 118%; }
 @media (prefers-reduced-motion: reduce) { .jl-tree, .jl-bulb, .jl-dangle, .jl-mode-rainbow body, .jl-mode-crt body::before { animation: none; } }
+
+/*
+ * Dark mode: <html data-theme="dark"> (picked in the 🎨 menu: light, dark, or auto).
+ * Every theme gets a dark version tinted with its own accent colour. A custom
+ * theme can set its own dark colours (its CSS comes after this, so it wins).
+ */
+:root[data-theme="dark"],
+:root[data-theme="dark"][data-season] {
+  --background: color-mix(in srgb, var(--accent) 9%, #0c0d11);
+  --panel: color-mix(in srgb, var(--accent) 11%, #16171d);
+  --line: color-mix(in srgb, var(--accent) 24%, #272a33);
+  --foreground: #eceef2;
+  --muted: #a3a9b4;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  color-scheme: dark;
+}
+/* The hills and trees are dimmed so they sit back at night. */
+:root[data-theme="dark"] .jl-backdrop svg,
+:root[data-theme="dark"] .jl-tree { filter: brightness(0.6) saturate(0.95); }
+:root[data-theme="dark"] .jl-wash { opacity: 0.7; }
+:root[data-theme="dark"] header { box-shadow: 0 1px 0 rgba(255,255,255,0.03), 0 8px 24px -16px rgba(0,0,0,0.6); }

@@ -7,6 +7,8 @@ export type Prefs = {
   theme?: string;
   modes?: string[];
   effectsOff?: boolean;
+  /** Light, dark or auto. */
+  look?: "light" | "dark" | "auto";
   /** Theme market themes they installed. */
   installed?: string[];
   /** Public profile: shown at /u/<username> and on Find profiles. */
