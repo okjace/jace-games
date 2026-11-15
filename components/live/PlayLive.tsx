@@ -14,7 +14,7 @@ import { GlobalBoardOptIn } from "./GlobalBoardOptIn";
 import { PlayerTeamPicker, TeamBoard } from "./HostTeams";
 import { TeamBadge } from "./TeamSetup";
 import { TournamentBoard } from "./Tournament";
-import { ReplayRecorder } from "./ReplayRecorder";
+import { PovRecorder, ReplayRecorder } from "./ReplayRecorder";
 import { VolumeButton } from "@/components/site/SeasonFx";
 import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
@@ -150,6 +150,8 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
   if (!token) return <JoinForm code={code} defaultName={user?.displayName || user?.username || ""} note={error} onJoined={(t) => (setToken(code, t), setTok(t))} />;
   if (!view) return <Centered>{error ? <p className="text-muted">{error}</p> : <p className="animate-pulse text-muted">Joining…</p>}</Centered>;
 
+  // What this screen shows, for "watch as" in the replay.
+  const povRec = token ? <PovRecorder code={code} token={token} view={view} skew={skew} /> : null;
   // Solo games: no host screen, so this one records the replay.
   const soloRec = view.solo ? (
     <ReplayRecorder
@@ -167,6 +169,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
   if (view.status === "playing" && PARTY_MODES.includes(view.mode)) {
     return (
       <>
+        {povRec}
         {soloRec}
         {error && <p className="fixed inset-x-0 top-20 z-[60] mx-auto w-fit rounded-full bg-red-500 px-4 py-1.5 text-sm font-bold text-white shadow-lg">{error}</p>}
         <PartyPlay
@@ -182,6 +185,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
 
   return (
     <div ref={playRef} className={full.on ? `${FULLSCREEN_CLASS} bg-background p-4` : ""}>
+    {povRec}
     {soloRec}
     <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
       <div className="flex items-center justify-between rounded-2xl border border-line bg-panel px-4 py-3">
@@ -375,7 +379,7 @@ function useSecondsLeft(endsAt: number | null, skew: number) {
   return left;
 }
 
-function ClassicPlay({ view, busy, skew, act }: { view: PlayerView; busy: boolean; skew: number; act: (b: Record<string, unknown>) => Promise<PlayerView | null> }) {
+export function ClassicPlay({ view, busy, skew, act }: { view: PlayerView; busy: boolean; skew: number; act: (b: Record<string, unknown>) => Promise<PlayerView | null> }) {
   const left = useSecondsLeft(view.phase === "question" ? view.endsAt : null, skew);
   const q = view.question;
   if (!q) return <Centered><p className="animate-pulse text-muted">Get ready…</p></Centered>;

@@ -137,3 +137,47 @@ export function ReplayRecorder({
 
   return null;
 }
+
+/**
+ * Records what this player's own screen shows (for "watch as" in the replay)
+ * and sends it once the game's replay is saved. Keeps a moment only when the
+ * screen changed, at most about twice a second.
+ */
+// Kept outside the component: the player's screen changes layout when a game ends,
+// which remounts this, and the recording must survive that.
+const povs = new Map<string, { frames: { at: number; v: Record<string, unknown> }[]; sent: string | null; hadMap: boolean }>();
+
+export function PovRecorder({ code, token, view, skew }: { code: string; token: string; view: import("@/lib/live/engine").PlayerView; skew: number }) {
+  useEffect(() => {
+    if (view.status !== "playing") return;
+    let r = povs.get(code);
+    // A new game (Play again / next round): start a fresh recording.
+    if (!r || r.sent) {
+      r = { frames: [], sent: null, hadMap: false };
+      povs.set(code, r);
+    }
+    const at = Date.now() + skew;
+    // Tower Siege's map is big and never changes: keep it in the first moment only.
+    const v = JSON.parse(JSON.stringify(view)) as Record<string, unknown> & { party?: Record<string, unknown> };
+    if (v.party?.map) {
+      if (r.hadMap) delete v.party.map;
+      r.hadMap = true;
+    }
+    const list = r.frames;
+    const last = list[list.length - 1];
+    // At most about twice a second (the first moment, with the map, always stays).
+    if (last && at - last.at < 450 && list.length > 1) list[list.length - 1] = { at, v };
+    else list.push({ at, v });
+    // Long games: thin out the older moments instead of stopping.
+    if (list.length > 600) r.frames = list.filter((_, i) => i === 0 || i % 2 === 0 || i > list.length - 100);
+  }, [view, skew, code]);
+  useEffect(() => {
+    const r = povs.get(code);
+    if (view.status !== "ended" || !view.replay || !r || r.sent === view.replay || r.frames.length === 0) return;
+    r.sent = view.replay;
+    void fetch(`/api/live/games/${code}/replay/pov`, { method: "POST", headers: { "Content-Type": "application/json", "X-Live-Token": token }, body: JSON.stringify({ frames: r.frames }) }).catch(() => {
+      r.sent = null;
+    });
+  }, [view.status, view.replay, code, token]);
+  return null;
+}

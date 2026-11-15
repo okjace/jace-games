@@ -7,7 +7,10 @@ import { mapStore } from "@/lib/db/liveMaps";
 import { submitBest, type BoardDetails } from "@/lib/db/liveBoards";
 import { cleanTournament, pointsFor, type Tournament } from "./tournament";
 import { REPLAY_MAX_BYTES, cleanReplay } from "./replay";
-import { saveReplay } from "@/lib/db/liveReplays";
+import { savePov, saveReplay } from "@/lib/db/liveReplays";
+
+const POV_MAX_FRAMES = 600;
+const POV_MAX_BYTES = 1_200_000;
 import { TEAMS, cleanTeams, shuffledTeams, smallestTeam, teamIndex, teamScores, type TeamPick, type TeamScore, type TeamSettings } from "./teams";
 import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
@@ -1117,6 +1120,22 @@ export async function saveGameReplay(code: string, session: Session | null, toke
   const latest = await getGame(code);
   await push(await bump(latest, { settings: { ...(latest.settings as GameSettings), replay: id } }), "replay", { replay: id });
   return id;
+}
+
+/** A player sends what their own screen showed during the game (for "watch as" in the replay). */
+export async function savePlayerPov(code: string, token: unknown, raw: unknown): Promise<void> {
+  const g = await getGame(code);
+  const me = await playerFor(g, token);
+  const replay = (g.settings as GameSettings).replay;
+  if (g.status !== "ended" || !replay) throw new LiveError("The replay isn't saved yet.", 409);
+  if (!Array.isArray(raw)) throw new LiveError("Send the frames.");
+  const frames = raw
+    .slice(0, POV_MAX_FRAMES)
+    .filter((f): f is { at: number; v: Record<string, unknown> } => !!f && typeof f === "object" && typeof (f as { at?: unknown }).at === "number" && !!(f as { v?: unknown }).v && typeof (f as { v?: unknown }).v === "object")
+    .map((f) => ({ at: Math.round(f.at), v: f.v }));
+  if (frames.length === 0) return;
+  if (JSON.stringify(frames).length > POV_MAX_BYTES) throw new LiveError("That's too much to save.", 413);
+  await savePov(replay, me.id, frames);
 }
 
 // ---------- Tournaments ----------

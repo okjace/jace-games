@@ -3,10 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { scoresAt, type ReplayData, type SnakeFrame } from "@/lib/live/replay";
-import { drawArena, type Snapshot } from "@/lib/live/snake";
+import type { PlayerView } from "@/lib/live/engine";
+import { drawArena, radiusOf, type Snapshot } from "@/lib/live/snake";
 import { TEAMS } from "@/lib/live/teams";
 import { MODES } from "@/lib/live/types";
 import { LiveAvatar } from "./LiveAvatar";
+import { setReplayQuiet } from "./fx/sfx";
+import { PARTY_MODES, PartyPlay } from "./party";
+import { ClassicPlay } from "./PlayLive";
 import { card } from "./ui";
 
 const SPEEDS = [1, 2, 4, 8];
@@ -35,6 +39,7 @@ function lastAt<T extends { t: number }>(list: T[], t: number): T | null {
 /** A whole game played back: scores racing, big moments, questions, and Snake Arena's arena. */
 export function ReplayViewer({ id }: { id: string }) {
   const [data, setData] = useState<ReplayData | null>(null);
+  const [povs, setPovs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -45,7 +50,10 @@ export function ReplayViewer({ id }: { id: string }) {
       .then(async (r) => {
         const b = await r.json().catch(() => null);
         if (!r.ok || !b?.replay) setError(b?.error ?? "couldnt load that replay :(");
-        else setData(b.replay);
+        else {
+          setData(b.replay);
+          setPovs(Array.isArray(b.povs) ? b.povs : []);
+        }
       })
       .catch(() => setError("couldnt load that replay :("));
   }, [id]);
@@ -74,11 +82,35 @@ export function ReplayViewer({ id }: { id: string }) {
 
   if (error) return <p className={`${card} text-center text-muted`}>{error}</p>;
   if (!data) return <div className="h-96 animate-pulse rounded-3xl bg-foreground/[.04]" />;
-  return <Replay data={data} t={t} setT={setT} playing={playing} setPlaying={setPlaying} speed={speed} setSpeed={setSpeed} />;
+  return <Replay id={id} data={data} povs={povs} t={t} setT={setT} playing={playing} setPlaying={setPlaying} speed={speed} setSpeed={setSpeed} />;
 }
 
-function Replay({ data, t, setT, playing, setPlaying, speed, setSpeed }: { data: ReplayData; t: number; setT: (t: number) => void; playing: boolean; setPlaying: (p: boolean) => void; speed: number; setSpeed: (s: number) => void }) {
+function Replay({ id, data, povs, t, setT, playing, setPlaying, speed, setSpeed }: { id: string; data: ReplayData; povs: string[]; t: number; setT: (t: number) => void; playing: boolean; setPlaying: (p: boolean) => void; speed: number; setSpeed: (s: number) => void }) {
   const def = MODES[data.mode];
+  // "Watch as": one player's own screen, played back.
+  const [watch, setWatch] = useState<string | null>(null);
+  const [pov, setPov] = useState<{ id: string; frames: { t: number; v: PlayerView }[] } | null>(null);
+  useEffect(() => {
+    if (!watch) return;
+    let live = true;
+    fetch(`/api/replays/${id}/pov/${watch}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => {
+        if (!live || !b?.frames) return;
+        const frames = (b.frames as { at: number; v: PlayerView }[]).map((f) => ({ t: f.at - data.startedAt, v: f.v })).sort((x, y) => x.t - y.t);
+        setPov({ id: watch, frames });
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [watch, id, data.startedAt]);
+  // No game sounds while watching someone's screen.
+  useEffect(() => {
+    setReplayQuiet(true);
+    return () => setReplayQuiet(false);
+  }, []);
+  const watchable = data.players.filter((p) => povs.includes(p.id) || data.snake.length > 0);
   const names = useMemo(() => new Map(data.players.map((p) => [p.id, p])), [data.players]);
   const scores = scoresAt(data.frames, t);
   const board = data.players.map((p) => ({ ...p, score: scores[p.id] ?? 0 })).sort((a, b) => b.score - a.score);
@@ -127,9 +159,42 @@ function Replay({ data, t, setT, playing, setPlaying, speed, setSpeed }: { data:
         </div>
       </div>
 
+      {watchable.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Watch as">
+          <span className="mr-1 text-sm font-bold">👀 watch as:</span>
+          <button type="button" role="radio" aria-checked={!watch} onClick={() => setWatch(null)} className={`rounded-full px-3 py-1.5 text-sm font-semibold ${!watch ? "bg-accent text-on-accent" : "border border-line hover:bg-accent/10"}`}>
+            📊 evryone
+          </button>
+          {watchable.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              role="radio"
+              aria-checked={watch === p.id}
+              onClick={() => setWatch(p.id)}
+              className={`flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-sm font-semibold ${watch === p.id ? "bg-accent text-on-accent" : "border border-line hover:bg-accent/10"}`}
+            >
+              <LiveAvatar avatar={p.avatar} size={22} />
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {watch && (
+        <section className="flex flex-col gap-2">
+          {data.snake.length > 0 ? (
+            <SnakeReplay frames={data.snake} t={t} names={names} follow={watch} />
+          ) : pov?.id === watch ? (
+            <PovScreen frames={pov.frames} t={t} />
+          ) : (
+            <div className="h-80 animate-pulse rounded-3xl bg-foreground/[.04]" />
+          )}
+        </section>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
-          {data.snake.length > 0 && <SnakeReplay frames={data.snake} t={t} names={names} />}
+          {data.snake.length > 0 && !watch && <SnakeReplay frames={data.snake} t={t} names={names} />}
           {q && (
             <section className={`${card} flex flex-col gap-2`}>
               <p className="text-xs font-bold text-muted">❓ question {data.questions.indexOf(q) + 1} of {data.questions.length}</p>
@@ -224,7 +289,7 @@ function Replay({ data, t, setT, playing, setPlaying, speed, setSpeed }: { data:
 }
 
 /** Snake Arena's whole arena at time t, sliding between the recorded frames. */
-function SnakeReplay({ frames, t, names }: { frames: SnakeFrame[]; t: number; names: Map<string, { name: string }> }) {
+function SnakeReplay({ frames, t, names, follow }: { frames: SnakeFrame[]; t: number; names: Map<string, { name: string }>; follow?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -253,7 +318,46 @@ function SnakeReplay({ frames, t, names }: { frames: SnakeFrame[]; t: number; na
       canvas.height = Math.round(h * dpr);
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawArena(ctx, w, h, snap, null, null, performance.now());
-  }, [frames, t, names]);
+    // Watching one player: the camera follows their snake, like on their phone.
+    const mine = follow ? snap.s.find((x) => x[0] === follow) : null;
+    const cam = mine && mine[6].length >= 2 ? { x: mine[6][0], y: mine[6][1], zoom: Math.max(0.42, 0.95 - radiusOf(mine[4]) / 40) } : null;
+    drawArena(ctx, w, h, snap, follow ? cam : null, follow ?? null, performance.now());
+  }, [frames, t, names, follow]);
   return <canvas ref={ref} className="aspect-square w-full max-w-2xl self-center rounded-3xl shadow-xl" aria-label="The Snake Arena, replayed" />;
+}
+
+/** One player's own screen at time t, shown with the real game screens (nothing clickable). */
+function PovScreen({ frames, t }: { frames: { t: number; v: PlayerView }[]; t: number }) {
+  const f = lastAt(frames, t) ?? frames[0];
+  // Timers count from "now" as if it were then (set when the moment changes).
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNow(Date.now());
+  }, [f]);
+  const view = useMemo(() => {
+    if (!f || !now) return null;
+    // Tower Siege's map lives in the first moment.
+    const shift = now - (f.v.serverNow ?? now);
+    const v: PlayerView = { ...f.v, serverNow: now, endsAt: f.v.endsAt ? f.v.endsAt + shift : null };
+    const firstMap = frames[0]?.v.party?.map;
+    if (v.party && !v.party.map && firstMap) v.party = { ...v.party, map: firstMap };
+    if (v.party?.rare?.endsAt) v.party = { ...v.party, rare: { ...v.party.rare, endsAt: v.party.rare.endsAt + shift } };
+    return v;
+  }, [f, frames, now]);
+  if (!view) return <p className={`${card} text-center text-muted`}>nothing saved for this player.</p>;
+  const noop = async () => null;
+  return (
+    <div className="pointer-events-none select-none" inert>
+      {view.status !== "playing" ? (
+        <p className={`${card} text-center text-muted`}>{view.status === "lobby" ? "waiting in the lobby…" : "game over!"}</p>
+      ) : PARTY_MODES.includes(view.mode) ? (
+        <PartyPlay view={view} busy={false} act={noop} embedded />
+      ) : (
+        <div className="mx-auto w-full max-w-xl">
+          <ClassicPlay view={view} busy={false} skew={0} act={noop} />
+        </div>
+      )}
+    </div>
+  );
 }

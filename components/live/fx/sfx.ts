@@ -14,8 +14,14 @@ const MUTE_KEY = "jace-games:live:muted";
 let ctx: AudioContext | null = null;
 let muted: boolean | null = null;
 
+/** Replays show players' screens back without their sounds. */
+let replayQuiet = false;
+export function setReplayQuiet(on: boolean) {
+  replayQuiet = on;
+}
+
 export function isMuted(): boolean {
-  if (getAudio().sfx === 0) return true;
+  if (replayQuiet || getAudio().sfx === 0) return true;
   if (muted === null) {
     try {
       muted = localStorage.getItem(MUTE_KEY) === "1";
