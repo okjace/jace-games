@@ -348,3 +348,12 @@ body {
 :root[data-theme="dark"] .jl-tree { filter: brightness(0.6) saturate(0.95); }
 :root[data-theme="dark"] .jl-wash { opacity: 0.7; }
 :root[data-theme="dark"] header { box-shadow: 0 1px 0 rgba(255,255,255,0.03), 0 8px 24px -16px rgba(0,0,0,0.6); }
+
+/* Emotes floating up during Live games. */
+.jl-emote { animation: jl-emote 3.1s ease-out forwards; }
+@keyframes jl-emote {
+  0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  10% { opacity: 1; transform: translate(calc(var(--drift) * 0.1), -8vh) scale(1.1); }
+  100% { transform: translate(var(--drift), -85vh) scale(1); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .jl-emote { animation-duration: 1.5s; } }

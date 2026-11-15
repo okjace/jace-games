@@ -19,6 +19,7 @@ import { PlayLive } from "./PlayLive";
 import { ask } from "@/components/site/ConfirmBox";
 import { HostTeamLobby, TeamBoard } from "./HostTeams";
 import { JoinLink } from "./JoinLink";
+import { EmoteLayer } from "./Emotes";
 import { TournamentBoard } from "./Tournament";
 import { ReplayRecorder } from "./ReplayRecorder";
 import { clock } from "./ui";
@@ -183,6 +184,16 @@ export function HostScreen({ code }: { code: string }) {
                 )}
               </div>
             )}
+            {view.status !== "ended" && (
+              <>
+                <button type="button" aria-pressed={view.settings.emotes !== false} onClick={() => void act("emotes", { on: view.settings.emotes === false })} title="Let playas send emotes that float up the screen" className={secondary}>
+                  {view.settings.emotes === false ? "🚫 Emotes off" : "😀 Emotes on"}
+                </button>
+                <button type="button" aria-pressed={view.settings.spectators !== false} onClick={() => void act("spectators", { on: view.settings.spectators === false })} title="Let ppl watch this game (they never see chat)" className={secondary}>
+                  {view.settings.spectators === false ? "🙈 No watchers" : "👀 Watchers ok"}
+                </button>
+              </>
+            )}
             <button type="button" aria-pressed={showPlayers} onClick={() => setShowPlayers((v) => !v)} className={secondary}>
               👥 Players ({view.players.length})
             </button>
@@ -262,6 +273,7 @@ export function HostScreen({ code }: { code: string }) {
         {view.status === "playing" && view.mode !== "classic" && view.mode !== "snake" && view.mode !== "mparty" && <SelfPaced view={view} secondsLeft={secondsLeft} />}
 
         {recorder}
+        {view.status !== "ended" && view.settings.emotes !== false && <EmoteLayer topic={view.topic} big />}
         {view.status === "ended" && view.replay && (
           <a href={`/replay/${view.replay}`} target="_blank" rel="noopener" className={`${card} flex items-center gap-3 font-semibold hover:bg-accent/10`}>
             <span className="text-3xl">🎬</span>

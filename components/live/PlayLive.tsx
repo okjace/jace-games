@@ -15,6 +15,7 @@ import { PlayerTeamPicker, TeamBoard } from "./HostTeams";
 import { TeamBadge } from "./TeamSetup";
 import { TournamentBoard } from "./Tournament";
 import { PovRecorder, ReplayRecorder } from "./ReplayRecorder";
+import { EmoteBar, EmoteLayer } from "./Emotes";
 import { VolumeButton } from "@/components/site/SeasonFx";
 import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
@@ -171,6 +172,14 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
       <>
         {povRec}
         {soloRec}
+        {view.emotesOn && token && (
+          <>
+            <EmoteLayer topic={view.topic} />
+            <div className="fixed bottom-3 left-1/2 z-[60] -translate-x-1/2">
+              <EmoteBar code={code} token={token} tone="stage" />
+            </div>
+          </>
+        )}
         {error && <p className="fixed inset-x-0 top-20 z-[60] mx-auto w-fit rounded-full bg-red-500 px-4 py-1.5 text-sm font-bold text-white shadow-lg">{error}</p>}
         <PartyPlay
           view={view}
@@ -216,6 +225,12 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
       </div>
       {error && <p className="text-center text-sm text-danger">{error}</p>}
       {view.status === "playing" && <RejoinPin code={view.code} small />}
+      {view.emotesOn && token && view.status !== "ended" && (
+        <>
+          <EmoteLayer topic={view.topic} />
+          <EmoteBar code={code} token={token} />
+        </>
+      )}
 
       {view.status === "lobby" && (
         <Centered>

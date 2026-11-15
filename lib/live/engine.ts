@@ -7,6 +7,7 @@ import { mapStore } from "@/lib/db/liveMaps";
 import { submitBest, type BoardDetails } from "@/lib/db/liveBoards";
 import { cleanTournament, pointsFor, type Tournament } from "./tournament";
 import { REPLAY_MAX_BYTES, cleanReplay } from "./replay";
+import { EMOTES } from "./emotes";
 import { savePov, saveReplay } from "@/lib/db/liveReplays";
 
 const POV_MAX_FRAMES = 600;
@@ -96,6 +97,10 @@ export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean; 
   tournament?: Tournament | null;
   /** The saved replay of the last finished game (its id). */
   replay?: string | null;
+  /** Spectators can watch (on unless the host turns it off). */
+  spectators?: boolean;
+  /** Emote reactions (on unless the host turns them off). */
+  emotes?: boolean;
   /** Solo: what was picked, so "Play again" can make the same game. */
   setId?: string | null;
   mapId?: string | null;
@@ -662,6 +667,8 @@ export type PlayerView = {
   noSet: boolean;
   /** Whether chat is on in this game (never in solo games). */
   chatOn: boolean;
+  /** Emote reactions are on (never in solo games). */
+  emotesOn: boolean;
   /** Solo games: what was picked, for "Play again". */
   solo: { setId: string | null; minutes: number; shuffle: boolean; mapId: string | null; gameId: string | null } | null;
   phase: string;
@@ -770,6 +777,7 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
     status: g.status,
     noSet: !!settings.noSet,
     chatOn: settings.chat !== false && !settings.solo,
+    emotesOn: settings.emotes !== false && !settings.solo,
     solo: settings.solo
       ? { setId: settings.setId ?? null, minutes: settings.minutes, shuffle: settings.shuffle, mapId: settings.mapId ?? null, gameId: settings.gameId ?? null }
       : null,
@@ -942,6 +950,8 @@ type HostAction =
   | { action: "public"; on: boolean }
   | { action: "again"; mode?: string }
   | { action: "chat"; on: boolean }
+  | { action: "spectators"; on: boolean }
+  | { action: "emotes"; on: boolean }
   // Teams: change the setup (lobby only), put someone on a team, or shuffle everyone.
   | { action: "teams"; teams: unknown }
   | { action: "team-set"; playerId: string; team: number }
@@ -990,6 +1000,10 @@ export async function hostAction(code: string, session: Session, body: HostActio
     if (t.round + 1 >= t.rounds.length) throw new LiveError("That was the last round!", 409);
     const next = await bump(g, { settings: { ...(g.settings as GameSettings), tournament: { ...t, round: t.round + 1 } } });
     await playAgain(next, t.rounds[t.round + 1], true);
+    return;
+  }
+  if (body.action === "spectators" || body.action === "emotes") {
+    await push(await bump(g, { settings: { ...(g.settings as GameSettings), [body.action]: body.on === true } }), "chat-settings");
     return;
   }
   if (body.action === "again") {
@@ -1088,6 +1102,79 @@ export async function startSoloGame(
   const { token, pin } = await joinLiveGame(code, session ? session.user.displayName || session.user.username : "You", session, avatar);
   await step(await getGame(code), "start");
   return { code, token, ...(pin ? { pin } : {}) };
+}
+
+// ---------- Spectators and emotes ----------
+
+export type SpectatorView = {
+  code: string;
+  mode: LiveMode;
+  status: LiveGameRow["status"];
+  setTitle: string | null;
+  host: string;
+  players: { name: string; avatar: Avatar | null; score: number; team: number | null }[];
+  teams: TeamScore[] | null;
+  tournament: TournamentView | null;
+  /** Classic: the question on screen (the answer only once it's revealed). */
+  question: { prompt: string; choices: string[] | null; index: number; total: number; right: string | null } | null;
+  endsAt: number | null;
+  serverNow: number;
+  replay: string | null;
+};
+
+/**
+ * What a spectator sees: names, scores, teams and the question on screen.
+ * No chat and no answers before they're revealed. Spectators don't get the
+ * game's live channel (that carries chat), they check back every few seconds.
+ */
+export async function spectatorView(code: string): Promise<SpectatorView> {
+  const g = await getGame(code);
+  const settings = g.settings as GameSettings;
+  if (settings.solo) throw new LiveError("Solo games can't be watched.", 403);
+  if (settings.spectators === false) throw new LiveError("The host turned watching off for this game.", 403);
+  const s = stateOf(g);
+  const all = ranked(await liveStore().players(g.id));
+  const qs = questionsOf(g);
+  const cq = g.mode === "classic" && s.order && (s.phase === "question" || s.phase === "reveal") ? qs[s.order[s.q!]] : null;
+  return {
+    code: g.code,
+    mode: g.mode,
+    status: g.status,
+    setTitle: g.set_title,
+    host: g.host_name,
+    players: all.slice(0, 50).map((p) => ({ name: p.name, avatar: avatarOf(p), score: p.score, team: teamIndex(settings.teams, dataOf(p).team) })),
+    teams: teamsOf(g, all),
+    tournament: tournamentOf(g, all),
+    question: cq
+      ? {
+          prompt: cq.prompt || "(picture question)",
+          choices: cq.type === "choice" || cq.type === "truefalse" ? (cq.choices ?? []) : null,
+          index: s.q!,
+          total: s.order!.length,
+          right: s.phase === "reveal" ? rightText(cq) : null,
+        }
+      : null,
+    endsAt: s.endsAt ?? null,
+    serverNow: Date.now(),
+    replay: g.status === "ended" ? (settings.replay ?? null) : null,
+  };
+}
+
+const lastEmote = new Map<string, number>();
+
+/** A player's emote: floats up on everyone's screens (no name on it). About one a second each. */
+export async function sendEmote(code: string, token: unknown, raw: unknown): Promise<void> {
+  const g = await getGame(code);
+  const me = await playerFor(g, token);
+  if ((g.settings as GameSettings).emotes === false) throw new LiveError("The host turned emotes off.", 403);
+  const emoji = EMOTES.find((e) => e === raw);
+  if (!emoji) throw new LiveError("Pick an emote.");
+  const key = `${g.id}:${me.id}`;
+  const now = Date.now();
+  if (now - (lastEmote.get(key) ?? 0) < 900) throw new LiveError("Slow down a little!", 429);
+  lastEmote.set(key, now);
+  if (lastEmote.size > 5000) lastEmote.clear();
+  await broadcast(topicOf(g), "emote", { emoji, x: Math.random() });
 }
 
 // ---------- Replays ----------

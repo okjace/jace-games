@@ -18,6 +18,12 @@ export function JoinPage() {
         <p className="mt-1 text-muted">got a code from the big screen? pop it in. no acount needed!!</p>
       </div>
       <JoinCodeForm code={code} setCode={setCode} onJoin={(c) => router.push(`/live/play/${c}`)} big />
+      <p className="-mt-3 text-center text-sm text-muted">
+        just wanna watch?{" "}
+        <button type="button" disabled={!/^\d{6}$/.test(code)} onClick={() => router.push(`/live/watch/${code}`)} className="font-semibold text-accent underline disabled:no-underline disabled:opacity-50">
+          👀 watch this game instead
+        </button>
+      </p>
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-2xl font-bold">🌍 open to evryone</h2>
         <LiveGames embedded />

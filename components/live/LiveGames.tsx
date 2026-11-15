@@ -64,6 +64,9 @@ export function LiveGames({ embedded = false, limit }: { embedded?: boolean; lim
                   {g.players} playing · {g.status === "lobby" ? "starting soon" : "in progress"}
                 </span>
               </span>
+              <Link href={`/live/watch/${g.code}`} title="Watch without playing" className="flex h-10 items-center rounded-full border border-line px-4 text-sm font-semibold hover:bg-accent/10">
+                👀 Watch
+              </Link>
               <Link href={`/live/play/${g.code}`} className={`${primary} h-10 px-5`}>
                 Join
               </Link>
