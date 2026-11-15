@@ -26,7 +26,7 @@ const STATUS_DOT: Record<Friend["status"], string> = {
  * Social with the room link. Friends without a Jace account can't sign in
  * to Jace Live, so they're shown but can't be invited.
  */
-export function FriendInvites({ code, inRoom }: { code: string; gameName: string; inRoom: string[] }) {
+export function FriendInvites({ code, inRoom, endpoint }: { code: string; gameName: string; inRoom: string[]; /** Where invites go (Live games have their own). */ endpoint?: string }) {
   const [state, setState] = useState<{ kind: "loading" } | { kind: "off" } | { kind: "unlinked" } | { kind: "ready"; friends: Friend[] }>({ kind: "loading" });
   const [sent, setSent] = useState<Record<string, "sending" | "sent" | string>>({});
   const [filter, setFilter] = useState("");
@@ -49,7 +49,7 @@ export function FriendInvites({ code, inRoom }: { code: string; gameName: string
 
   const invite = async (f: Friend) => {
     setSent((s) => ({ ...s, [f.uuid]: "sending" }));
-    const res = await fetch(`/api/rooms/${code}/invite`, {
+    const res = await fetch(endpoint ?? `/api/rooms/${code}/invite`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ to: f.uuid }),

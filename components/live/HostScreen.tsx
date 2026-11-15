@@ -20,6 +20,8 @@ import { ask } from "@/components/site/ConfirmBox";
 import { HostTeamLobby, TeamBoard } from "./HostTeams";
 import { JoinLink } from "./JoinLink";
 import { EmoteLayer } from "./Emotes";
+import { PowerBanner } from "./PowerBanner";
+import { InviteFriends } from "./InviteFriends";
 import { TournamentBoard } from "./Tournament";
 import { ReplayRecorder } from "./ReplayRecorder";
 import { clock } from "./ui";
@@ -82,7 +84,7 @@ export function HostScreen({ code }: { code: string }) {
     if (!topic) return;
     const ch = openRoomChannel(topic, null);
     // "mp": someone flipped a card in Memory Party.
-    const offs = ["phase", "players", "answered", "mp", "replay"].map((ev) => ch.on(ev, () => void load()));
+    const offs = ["phase", "players", "answered", "mp", "replay", "event"].map((ev) => ch.on(ev, () => void load()));
     return () => {
       offs.forEach((off) => off());
       ch.close();
@@ -120,6 +122,13 @@ export function HostScreen({ code }: { code: string }) {
     }, 250);
     return () => clearInterval(t);
   }, [endsAt, phase, act]);
+  // Power-ups: check every 10 s whether the next event is due (players' actions check too).
+  const nextEventAt = view?.status === "playing" ? (view.state.nextEventAt ?? null) : null;
+  useEffect(() => {
+    if (!nextEventAt) return;
+    const t = setInterval(() => void act("tick"), 10_000);
+    return () => clearInterval(t);
+  }, [nextEventAt, act]);
   useGameMusic(view?.mode);
 
   if (error && !view) return <p className={`${card} text-center text-sm text-muted`}>{error}</p>;
@@ -172,6 +181,7 @@ export function HostScreen({ code }: { code: string }) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {view.status !== "ended" && <InviteFriends code={view.code} className={secondary} />}
             {view.status !== "lobby" && view.status !== "ended" && (
               <div className="relative">
                 <button type="button" aria-expanded={showQr} onClick={() => setShowQr((v) => !v)} title="QR code n link for ppl joining late" className={secondary}>
@@ -238,6 +248,7 @@ export function HostScreen({ code }: { code: string }) {
             <HostTeamLobby view={view} act={(a, extra) => void act(a, extra)} onKick={(id, name) => void ask(`Remove ${name} from the game?`).then((ok) => { if (ok) void act("kick", { playerId: id }); })} />
           </Lobby>
         )}
+        {view.status === "playing" && <PowerBanner event={view.event} serverNow={view.serverNow} big />}
         {view.status === "playing" && view.teams && <TeamBoard teams={view.teams} />}
 
         {view.status === "playing" && view.mode === "classic" && view.current && (

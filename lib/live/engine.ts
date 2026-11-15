@@ -8,6 +8,7 @@ import { submitBest, type BoardDetails } from "@/lib/db/liveBoards";
 import { cleanTournament, pointsFor, type Tournament } from "./tournament";
 import { REPLAY_MAX_BYTES, cleanReplay } from "./replay";
 import { EMOTES } from "./emotes";
+import { NO_POWERUPS, POWERS, bonusFor, eventOn, nextGap, rollEvent, type PowerEvent } from "./powerups";
 import { savePov, saveReplay } from "@/lib/db/liveReplays";
 
 const POV_MAX_FRAMES = 600;
@@ -101,6 +102,8 @@ export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean; 
   spectators?: boolean;
   /** Emote reactions (on unless the host turns them off). */
   emotes?: boolean;
+  /** Power-up events (on unless the host turns them off). */
+  powerups?: boolean;
   /** Solo: what was picked, so "Play again" can make the same game. */
   setId?: string | null;
   mapId?: string | null;
@@ -118,6 +121,10 @@ type State = {
   startedAt?: number;
   endsAt?: number;
   winner?: string;
+  /** Power-ups: the event on now (or the last one), and when the next one starts. */
+  event?: PowerEvent | null;
+  nextEventAt?: number;
+  events?: number;
 };
 
 type ClassicAnswer = { a: unknown; correct: boolean; pts: number; at: number };
@@ -316,6 +323,7 @@ export async function createLiveGame(
     // Teams (not in solo games, or Tug of War, which has its own two).
     ...(!solo && mode !== "tug" && cleanTeams(opts.settings.teams) ? { teams: cleanTeams(opts.settings.teams) } : {}),
     ...(tournament ? { tournament } : {}),
+    ...(opts.settings.powerups === false ? { powerups: false } : {}),
     ...(opts.settings.public === true && opts.settings.solo !== true ? { public: true } : {}),
     ...(solo
       ? {
@@ -609,6 +617,8 @@ export type HostView = {
   teamsTopic: string | null;
   tournament: TournamentView | null;
   replay: string | null;
+  /** A power-up event on right now. */
+  event: EventView | null;
   /** Memory Party: the shared board for the big screen. */
   mp?: MpView;
   serverNow: number;
@@ -655,6 +665,7 @@ export async function hostView(code: string, session: Session): Promise<HostView
     teamsTopic: (g.settings as GameSettings).teams ? teamTopicOf(g, "host") : null,
     tournament: tournamentOf(g, players),
     replay: (g.settings as GameSettings).replay ?? null,
+    event: eventView(g),
     ...(g.mode === "mparty" ? { mp: mpView(g.id, null, players, Date.now()) } : {}),
     serverNow: Date.now(),
   };
@@ -681,6 +692,8 @@ export type PlayerView = {
   tournament: TournamentView | null;
   /** The finished game's replay, once saved. */
   replay: string | null;
+  /** A power-up event on right now. */
+  event: EventView | null;
   endsAt: number | null;
   /** Classic: the question being played (no answers), what I answered, and at reveal the right answer. */
   question: (PlayerQuestion & { index: number; total: number }) | null;
@@ -794,6 +807,7 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
       : null,
     tournament: tournamentOf(g, all, me.id),
     replay: g.status === "ended" ? (settings.replay ?? null) : null,
+    event: eventView(g),
     endsAt: s.endsAt ?? null,
     question: classicQ ? { ...forPlayers(classicQ), index: s.q!, total: s.order!.length } : null,
     myAnswer: classicQ ? (d.answers?.[String(s.q)] ?? null) : null,
@@ -1047,10 +1061,10 @@ async function step(g: LiveGameRow, action: string): Promise<void> {
         const order = qs.map((_, i) => i);
         if (settings.shuffle) for (let i = order.length - 1; i > 0; i--) { const j = randomInt(i + 1); [order[i], order[j]] = [order[j], order[i]]; }
         const first = qs[order[0]];
-        const next = await bump(g, { status: "playing", started_at: new Date(now).toISOString(), state: { phase: "question", q: 0, order, startedAt: now, endsAt: now + first.time * 1000 } });
+        const next = await bump(g, { status: "playing", started_at: new Date(now).toISOString(), state: { phase: "question", q: 0, order, startedAt: now, endsAt: now + first.time * 1000, ...firstEvent(g, now) } });
         await push(next);
       } else {
-        const next = await bump(g, { status: "playing", started_at: new Date(now).toISOString(), state: { phase: "running", startedAt: now, ...(settings.minutes ? { endsAt: now + Math.round(settings.minutes * 60) * 1000 } : {}) } });
+        const next = await bump(g, { status: "playing", started_at: new Date(now).toISOString(), state: { phase: "running", startedAt: now, ...(settings.minutes ? { endsAt: now + Math.round(settings.minutes * 60) * 1000 } : {}), ...firstEvent(g, now) } });
         await push(next);
       }
       return;
@@ -1072,9 +1086,11 @@ async function step(g: LiveGameRow, action: string): Promise<void> {
       return;
     }
     case "tick": {
-      // The host's screen nudges the server when a timer runs out.
-      if (g.mode === "classic" && s.phase === "question" && now >= (s.endsAt ?? 0)) await push(await bump(g, { state: { ...s, phase: "reveal" } }));
-      else if (g.mode !== "classic" && s.phase === "running" && s.endsAt && now >= s.endsAt) await endGame(g);
+      // The host's screen nudges the server now and then: power-up events, and timers running out.
+      if (g.status === "playing") g = await maybeStartEvent(g);
+      const st = stateOf(g);
+      if (g.mode === "classic" && st.phase === "question" && now >= (st.endsAt ?? 0)) await push(await bump(g, { state: { ...st, phase: "reveal" } }));
+      else if (g.mode !== "classic" && st.phase === "running" && st.endsAt && now >= st.endsAt) await endGame(g);
       return;
     }
     case "end": {
@@ -1104,6 +1120,39 @@ export async function startSoloGame(
   return { code, token, ...(pin ? { pin } : {}) };
 }
 
+// ---------- Power-ups ----------
+
+/** The first event's time, when a game starts (if power-ups are on for it). */
+function firstEvent(g: LiveGameRow, now: number): Partial<State> {
+  const settings = g.settings as GameSettings;
+  if (settings.powerups === false || NO_POWERUPS.includes(g.mode)) return {};
+  return { nextEventAt: now + nextGap(true), event: null, events: 0 };
+}
+
+/** Starts the next power-up event if it's due (and tells everyone). */
+async function maybeStartEvent(g: LiveGameRow): Promise<LiveGameRow> {
+  const s = stateOf(g);
+  const now = Date.now();
+  if (!s.nextEventAt || now < s.nextEventAt || eventOn(s.event, now)) return g;
+  // Not in the last 20 seconds of a timed game.
+  if (s.endsAt && g.mode !== "classic" && s.endsAt - now < 20_000) return g;
+  const event = rollEvent((s.events ?? 0) + 1, now, !!(g.settings as GameSettings).solo);
+  try {
+    const next = await bump(g, { state: { ...s, event, events: event.id, nextEventAt: event.endsAt + nextGap(false) } });
+    await push(next, "event");
+    return next;
+  } catch {
+    // Someone else started it at the same moment.
+    return (await liveStore().gameByCode(g.code)) ?? g;
+  }
+}
+
+export type EventView = PowerEvent & { name: string; icon: string; desc: string };
+const eventView = (g: LiveGameRow): EventView | null => {
+  const e = stateOf(g).event;
+  return e && g.status === "playing" && eventOn(e, Date.now()) ? { ...e, ...POWERS[e.kind] } : null;
+};
+
 // ---------- Spectators and emotes ----------
 
 export type SpectatorView = {
@@ -1120,6 +1169,7 @@ export type SpectatorView = {
   endsAt: number | null;
   serverNow: number;
   replay: string | null;
+  event: EventView | null;
 };
 
 /**
@@ -1157,6 +1207,7 @@ export async function spectatorView(code: string): Promise<SpectatorView> {
     endsAt: s.endsAt ?? null,
     serverNow: Date.now(),
     replay: g.status === "ended" ? (settings.replay ?? null) : null,
+    event: eventView(g),
   };
 }
 
@@ -1559,7 +1610,46 @@ type PlayerAction =
   | { action: "mparty-flip"; cell: number }
   | { action: "mparty-view" };
 
+/**
+ * A player's action, with power-ups on top: a due event starts first, and
+ * whatever the action gained (points, or coins in the coin modes) gets the
+ * event's bonus.
+ */
 export async function playerAction(code: string, token: unknown, body: PlayerAction): Promise<PlayerView> {
+  let g = await getGame(code);
+  if (g.status === "playing") g = await maybeStartEvent(g);
+  const s = stateOf(g);
+  const now = Date.now();
+  const powered = eventOn(s.event, now) && g.status === "playing" && !["report", "team", "solo", "snake-score"].includes(body.action);
+  const before = powered ? await playerFor(g, token) : null;
+  const view = await playerActionInner(code, token, body);
+  if (!powered || !before) return view;
+  const store = liveStore();
+  const all = await store.players(g.id);
+  let me = all.find((p) => p.id === before.id);
+  if (!me) return view;
+  const coins = DEVICE_MODES.includes(g.mode);
+  const gain = coins ? (dataOf(me).bank ?? 0) - (dataOf(before).bank ?? 0) : me.score - before.score;
+  const rank = ranked(all).findIndex((p) => p.id === me!.id);
+  const { extra, jackpot } = bonusFor(s.event!, gain, rank >= Math.ceil(all.length / 2), coins);
+  if (extra <= 0) return view;
+  if (jackpot) {
+    // Only one player wins the jackpot: whoever claims it first (the game's version decides).
+    const latest = await getGame(code);
+    const ev = stateOf(latest).event;
+    if (!ev || ev.id !== s.event!.id || ev.claimedBy) return view;
+    try {
+      await push(await bump(latest, { state: { ...stateOf(latest), event: { ...ev, claimedBy: me.name } } }), "event");
+    } catch {
+      return view;
+    }
+  }
+  const d = dataOf(me);
+  me = (await store.updatePlayer(g.id, me.id, coins ? { data: { ...d, bank: (d.bank ?? 0) + extra, last: { ...(d.last ?? {}), power: extra } } } : { score: me.score + extra, data: { ...d, last: { ...(d.last ?? {}), power: extra } } }))!;
+  return buildPlayerView(await getGame(code), me, await store.players(g.id));
+}
+
+async function playerActionInner(code: string, token: unknown, body: PlayerAction): Promise<PlayerView> {
   const store = liveStore();
   const g = await getGame(code);
   let me = await playerFor(g, token);

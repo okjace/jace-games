@@ -8,6 +8,7 @@ import { MODES } from "@/lib/live/types";
 import { TeamBoard } from "./HostTeams";
 import { LiveAvatar } from "./LiveAvatar";
 import { TournamentBoard } from "./Tournament";
+import { PowerBanner } from "./PowerBanner";
 import { card, clock } from "./ui";
 
 /**
@@ -71,6 +72,7 @@ export function Watch({ code }: { code: string }) {
         </div>
       </div>
 
+      {view.status === "playing" && <PowerBanner event={view.event} serverNow={view.serverNow} big />}
       {view.status === "lobby" && <p className={`${card} text-center text-lg font-semibold`}>⏳ waitin for the host to start…</p>}
       {view.status === "ended" && (
         <div className={`${card} flex flex-wrap items-center justify-between gap-3`}>

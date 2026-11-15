@@ -16,6 +16,8 @@ import { TeamBadge } from "./TeamSetup";
 import { TournamentBoard } from "./Tournament";
 import { PovRecorder, ReplayRecorder } from "./ReplayRecorder";
 import { EmoteBar, EmoteLayer } from "./Emotes";
+import { PowerBanner } from "./PowerBanner";
+import { InviteFriends } from "./InviteFriends";
 import { VolumeButton } from "@/components/site/SeasonFx";
 import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
@@ -75,6 +77,8 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
     const ch = openRoomChannel(topic, null);
     const offs = [
       ch.on("phase", () => void load()),
+      // A power-up event started (or the jackpot got won).
+      ch.on("event", () => void load()),
       // The finished game's replay got saved.
       ch.on("replay", () => void load()),
       // The host turned chat on or off.
@@ -93,6 +97,15 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
   }, [topic, myId, load, code]);
 
   useGameMusic(view?.mode);
+
+  // Jace Social: show friends what ur playing (signed in only; best effort).
+  const playingMode = user && view && view.status !== "ended" ? MODES[view.mode].name : null;
+  useEffect(() => {
+    if (!playingMode) return;
+    const say = (activity: string | null) => void fetch("/api/presence", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ activity }), keepalive: true }).catch(() => {});
+    say(`Playing ${playingMode}`);
+    return () => say(null);
+  }, [playingMode]);
 
   // Solo games have no host screen to notice a timer running out, so this screen does.
   const soloEnds = view?.solo && view.status === "playing" && (view.phase === "question" || view.phase === "running") ? view.endsAt : null;
@@ -172,6 +185,11 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
       <>
         {povRec}
         {soloRec}
+        {view.event && (
+          <div className="fixed inset-x-0 top-16 z-[60] mx-auto w-[min(92vw,30rem)]">
+            <PowerBanner event={view.event} serverNow={view.serverNow} />
+          </div>
+        )}
         {view.emotesOn && token && (
           <>
             <EmoteLayer topic={view.topic} />
@@ -225,6 +243,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
       </div>
       {error && <p className="text-center text-sm text-danger">{error}</p>}
       {view.status === "playing" && <RejoinPin code={view.code} small />}
+      {view.status === "playing" && <PowerBanner event={view.event} serverNow={view.serverNow} />}
       {view.emotesOn && token && view.status !== "ended" && (
         <>
           <EmoteLayer topic={view.topic} />
@@ -238,6 +257,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           <p className="text-xl font-bold">Ur in!</p>
           <p className="text-muted">Watch the big screen. The game starts soon.</p>
           <p className="text-sm text-muted">{view.playerCount} playing</p>
+          {user && !view.solo && <InviteFriends code={view.code} className="rounded-full border border-line px-4 py-2 text-sm font-semibold hover:bg-accent/10" />}
           {view.teams && <PlayerTeamPicker teams={view.teams} busy={busy} onPick={(team) => void act({ action: "team", team })} />}
           <RejoinPin code={view.code} />
         </Centered>
