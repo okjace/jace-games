@@ -275,7 +275,7 @@ export function PromptEditor({ q, onChange }: { q: Question; onChange: (fn: (q: 
 }
 
 /** Pictures are shrunk to at most 1600px and saved as WebP (or JPEG), unless that would make them bigger. */
-async function shrinkImage(file: File): Promise<Blob | null> {
+export async function shrinkImage(file: File): Promise<Blob | null> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");

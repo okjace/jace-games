@@ -12,11 +12,13 @@
  */
 
 export const ARENA = 1800;
-const SPACING = 6;
-const BASE_SPEED = 215;
-const BOOST_SPEED = 410;
-const TURN_RATE = 5.2;
-const START_LEN = 14;
+export const SPACING = 6;
+export const BASE_SPEED = 215;
+export const BOOST_SPEED = 410;
+export const TURN_RATE = 5.2;
+export const START_LEN = 14;
+/** A player's phone moves their own snake (no waiting on the host); if it goes quiet this long, the host steers it again. */
+const REMOTE_MS = 800;
 const FOOD_TARGET = 260;
 const RESPAWN_MS = 2200;
 /** Snakes there are always at least this many of (bots fill the gaps). */
@@ -43,13 +45,19 @@ export type Snake = {
   deadUntil: number;
   best: number;
   kills: number;
+  /** Goes up each time it (re)spawns, so moves from an old life are ignored. */
+  life: number;
+  /** When the player's phone last sent where their snake went. */
+  remoteAt: number;
+  /** The number on the last move from the phone (late, out-of-order ones are ignored). */
+  seq: number;
 };
 
 /** What phones get several times a second (rounded and thinned out to keep it small). */
 export type Snapshot = {
   t: number;
-  /** id, name, colour, alive, length, best, then the body as [x, y, x, y, …] (every few points). */
-  s: [string, string, string, 0 | 1, number, number, number[]][];
+  /** id, name, colour, alive, length, best, the body as [x, y, x, y, …] (every few points), boost fuel, life. */
+  s: [string, string, string, 0 | 1, number, number, number[], number?, number?][];
   /** Food as [x, y, value, colourIndex, …]. */
   f: number[];
   /** Recent events for the feed ("noodle ate ur mom"). */
@@ -59,6 +67,16 @@ export type Snapshot = {
 const FOOD_COLORS = ["#f87171", "#fbbf24", "#a3e635", "#34d399", "#38bdf8", "#a78bfa", "#f472b6"];
 
 export const radiusOf = (len: number) => 7 + Math.min(13, len / 28);
+
+/**
+ * Moves a body's head to (x, y): the head slides, and every SPACING pixels
+ * it leaves a body point behind. (Head first.)
+ */
+export function advance(pts: { x: number; y: number }[], x: number, y: number) {
+  pts[0] = { x, y };
+  const anchor = pts[1];
+  if (!anchor || Math.hypot(x - anchor.x, y - anchor.y) >= SPACING) pts.unshift({ x, y });
+}
 
 export class Arena {
   snakes = new Map<string, Snake>();
@@ -84,13 +102,16 @@ export class Arena {
     s.len = START_LEN;
     s.alive = true;
     s.boost = false;
+    s.life = (s.life ?? 0) + 1;
+    s.remoteAt = 0;
+    s.seq = 0;
   }
 
   /** Adds a player (or brings back one who left). */
   join(id: string, name: string, bot = false): Snake {
     let s = this.snakes.get(id);
     if (!s) {
-      s = { id, name, color: SNAKE_COLORS[this.nextColor++ % SNAKE_COLORS.length], bot, pts: [], len: START_LEN, angle: 0, target: 0, boost: false, fuel: 0, alive: false, deadUntil: 0, best: START_LEN, kills: 0 };
+      s = { id, name, color: SNAKE_COLORS[this.nextColor++ % SNAKE_COLORS.length], bot, pts: [], len: START_LEN, angle: 0, target: 0, boost: false, fuel: 0, alive: false, deadUntil: 0, best: START_LEN, kills: 0, life: 0, remoteAt: 0, seq: 0 };
       this.snakes.set(id, s);
       this.spawnSnake(s);
     }
@@ -108,6 +129,45 @@ export class Arena {
     if (!s || !Number.isFinite(angle)) return;
     s.target = angle;
     s.boost = !!boost;
+  }
+
+  /**
+   * Where a player's own snake went (their phone moves it, so steering feels
+   * instant): the points it laid down since last time, oldest first, as
+   * [x, y, x, y, …]. Too-far jumps get cut short.
+   */
+  move(id: string, life: number, path: number[], boost: boolean, now: number, seq = 0) {
+    const s = this.snakes.get(id);
+    if (!s || s.bot || !s.alive || s.life !== life || !Array.isArray(path)) return;
+    if (seq) {
+      if (seq <= s.seq) return;
+      s.seq = seq;
+    }
+    const since = s.remoteAt ? Math.min(1, (now - s.remoteAt) / 1000) : 0.25;
+    let budget = BOOST_SPEED * (since + 0.15) * 1.3;
+    s.boost = !!boost;
+    s.remoteAt = now;
+    for (let i = 0; i + 1 < path.length && i < 400; i += 2) {
+      let x = Number(path[i]);
+      let y = Number(path[i + 1]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      const h = s.pts[0];
+      let d = Math.hypot(x - h.x, y - h.y);
+      if (d > budget) {
+        if (budget <= 0) break;
+        x = h.x + ((x - h.x) / d) * budget;
+        y = h.y + ((y - h.y) / d) * budget;
+        d = budget;
+      }
+      budget -= d;
+      if (d > 0.01) s.angle = s.target = Math.atan2(y - h.y, x - h.x);
+      advance(s.pts, x, y);
+      while (s.pts.length > Math.max(2, Math.round(s.len))) s.pts.pop();
+      if (x < 0 || y < 0 || x > ARENA || y > ARENA) {
+        this.kill(s, null, now);
+        return;
+      }
+    }
   }
 
   /** A right answer: grow, and fill the boost tank. */
@@ -194,15 +254,13 @@ export class Arena {
           }
         }
       }
+      // A phone that's moving its own snake: the host only checks it.
+      if (!s.bot && now - s.remoteAt < REMOTE_MS) continue;
       const speed = boosting ? BOOST_SPEED : BASE_SPEED;
       const h = s.pts[0];
       const nx = h.x + Math.cos(s.angle) * speed * dt;
       const ny = h.y + Math.sin(s.angle) * speed * dt;
-      // Lay down points every SPACING pixels.
-      const last = s.pts[0];
-      const moved = Math.hypot(nx - last.x, ny - last.y);
-      if (moved >= SPACING) s.pts.unshift({ x: nx, y: ny });
-      else s.pts[0] = { x: nx, y: ny };
+      advance(s.pts, nx, ny);
       while (s.pts.length > Math.max(2, Math.round(s.len))) s.pts.pop();
       // Walls.
       if (nx < 0 || ny < 0 || nx > ARENA || ny > ARENA) this.kill(s, null, now);
@@ -252,7 +310,7 @@ export class Arena {
       // Every other point, rounded, at most 160 numbers per snake.
       const stride = Math.max(2, Math.ceil(sn.pts.length / 80));
       for (let i = 0; i < sn.pts.length; i += stride) body.push(Math.round(sn.pts[i].x), Math.round(sn.pts[i].y));
-      s.push([sn.id, sn.name, sn.color, sn.alive ? 1 : 0, Math.round(sn.len), sn.best, body]);
+      s.push([sn.id, sn.name, sn.color, sn.alive ? 1 : 0, Math.round(sn.len), sn.best, body, Math.round(sn.fuel * 10) / 10, sn.life]);
     }
     const f: number[] = [];
     for (const fd of this.food) f.push(Math.round(fd.x), Math.round(fd.y), fd.v, Math.max(0, FOOD_COLORS.indexOf(fd.c)));
@@ -273,9 +331,10 @@ export function blendSnapshots(a: Snapshot | null, b: Snapshot, k: number): Snap
     ...b,
     s: b.s.map((x) => {
       const old = before.get(x[0]);
-      if (!old || old.length !== x[6].length || !x[3]) return x;
-      const body = x[6].map((v, i) => old[i] + (v - old[i]) * t);
-      return [x[0], x[1], x[2], x[3], x[4], x[5], body] as Snapshot["s"][number];
+      if (!old || !old.length || !x[3]) return x;
+      // Head first in both, so point i is "i steps behind the head" in each (a snake that grew just has extra tail).
+      const body = x[6].map((v, i) => (i < old.length ? old[i] + (v - old[i]) * t : v));
+      return [x[0], x[1], x[2], x[3], x[4], x[5], body, x[7], x[8]] as Snapshot["s"][number];
     }),
   };
 }
@@ -337,6 +396,19 @@ export function drawArena(ctx: CanvasRenderingContext2D, w: number, h: number, s
     for (let i = body.length - 2; i >= 0; i -= 2) {
       ctx.fillStyle = (i / 2) % 4 < 2 ? color : shadeHex(color, -0.18);
       ctx.beginPath();
+      // Fill in between points that are far apart, so the body never looks broken.
+      const px = i + 2 < body.length ? body[i + 2] : body[i];
+      const py = i + 2 < body.length ? body[i + 3] : body[i + 1];
+      const gap = Math.hypot(body[i] - px, body[i + 1] - py);
+      const steps = Math.min(10, Math.floor(gap / (r * 0.7)));
+      for (let k = steps; k >= 1; k--) {
+        const f = k / (steps + 1);
+        const x = body[i] + (px - body[i]) * f;
+        const y = body[i + 1] + (py - body[i + 1]) * f;
+        ctx.moveTo(x + r, y);
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+      }
+      ctx.moveTo(body[i] + r, body[i + 1]);
       ctx.arc(body[i], body[i + 1], r, 0, Math.PI * 2);
       ctx.fill();
     }

@@ -59,6 +59,11 @@ export type LiveSet = {
 
 export type SetSummary = Omit<LiveSet, "questions"> & { questionCount: number };
 
+/** The longest a timed game can be (minutes: 24 hours). 0 minutes means forever (till the host presses End). */
+export const MAX_MINUTES = 24 * 60;
+/** The shortest timed game (minutes: 10 seconds). Minutes can have seconds in them (1.5 = 1:30). */
+export const MIN_MINUTES = 10 / 60;
+
 export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata" | "rare" | "territory" | "vault" | "king" | "memory" | "sweep" | "stack" | "snake" | "mparty";
 
 export type ModeDef = {

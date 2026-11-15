@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
-import { MODES, type LiveMode, type SetSummary } from "@/lib/live/types";
+import { MAX_MINUTES, MIN_MINUTES, MODES, type LiveMode, type SetSummary } from "@/lib/live/types";
 import { guestAvatar } from "./LiveAvatar";
 import { RejoinBanner } from "./RejoinBanner";
 import { MapCard, type MapSummaryView } from "./MapList";
@@ -35,6 +35,7 @@ export function HostSetup() {
   const [gameId, setGameId] = useState<string | null>(params.get("game"));
   const [studioGames, setStudioGames] = useState<StudioPick[] | null>(null);
   const [minutes, setMinutes] = useState(5);
+  const [customTime, setCustomTime] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [listed, setListed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -257,16 +258,33 @@ export function HostSetup() {
         )}
         <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
           {MODES[mode].selfPaced ? (
-            <label className="flex items-center gap-2">
-              Time limit
-              <select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className="h-9 rounded-full border border-line bg-background px-3">
-                {[1, 2, 3, 5, 7, 10, 15, 20].map((n) => (
+            <div className="flex flex-wrap items-center gap-2">
+              <span>Time limit</span>
+              <select
+                value={[1, 2, 3, 5, 7, 10, 15, 20, 30, 60, 0].includes(minutes) && !customTime ? String(minutes) : "custom"}
+                onChange={(e) => {
+                  if (e.target.value === "custom") {
+                    setCustomTime(true);
+                    if (minutes === 0) setMinutes(45);
+                  } else {
+                    setCustomTime(false);
+                    setMinutes(Number(e.target.value));
+                  }
+                }}
+                className="h-9 rounded-full border border-line bg-background px-3"
+                aria-label="Time limit"
+              >
+                {[1, 2, 3, 5, 7, 10, 15, 20, 30, 60].map((n) => (
                   <option key={n} value={n}>
-                    {n} min
+                    {n === 60 ? "1 hour" : `${n} min`}
                   </option>
                 ))}
+                <option value="custom">✏️ custom…</option>
+                <option value="0">♾️ forever (till u press End)</option>
               </select>
-            </label>
+              {customTime && <CustomTime minutes={minutes} onChange={setMinutes} />}
+              {minutes === 0 && !customTime && <span className="text-xs text-muted">no timer, it keeps goin till u end it 👍</span>}
+            </div>
           ) : (
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={shuffle} onChange={(e) => setShuffle(e.target.checked)} />
@@ -313,6 +331,35 @@ export function HostSetup() {
           Cancel
         </Link>
       </div>
+    </div>
+  );
+}
+
+/** A custom game length: hours, minutes and seconds (10 seconds to 24 hours). */
+function CustomTime({ minutes, onChange }: { minutes: number; onChange: (m: number) => void }) {
+  const total = Math.round(minutes * 60);
+  const [h, m, sec] = [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60];
+  const set = (nh: number, nm: number, ns: number) => onChange((nh * 3600 + nm * 60 + ns) / 60);
+  const box = (label: string, value: number, max: number, apply: (v: number) => void) => (
+    <label className="flex items-center gap-1">
+      <input
+        type="number"
+        min={0}
+        max={max}
+        value={value}
+        onChange={(e) => apply(Math.min(max, Math.max(0, Math.round(Number(e.target.value) || 0))))}
+        className="h-9 w-16 rounded-full border border-line bg-background px-2 text-center"
+        aria-label={label}
+      />
+      <span className="text-xs text-muted">{label === "Hours" ? "hr" : label === "Minutes" ? "min" : "sec"}</span>
+    </label>
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-2" onBlur={() => minutes < MIN_MINUTES && onChange(MIN_MINUTES)}>
+      {box("Hours", h, MAX_MINUTES / 60, (v) => set(v, v === MAX_MINUTES / 60 ? 0 : m, v === MAX_MINUTES / 60 ? 0 : sec))}
+      {box("Minutes", m, 59, (v) => set(h, v, sec))}
+      {box("Seconds", sec, 59, (v) => set(h, m, v))}
+      <span className="text-xs text-muted">(10 sec to {MAX_MINUTES / 60} hrs)</span>
     </div>
   );
 }

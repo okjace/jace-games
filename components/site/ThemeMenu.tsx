@@ -6,6 +6,7 @@ import { SEASONS, SEASON_IDS, type ThemeChoice } from "@/lib/seasons";
 import { EffectsToggle } from "./Seasonal";
 import { MyThemeChips } from "./MyThemeChips";
 import { LookToggle } from "./LookToggle";
+import { ThemeMusicDownload } from "./ThemeMusicDownload";
 import { SPECIAL_MODES, setMyTheme, toggleMode, useModes, useMyThemeChoice, useSeason, useSiteSeason } from "./ThemeContext";
 
 /** The menu bar's theme button: pick ur own theme (or follow the site's), moving decorations, and special modes. */
@@ -111,6 +112,7 @@ export function ThemeMenu() {
                 {SEASON_IDS.map((id) => chip(id, SEASONS[id].icon, SEASONS[id].name, mine === id, () => setMyTheme(id)))}
                 <MyThemeChips compact />
               </div>
+              <ThemeMusicDownload compact />
             </>
           )}
           <div className="flex items-center justify-between rounded-xl bg-foreground/[.04] px-3 py-2 text-sm font-semibold">

@@ -17,6 +17,8 @@ import { Markdown, QuestionMediaView } from "./Markdown";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
 import { PlayLive } from "./PlayLive";
 import { ask } from "@/components/site/ConfirmBox";
+import { clock } from "./ui";
+import { useGameMusic } from "@/lib/gameMusic";
 
 /**
  * The host's big screen. It refreshes when the server pushes a change (a
@@ -112,7 +114,7 @@ export function HostScreen({ code }: { code: string }) {
     }, 250);
     return () => clearInterval(t);
   }, [endsAt, phase, act]);
-
+  useGameMusic(view?.mode);
 
   if (error && !view) return <p className={`${card} text-center text-sm text-muted`}>{error}</p>;
   if (!view) return <div className="h-80 animate-pulse rounded-2xl bg-foreground/[.04]" />;
@@ -185,7 +187,7 @@ export function HostScreen({ code }: { code: string }) {
         )}
 
         {view.status === "playing" && view.mode === "snake" && (
-          <SnakeArenaHost view={view} secondsLeft={secondsLeft ?? 0} onScores={(scores) => void act("snake-scores", { scores })} />
+          <SnakeArenaHost view={view} secondsLeft={secondsLeft} onScores={(scores) => void act("snake-scores", { scores })} />
         )}
         {view.status === "playing" && view.mode === "mparty" && view.mp && (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
@@ -194,7 +196,7 @@ export function HostScreen({ code }: { code: string }) {
             </div>
             <div className={`${card} flex flex-col gap-2`}>
               <p className="font-mono text-4xl font-black tabular-nums">
-                {Math.floor((secondsLeft ?? 0) / 60)}:{String((secondsLeft ?? 0) % 60).padStart(2, "0")}
+                {clock(secondsLeft)}
               </p>
               <p className="font-display text-xl font-extrabold">🎴 most pairs</p>
               <ol className="flex flex-col gap-1.5">
@@ -210,7 +212,7 @@ export function HostScreen({ code }: { code: string }) {
             </div>
           </div>
         )}
-        {view.status === "playing" && view.mode !== "classic" && view.mode !== "snake" && view.mode !== "mparty" && <SelfPaced view={view} secondsLeft={secondsLeft ?? 0} />}
+        {view.status === "playing" && view.mode !== "classic" && view.mode !== "snake" && view.mode !== "mparty" && <SelfPaced view={view} secondsLeft={secondsLeft} />}
 
         {view.status === "ended" && <Podium view={view} />}
         {view.status === "ended" && <PlayAgain view={view} busy={busy} onAgain={(m) => act("again", { mode: m })} />}
@@ -277,9 +279,9 @@ function HostBar({
       <span className="text-xl">{mode.icon}</span>
       <span className="text-sm">
         <b>Hosting</b> · code <b className="font-mono tracking-widest">{view.code}</b> · 👥 {view.players.length}
-        {view.status === "playing" && secondsLeft !== null && (
+        {view.status === "playing" && (
           <span className="ml-1 font-mono tabular-nums">
-            · ⏱ {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}
+            · ⏱ {clock(secondsLeft)}
           </span>
         )}
         {view.status === "ended" && <span className="ml-1 text-muted">· ended</span>}
@@ -401,7 +403,7 @@ function Classic({ view, secondsLeft, busy, onReveal, onNext }: { view: HostView
   );
 }
 
-function SelfPaced({ view, secondsLeft }: { view: HostView; secondsLeft: number }) {
+function SelfPaced({ view, secondsLeft }: { view: HostView; secondsLeft: number | null }) {
   const rocket = view.mode === "rocket";
   const max = Math.max(1, ...view.players.map((p) => p.score));
   return (
@@ -410,8 +412,8 @@ function SelfPaced({ view, secondsLeft }: { view: HostView; secondsLeft: number 
         <p className="text-sm text-muted">
           {rocket ? "First to 100% wins" : `${MODES[view.mode].icon} ${MODES[view.mode].name}: highest score when time's up wins`}
         </p>
-        <p className={`font-mono text-4xl font-black tabular-nums ${secondsLeft <= 10 ? "text-danger" : ""}`}>
-          {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}
+        <p className={`font-mono text-4xl font-black tabular-nums ${secondsLeft !== null && secondsLeft <= 10 ? "text-danger" : ""}`}>
+          {clock(secondsLeft)}
         </p>
       </div>
       <ol className="flex flex-col gap-2">

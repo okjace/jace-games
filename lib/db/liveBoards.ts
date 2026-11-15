@@ -3,7 +3,28 @@ import { supabase, usingSupabase } from "./rooms";
 
 /** Global leaderboards for Live modes (supabase/migrations/023_live_mode_scores.sql); in memory during development without Supabase. */
 
-export type BoardRow = { user_id: string; mode: string; best: number; username: string; avatar: unknown; game_code: string | null; updated_at: string };
+/** What the game was like when someone got their best (shown on the leaderboard). */
+export type BoardDetails = {
+  /** Time limit in minutes (0 = forever; classic games have none). */
+  minutes: number | null;
+  noSet: boolean;
+  setTitle: string | null;
+  questions: number;
+  shuffle: boolean;
+  players: number;
+  place: number;
+  correct: number;
+  answered: number;
+  streak: number;
+  solo: boolean;
+  host: string;
+  mapTitle: string | null;
+  /** How long the game really lasted (seconds). */
+  playedSeconds: number | null;
+  playedAt: string | null;
+};
+
+export type BoardRow = { user_id: string; mode: string; best: number; username: string; avatar: unknown; game_code: string | null; details?: BoardDetails | null; updated_at: string };
 
 const mem = globalThis as unknown as { __jlBoards?: Map<string, BoardRow> };
 const memory = () => (mem.__jlBoards ??= new Map());
@@ -23,7 +44,13 @@ export async function submitBest(row: Omit<BoardRow, "updated_at">): Promise<{ b
   if (got.error) throw new Error(got.error.message);
   const previous = (got.data as { best: number } | null)?.best ?? null;
   if (previous !== null && previous >= row.best) return { best: false, previous };
-  const res = await supabase().from("live_mode_scores").upsert({ ...row, updated_at });
+  let res = await supabase().from("live_mode_scores").upsert({ ...row, updated_at });
+  // Before migration 027 adds the details column: save without them.
+  if (res.error && /details/.test(res.error.message)) {
+    const { details: _skip, ...plain } = row;
+    void _skip;
+    res = await supabase().from("live_mode_scores").upsert({ ...plain, updated_at });
+  }
   if (res.error) throw new Error(res.error.message);
   return { best: true, previous };
 }

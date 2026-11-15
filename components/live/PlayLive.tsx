@@ -18,6 +18,7 @@ import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/use
 import { PARTY_MODES, PartyPlay } from "./party";
 import { card, getPin, getToken, input, primary, secondary, setPin, setToken } from "./ui";
 import { ask } from "@/components/site/ConfirmBox";
+import { useGameMusic } from "@/lib/gameMusic";
 
 /** A player's screen for a Live game (usually a phone). */
 /** A player's screen. embedded: inside the host's page (the host playing too). */
@@ -83,6 +84,8 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
       ch.close();
     };
   }, [topic, myId, load, code]);
+
+  useGameMusic(view?.mode);
 
   // Solo games have no host screen to notice a timer running out, so this screen does.
   const soloEnds = view?.solo && view.status === "playing" && (view.phase === "question" || view.phase === "running") ? view.endsAt : null;

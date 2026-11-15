@@ -4,7 +4,7 @@ import { liveStore, type LiveGameRow, type LivePlayerRow } from "@/lib/db/live";
 import { grantedOf, lockerStore, lookOf, statsOf } from "@/lib/db/liveLocker";
 import { chatStore, type ChatRow } from "@/lib/db/liveChat";
 import { mapStore } from "@/lib/db/liveMaps";
-import { submitBest } from "@/lib/db/liveBoards";
+import { submitBest, type BoardDetails } from "@/lib/db/liveBoards";
 import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
 import { addGameToStats, cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar, type XpPart } from "./locker";
@@ -48,7 +48,7 @@ import {
 
 /** Modes with the upgrade shop (score is also the currency). */
 const SHOP_MODES: LiveMode[] = ["gold", "hack"];
-import { DEVICE_MODES, MODES, cleanName, forPlayers, isCorrect, isPlayable, type LiveMode, type PlayerQuestion, type Question } from "./types";
+import { DEVICE_MODES, MAX_MINUTES, MIN_MINUTES, MODES, cleanName, forPlayers, isCorrect, isPlayable, type LiveMode, type PlayerQuestion, type Question } from "./types";
 
 /**
  * Jace Live, on the server. The host runs the game from a Jace
@@ -285,7 +285,8 @@ export async function createLiveGame(
   if (mode === "rare" && !isRareSet(questions)) throw new LiveError("Rare Finds only works with a Rare Finds set (one whose answers have rarities).");
   const settings: GameSettings = {
     noSet,
-    minutes: Math.min(30, Math.max(1, Math.round(Number(opts.settings.minutes) || 5))),
+    // 0 = forever (until the host presses End); otherwise 10 seconds to 24 hours, to the second.
+    minutes: Number(opts.settings.minutes) === 0 ? 0 : Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, Math.round((Number(opts.settings.minutes) || 5) * 60) / 60)),
     shuffle: !!opts.settings.shuffle,
     ...(opts.settings.public === true && opts.settings.solo !== true ? { public: true } : {}),
     ...(solo
@@ -739,7 +740,28 @@ export async function submitToBoard(code: string, token: unknown, session: Sessi
   if (g.status !== "ended") throw new LiveError("Finish the game first.", 409);
   if (!session || !me.user_id || me.user_id !== session.user.id) throw new LiveError("Sign in w/ Jace to go on the leaderboards.", 401);
   if (g.mode === "custom") throw new LiveError("Studio games don't have a global leaderboard.");
-  const res = await submitBest({ user_id: session.user.id, mode: g.mode, best: me.score, username: session.user.displayName || session.user.username, avatar: avatarOf(me), game_code: g.code });
+  // What the game was like, so the leaderboard can show it.
+  const all = await liveStore().players(g.id);
+  const settings = g.settings as GameSettings;
+  const place = [...all].sort((a, b) => b.score - a.score).findIndex((p) => p.id === me.id) + 1;
+  const details: BoardDetails = {
+    minutes: g.mode === "classic" ? null : Number(settings.minutes ?? 0),
+    noSet: !!settings.noSet,
+    setTitle: g.set_title ?? null,
+    questions: g.questions?.length ?? 0,
+    shuffle: !!settings.shuffle,
+    players: all.length,
+    place: place || 1,
+    correct: me.correct,
+    answered: me.answered,
+    streak: me.streak,
+    solo: !!settings.solo,
+    host: g.host_name,
+    mapTitle: settings.mapTitle ?? null,
+    playedSeconds: g.started_at && g.ended_at ? Math.max(0, Math.round((Date.parse(g.ended_at) - Date.parse(g.started_at)) / 1000)) : null,
+    playedAt: g.ended_at,
+  };
+  const res = await submitBest({ user_id: session.user.id, mode: g.mode, best: me.score, username: session.user.displayName || session.user.username, avatar: avatarOf(me), game_code: g.code, details });
   return { ...res, score: me.score };
 }
 
@@ -902,7 +924,7 @@ async function step(g: LiveGameRow, action: string): Promise<void> {
         const next = await bump(g, { status: "playing", started_at: new Date(now).toISOString(), state: { phase: "question", q: 0, order, startedAt: now, endsAt: now + first.time * 1000 } });
         await push(next);
       } else {
-        const next = await bump(g, { status: "playing", started_at: new Date(now).toISOString(), state: { phase: "running", startedAt: now, endsAt: now + settings.minutes * 60_000 } });
+        const next = await bump(g, { status: "playing", started_at: new Date(now).toISOString(), state: { phase: "running", startedAt: now, ...(settings.minutes ? { endsAt: now + Math.round(settings.minutes * 60) * 1000 } : {}) } });
         await push(next);
       }
       return;
@@ -926,7 +948,7 @@ async function step(g: LiveGameRow, action: string): Promise<void> {
     case "tick": {
       // The host's screen nudges the server when a timer runs out.
       if (g.mode === "classic" && s.phase === "question" && now >= (s.endsAt ?? 0)) await push(await bump(g, { state: { ...s, phase: "reveal" } }));
-      else if (g.mode !== "classic" && s.phase === "running" && now >= (s.endsAt ?? 0)) await endGame(g);
+      else if (g.mode !== "classic" && s.phase === "running" && s.endsAt && now >= s.endsAt) await endGame(g);
       return;
     }
     case "end": {
@@ -1254,7 +1276,7 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
 
   // Self-paced modes.
   if (s.phase !== "running") throw new LiveError("The game is over.", 409);
-  if (now > (s.endsAt ?? 0)) {
+  if (s.endsAt && now > s.endsAt) {
     await endGame(g);
     throw new LiveError("Time's up!", 409);
   }

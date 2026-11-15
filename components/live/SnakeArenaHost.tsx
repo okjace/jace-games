@@ -4,14 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import type { HostView } from "@/lib/live/engine";
 import { Arena, drawArena, type Snapshot } from "@/lib/live/snake";
 import { openRoomChannel } from "@/lib/realtime/client";
-import { card } from "./ui";
+import { card, clock } from "./ui";
 
 /**
  * Snake Arena on the host's big screen: this runs the arena for everyone,
- * sends the phones a snapshot ~11 times a second, and every few seconds
+ * sends the phones a snapshot 20 times a second (phones move their own snake and tell it where it went), and every few seconds
  * saves each player's longest snake as their score.
  */
-export function SnakeArenaHost({ view, secondsLeft, onScores }: { view: HostView; secondsLeft: number; onScores: (scores: Record<string, number>) => void }) {
+export function SnakeArenaHost({ view, secondsLeft, onScores }: { view: HostView; secondsLeft: number | null; onScores: (scores: Record<string, number>) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const arena = useRef<Arena | null>(null);
   const [board, setBoard] = useState<{ name: string; color: string; len: number; best: number; bot: boolean }[]>([]);
@@ -41,6 +41,10 @@ export function SnakeArenaHost({ view, secondsLeft, onScores }: { view: HostView
       ch.on("snake-input", (p) => {
         const m = p as { id?: string; a?: number; b?: boolean };
         if (typeof m.id === "string") a.steer(m.id, Number(m.a), !!m.b);
+      }),
+      ch.on("snake-move", (p) => {
+        const m = p as { id?: string; l?: number; p?: number[]; b?: boolean; n?: number };
+        if (typeof m.id === "string" && Array.isArray(m.p) && typeof a.move === "function") a.move(m.id, Number(m.l), m.p, !!m.b, Date.now(), Number(m.n) || 0);
       }),
       ch.on("snake-feed", (p) => {
         const m = p as { playerId?: string; amount?: number };
@@ -113,8 +117,8 @@ export function SnakeArenaHost({ view, secondsLeft, onScores }: { view: HostView
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
       <div className="relative">
         <canvas ref={canvasRef} className="aspect-square w-full rounded-3xl shadow-xl" aria-label="The Snake Arena" />
-        <p className={`absolute left-3 top-3 rounded-full bg-black/60 px-3 py-1 font-mono text-2xl font-black text-white ${secondsLeft <= 10 ? "text-red-300" : ""}`}>
-          {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}
+        <p className={`absolute left-3 top-3 rounded-full bg-black/60 px-3 py-1 font-mono text-2xl font-black text-white ${secondsLeft !== null && secondsLeft <= 10 ? "text-red-300" : ""}`}>
+          {clock(secondsLeft)}
         </p>
         {events.length > 0 && (
           <ul className="absolute bottom-3 left-3 flex flex-col gap-1 text-sm font-bold text-white">

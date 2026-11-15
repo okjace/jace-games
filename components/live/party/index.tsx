@@ -7,6 +7,7 @@ import { GameQuestion, type AnswerResult } from "../fx/GameQuestion";
 import { Juice, useCountUp, useJuice } from "../fx/Juice";
 import { VolumeButton } from "@/components/site/SeasonFx";
 import { sfx } from "../fx/sfx";
+import { clock } from "../ui";
 import { BananaBonanza } from "./BananaBonanza";
 import { RareFinds } from "./RareFinds";
 import { BossBattle, DragonHatchery, LastStanding, PinataParty, SummitClimb, TugOfWar } from "./MoreModes";
@@ -242,7 +243,7 @@ function Stage({ view, busy, act, chat, embedded = false }: { view: PlayerView; 
           {view.me.streak >= 2 && <span className="rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-3 py-2 text-sm font-black">🔥{view.me.streak}</span>}
           <span className="rounded-full bg-black/25 px-3 py-2 text-sm font-bold backdrop-blur">#{view.me.rank}</span>
           <span className={`rounded-full bg-black/25 px-3 py-2 font-mono text-sm font-bold tabular-nums backdrop-blur ${left !== null && left <= 10 ? "text-red-300" : ""}`}>
-            {left !== null ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : ""}
+            {view.status === "playing" && !view.endsAt ? "♾️" : left !== null ? clock(left) : ""}
           </span>
           {view.party.shop && (
             <button type="button" onClick={() => setShopOpen(true)} className="rounded-full px-3 py-2 text-sm font-black text-black shadow-[0_3px_0_rgba(0,0,0,0.3)]" style={{ background: theme.accent }}>

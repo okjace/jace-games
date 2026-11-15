@@ -30,8 +30,29 @@ export const UPLOAD = {
   perDay: 50,
 };
 
+/** Theme uploads (the theme maker): a background picture or the theme's own music. */
+export const THEME_UPLOAD = {
+  types: {
+    "image/png": { ext: "png", kind: "image" },
+    "image/jpeg": { ext: "jpg", kind: "image" },
+    "image/gif": { ext: "gif", kind: "image" },
+    "image/webp": { ext: "webp", kind: "image" },
+    "audio/mpeg": { ext: "mp3", kind: "audio" },
+    "audio/ogg": { ext: "ogg", kind: "audio" },
+    "audio/wav": { ext: "wav", kind: "audio" },
+    "audio/x-wav": { ext: "wav", kind: "audio" },
+    "audio/mp4": { ext: "m4a", kind: "audio" },
+    "audio/x-m4a": { ext: "m4a", kind: "audio" },
+  } as Record<string, { ext: string; kind: "image" | "audio" }>,
+  maxImageBytes: 8 * 1024 * 1024,
+  maxAudioBytes: 15 * 1024 * 1024,
+};
+
+/** The type to serve an uploaded file as, by its extension. */
+export const typeForExt: Record<string, string> = { png: "image/png", jpg: "image/jpeg", gif: "image/gif", webp: "image/webp", mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime", mp3: "audio/mpeg", ogg: "audio/ogg", wav: "audio/wav", m4a: "audio/mp4" };
+
 /** An uploaded file's path: the uploader's folder, then a random id. */
-export const UPLOAD_PATH = /^[A-Za-z0-9_-]{1,64}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|gif|webp|mp4|webm|mov)$/;
+export const UPLOAD_PATH = /^[A-Za-z0-9_-]{1,64}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(png|jpg|gif|webp|mp4|webm|mov|mp3|ogg|wav|m4a)$/;
 
 /** Where an uploaded file is served from (our own address, which points at the bucket). */
 export const uploadSrc = (path: string) => `/api/live/media/${path}`;

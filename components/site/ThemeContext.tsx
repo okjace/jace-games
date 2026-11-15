@@ -249,6 +249,13 @@ export function useModes(): SpecialMode[] {
   return useSyncExternalStore(subscribe, readModes, () => NO_MODES);
 }
 
+/** The custom theme this viewer is using right now (not a maker preview), or null. */
+export function useMyCustomTheme(): { id: string; data: ThemeData } | null {
+  const mine = useMyThemeChoice();
+  const custom = useSyncExternalStore(subscribe, readCustom, () => null);
+  return custom && mine === `custom:${custom.id}` ? custom : null;
+}
+
 /** The custom theme in use (id), if any, so its pieces can restart when it changes. */
 export function useCustomKey(): string {
   const preview = useSyncExternalStore(subscribe, previewSub, () => null);

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SEASONS, SEASON_IDS, type SeasonId, type ThemeChoice } from "@/lib/seasons";
 import { setMyTheme, useMyThemeChoice } from "./ThemeContext";
+import { ThemeMusicDownload } from "./ThemeMusicDownload";
 import { MyThemeChips } from "./MyThemeChips";
 
 type State = { choice: ThemeChoice; active: SeasonId; auto: SeasonId; canEdit: boolean };
@@ -111,6 +112,9 @@ export function SiteThemePicker() {
             {SEASON_IDS.map((id) => mineOption(id, SEASONS[id].icon, SEASONS[id].name, id === "plain" ? "no decorations, no extra colour" : SEASONS[id].when))}
             <MyThemeChips />
           </ul>
+          <div className="mt-3">
+            <ThemeMusicDownload />
+          </div>
         </>
       ) : (
         <>

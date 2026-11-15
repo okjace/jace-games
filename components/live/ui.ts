@@ -51,3 +51,12 @@ export function joinedCodes(): string[] {
     return [];
   }
 }
+
+/** A game clock: "4:05" (or "1:30:00"), or ♾️ for a game with no time limit (null). */
+export function clock(secondsLeft: number | null): string {
+  if (secondsLeft === null) return "♾️";
+  const h = Math.floor(secondsLeft / 3600);
+  const m = Math.floor((secondsLeft % 3600) / 60);
+  const sec = String(secondsLeft % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+}

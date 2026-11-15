@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { SEASONS, type Motion, type SeasonId } from "@/lib/seasons";
+import { currentCustom } from "@/lib/customThemes";
 import { popSound } from "./SeasonFx";
 import { onPrefsLoaded, pushPrefs } from "./ThemeContext";
 
@@ -60,8 +61,8 @@ function sprite(ch: string, px: number, color: string): HTMLCanvasElement {
   return c;
 }
 
-function spawn(motion: Motion, w: number, h: number, sprites: HTMLCanvasElement[], anywhere: boolean): P {
-  const size = motion === "snow" ? 10 + Math.random() * 14 : 16 + Math.random() * 18;
+function spawn(motion: Motion, w: number, h: number, sprites: HTMLCanvasElement[], anywhere: boolean, scale = 1, speed = 1): P {
+  const size = (motion === "snow" ? 10 + Math.random() * 14 : 16 + Math.random() * 18) * scale;
   const p: P = {
     x: Math.random() * w,
     y: anywhere ? Math.random() * h : motion === "rise" ? h + 30 : -30,
@@ -81,6 +82,9 @@ function spawn(motion: Motion, w: number, h: number, sprites: HTMLCanvasElement[
     p.vy = 8 + Math.random() * 14;
     p.vx = (Math.random() < 0.5 ? -1 : 1) * (14 + Math.random() * 24);
   } else p.vy = 4 + Math.random() * 6;
+  p.vx *= speed;
+  p.vy *= speed;
+  p.vr *= speed;
   return p;
 }
 
@@ -104,6 +108,11 @@ export function SeasonalSky({ season, boost = 1 }: { season: SeasonId; boost?: n
     if (!canvas || off || !s.particles.length) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const ctx = canvas.getContext("2d")!;
+    // A custom theme can make them bigger/smaller and faster/slower.
+    const custom = (season as string) === "custom" ? currentCustom() : null;
+    const scale = custom?.particleSize ?? 1;
+    const speed = custom?.particleSpeed ?? 1;
+    const make = (anywhere: boolean) => spawn(s.motion, w, h, sprites, anywhere, scale, speed);
     // Plain symbols take the theme's colours (white would vanish on the light page).
     const css = getComputedStyle(document.documentElement);
     const tint = [css.getPropertyValue("--accent").trim() || "#38bdf8", css.getPropertyValue("--accent2").trim() || "#a5b4fc"];
@@ -122,7 +131,7 @@ export function SeasonalSky({ season, boost = 1 }: { season: SeasonId; boost?: n
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       // About `density` on a big screen, fewer on small ones.
       const want = Math.round((s.density * Math.min(1, (w * h) / (1440 * 900)) + s.density * 0.3) * boost);
-      while (parts.length < want) parts.push(spawn(s.motion, w, h, sprites, true));
+      while (parts.length < want) parts.push(make(true));
       parts = parts.slice(0, want);
     };
     resize();
@@ -137,7 +146,7 @@ export function SeasonalSky({ season, boost = 1 }: { season: SeasonId; boost?: n
         const a = (k / 7) * Math.PI * 2;
         bits.push({ x: p.x, y: p.y, vx: Math.cos(a) * 140, vy: Math.sin(a) * 140 - 60, life: 1, sprite: p.sprite });
       }
-      parts[i] = spawn(s.motion, w, h, sprites, false);
+      parts[i] = make(false);
       popSound(season);
       if (charOf.get(p.sprite) === "🎁") void openPresent();
     };
@@ -161,7 +170,7 @@ export function SeasonalSky({ season, boost = 1 }: { season: SeasonId; boost?: n
           p.rot += p.vr * dt;
         }
         const gone = p.y > h + 40 || p.y < -50 || p.x < -60 || p.x > w + 60;
-        if (gone) parts[i] = spawn(s.motion, w, h, sprites, false);
+        if (gone) parts[i] = make(false);
         ctx.globalAlpha = p.alpha;
         ctx.save();
         ctx.translate(p.x, p.y);

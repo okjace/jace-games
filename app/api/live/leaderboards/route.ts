@@ -7,5 +7,5 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const mode = req.nextUrl.searchParams.get("mode") ?? "classic";
   if (!(mode in MODES)) return NextResponse.json({ error: "No such mode." }, { status: 404 });
   const rows = await topScores(mode, 50);
-  return NextResponse.json({ rows: rows.map((r) => ({ name: r.username, best: r.best, avatar: r.avatar, at: r.updated_at })) });
+  return NextResponse.json({ rows: rows.map((r) => ({ name: r.username, best: r.best, avatar: r.avatar, at: r.updated_at, code: r.game_code, details: r.details ?? null })) });
 }
