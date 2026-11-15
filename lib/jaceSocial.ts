@@ -70,3 +70,11 @@ export async function socialInvite(token: string, invite: { to: string; game: st
 export async function socialPresence(token: string, activity: string | null): Promise<void> {
   await call(token, "presence", { method: "POST", body: { activity } });
 }
+
+export type IceServer = { urls: string | string[]; username?: string; credential?: string };
+
+/** Voice-call relay servers from Jace Social (for in-game calls between friends). */
+export async function socialIce(token: string): Promise<IceServer[]> {
+  const d = await call<{ ice_servers: IceServer[] }>(token, "ice");
+  return Array.isArray(d.ice_servers) ? d.ice_servers : [];
+}

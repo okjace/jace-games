@@ -199,6 +199,9 @@ export function HostScreen({ code }: { code: string }) {
                 <button type="button" aria-pressed={view.settings.emotes !== false} onClick={() => void act("emotes", { on: view.settings.emotes === false })} title="Let playas send emotes that float up the screen" className={secondary}>
                   {view.settings.emotes === false ? "🚫 Emotes off" : "😀 Emotes on"}
                 </button>
+                <button type="button" aria-pressed={view.settings.calls === true} onClick={() => void act("calls", { on: view.settings.calls !== true })} title="Let playas voice chat w/ their Jace Social friends (they press join; they start muted)" className={secondary}>
+                  {view.settings.calls === true ? "📞 Calls on" : "📵 Calls off"}
+                </button>
                 <button type="button" aria-pressed={view.settings.spectators !== false} onClick={() => void act("spectators", { on: view.settings.spectators === false })} title="Let ppl watch this game (they never see chat)" className={secondary}>
                   {view.settings.spectators === false ? "🙈 No watchers" : "👀 Watchers ok"}
                 </button>

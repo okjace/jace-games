@@ -104,6 +104,8 @@ export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean; 
   emotes?: boolean;
   /** Power-up events (on unless the host turns them off). */
   powerups?: boolean;
+  /** Voice calls between Jace Social friends (off unless the host turns them on). */
+  calls?: boolean;
   /** Solo: what was picked, so "Play again" can make the same game. */
   setId?: string | null;
   mapId?: string | null;
@@ -680,6 +682,8 @@ export type PlayerView = {
   chatOn: boolean;
   /** Emote reactions are on (never in solo games). */
   emotesOn: boolean;
+  /** The host turned voice calls on (never in solo games). */
+  callsOn: boolean;
   /** Solo games: what was picked, for "Play again". */
   solo: { setId: string | null; minutes: number; shuffle: boolean; mapId: string | null; gameId: string | null } | null;
   phase: string;
@@ -791,6 +795,7 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
     noSet: !!settings.noSet,
     chatOn: settings.chat !== false && !settings.solo,
     emotesOn: settings.emotes !== false && !settings.solo,
+    callsOn: settings.calls === true && !settings.solo,
     solo: settings.solo
       ? { setId: settings.setId ?? null, minutes: settings.minutes, shuffle: settings.shuffle, mapId: settings.mapId ?? null, gameId: settings.gameId ?? null }
       : null,
@@ -965,6 +970,7 @@ type HostAction =
   | { action: "again"; mode?: string }
   | { action: "chat"; on: boolean }
   | { action: "spectators"; on: boolean }
+  | { action: "calls"; on: boolean }
   | { action: "emotes"; on: boolean }
   // Teams: change the setup (lobby only), put someone on a team, or shuffle everyone.
   | { action: "teams"; teams: unknown }
@@ -1016,7 +1022,7 @@ export async function hostAction(code: string, session: Session, body: HostActio
     await playAgain(next, t.rounds[t.round + 1], true);
     return;
   }
-  if (body.action === "spectators" || body.action === "emotes") {
+  if (body.action === "spectators" || body.action === "emotes" || body.action === "calls") {
     await push(await bump(g, { settings: { ...(g.settings as GameSettings), [body.action]: body.on === true } }), "chat-settings");
     return;
   }

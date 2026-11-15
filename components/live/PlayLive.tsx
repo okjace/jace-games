@@ -18,6 +18,8 @@ import { PovRecorder, ReplayRecorder } from "./ReplayRecorder";
 import { EmoteBar, EmoteLayer } from "./Emotes";
 import { PowerBanner } from "./PowerBanner";
 import { InviteFriends } from "./InviteFriends";
+import { CallPanel } from "./CallPanel";
+import { leaveCall } from "./callClient";
 import { VolumeButton } from "@/components/site/SeasonFx";
 import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
@@ -97,6 +99,13 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
   }, [topic, myId, load, code]);
 
   useGameMusic(view?.mode);
+
+  // Voice call: leaving the game page (or the game ending) leaves the call.
+  const gameOver = view?.status === "ended";
+  useEffect(() => {
+    if (gameOver) void leaveCall();
+  }, [gameOver]);
+  useEffect(() => () => void leaveCall(), []);
 
   // Jace Social: show friends what ur playing (signed in only; best effort).
   const playingMode = user && view && view.status !== "ended" ? MODES[view.mode].name : null;
@@ -190,6 +199,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
             <PowerBanner event={view.event} serverNow={view.serverNow} />
           </div>
         )}
+        {view.callsOn && user && <CallPanel code={code} hasTeam={view.teams?.mine !== null && view.teams?.mine !== undefined} />}
         {view.emotesOn && token && (
           <>
             <EmoteLayer topic={view.topic} />
@@ -244,6 +254,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
       {error && <p className="text-center text-sm text-danger">{error}</p>}
       {view.status === "playing" && <RejoinPin code={view.code} small />}
       {view.status === "playing" && <PowerBanner event={view.event} serverNow={view.serverNow} />}
+      {view.callsOn && user && view.status !== "ended" && <CallPanel code={code} hasTeam={view.teams?.mine !== null && view.teams?.mine !== undefined} />}
       {view.emotesOn && token && view.status !== "ended" && (
         <>
           <EmoteLayer topic={view.topic} />
