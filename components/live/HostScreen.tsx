@@ -18,6 +18,7 @@ import { ANSWER_COLORS, ANSWER_SHAPES, card, primary, secondary } from "./ui";
 import { PlayLive } from "./PlayLive";
 import { ask } from "@/components/site/ConfirmBox";
 import { HostTeamLobby, TeamBoard } from "./HostTeams";
+import { JoinLink } from "./JoinLink";
 import { clock } from "./ui";
 import { useGameMusic } from "@/lib/gameMusic";
 
@@ -35,6 +36,7 @@ export function HostScreen({ code }: { code: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const full = useStageFullscreen(hostRef);
   const [showPlayers, setShowPlayers] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const chatShown = useChatShown();
 
   /** The host joins as a player too, in a new tab (their name comes from their Jace account). */
@@ -142,6 +144,18 @@ export function HostScreen({ code }: { code: string }) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {view.status !== "lobby" && view.status !== "ended" && (
+              <div className="relative">
+                <button type="button" aria-expanded={showQr} onClick={() => setShowQr((v) => !v)} title="QR code n link for ppl joining late" className={secondary}>
+                  📱 Join QR
+                </button>
+                {showQr && (
+                  <div className="jl-pop-in absolute left-0 top-12 z-50 rounded-2xl border border-line bg-panel p-4 shadow-xl">
+                    <JoinLink code={view.code} size={220} />
+                  </div>
+                )}
+              </div>
+            )}
             <button type="button" aria-pressed={showPlayers} onClick={() => setShowPlayers((v) => !v)} className={secondary}>
               👥 Players ({view.players.length})
             </button>
@@ -317,8 +331,14 @@ function HostBar({
 function Lobby({ view, busy, onStart, onKick, children }: { view: HostView; busy: boolean; onStart: () => void; onKick: (id: string) => void; children?: React.ReactNode }) {
   return (
     <div className={`${card} flex flex-col items-center gap-5 py-10 text-center`}>
-      <p className="text-sm text-muted">Game code</p>
-      <p className="font-mono text-6xl font-black tracking-[0.25em] sm:text-7xl">{view.code}</p>
+      <div className="flex flex-col items-center gap-6 sm:flex-row sm:gap-10">
+        <div>
+          <p className="text-sm text-muted">Game code</p>
+          <p className="font-mono text-6xl font-black tracking-[0.25em] sm:text-7xl">{view.code}</p>
+          <p className="mt-1 text-sm text-muted">go to {typeof window !== "undefined" ? window.location.host : ""}/join n type it in</p>
+        </div>
+        <JoinLink code={view.code} size={180} />
+      </div>
       <p className="text-muted">
         {view.players.length === 0 ? "Waitin for playas…" : `${view.players.length} player${view.players.length === 1 ? "" : "s"} in`}
       </p>
