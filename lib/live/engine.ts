@@ -5,7 +5,8 @@ import { grantedOf, lockerStore, lookOf, statsOf } from "@/lib/db/liveLocker";
 import { chatStore, type ChatRow } from "@/lib/db/liveChat";
 import { mapStore } from "@/lib/db/liveMaps";
 import { submitBest, type BoardDetails } from "@/lib/db/liveBoards";
-import { cleanTeams, shuffledTeams, smallestTeam, teamIndex, teamScores, type TeamPick, type TeamScore, type TeamSettings } from "./teams";
+import { cleanTournament, pointsFor, type Tournament } from "./tournament";
+import { TEAMS, cleanTeams, shuffledTeams, smallestTeam, teamIndex, teamScores, type TeamPick, type TeamScore, type TeamSettings } from "./teams";
 import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
 import { addGameToStats, cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar, type XpPart } from "./locker";
@@ -86,6 +87,8 @@ export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean; 
   solo?: boolean;
   /** Teams (2–12), and how players get on one. */
   teams?: TeamSettings | null;
+  /** A tournament: modes played back to back, with points by place after each round. */
+  tournament?: Tournament | null;
   /** Solo: what was picked, so "Play again" can make the same game. */
   setId?: string | null;
   mapId?: string | null;
@@ -137,6 +140,9 @@ type PlayerData = PartyData & {
   pinHash?: string;
   /** Which team they're on (games with teams). */
   team?: number;
+  /** Tournaments: points so far, and what the last round gave. */
+  tp?: number;
+  tpLast?: number;
   /** Self-paced modes: every answer, for the review at the end. */
   log?: { qi: number; a: unknown; correct: boolean }[];
 };
@@ -272,7 +278,9 @@ export async function createLiveGame(
   session: Session,
   opts: { setId: string | null; mode: LiveMode; settings: Partial<GameSettings> & { mapId?: unknown; gameId?: unknown } },
 ): Promise<string> {
-  const mode = MODES[opts.mode] ? opts.mode : "classic";
+  // A tournament starts with its first round's mode.
+  const tournament = opts.settings.solo === true ? null : cleanTournament(opts.settings.tournament, !opts.setId);
+  const mode = tournament ? tournament.rounds[0] : MODES[opts.mode] ? opts.mode : "classic";
   const store = liveStore();
   const solo = opts.settings.solo === true;
   const noSet = !opts.setId;
@@ -295,6 +303,7 @@ export async function createLiveGame(
     shuffle: !!opts.settings.shuffle,
     // Teams (not in solo games, or Tug of War, which has its own two).
     ...(!solo && mode !== "tug" && cleanTeams(opts.settings.teams) ? { teams: cleanTeams(opts.settings.teams) } : {}),
+    ...(tournament ? { tournament } : {}),
     ...(opts.settings.public === true && opts.settings.solo !== true ? { public: true } : {}),
     ...(solo
       ? {
@@ -423,10 +432,18 @@ export async function publicLiveGames(): Promise<{ code: string; mode: LiveMode;
  * (optionally in a different mode). Scores and mode data reset; each
  * player's look and rejoin PIN are kept, and the game gets 12 more hours.
  */
-async function playAgain(g: LiveGameRow, rawMode: string) {
+async function playAgain(g: LiveGameRow, rawMode: string, nextRound = false) {
   if (g.status !== "ended") throw new LiveError("Finish this game first.", 409);
   const mode = (rawMode in MODES ? rawMode : g.mode) as LiveMode;
-  const settings = g.settings as GameSettings;
+  let settings = g.settings as GameSettings;
+  // A plain "Play again" ends a tournament: no more rounds, points cleared.
+  const endTournament = !nextRound && !!settings.tournament;
+  if (endTournament) {
+    const { tournament: _drop, ...rest } = settings;
+    void _drop;
+    settings = rest;
+    g = await bump(g, { settings });
+  }
   if (MODES[mode].needsSet && settings.noSet) throw new LiveError(`${MODES[mode].name} needs a question set.`);
   if (mode === "custom" && !settings.custom) throw new LiveError("Pick a Studio game from Host a game for that mode.");
   const store = liveStore();
@@ -438,7 +455,7 @@ async function playAgain(g: LiveGameRow, rawMode: string) {
       correct: 0,
       answered: 0,
       finished_at: null,
-      data: { ...(d.avatar ? { avatar: d.avatar } : {}), ...(d.pinHash ? { pinHash: d.pinHash } : {}), ...(d.team !== undefined ? { team: d.team } : {}) },
+      data: { ...(d.avatar ? { avatar: d.avatar } : {}), ...(d.pinHash ? { pinHash: d.pinHash } : {}), ...(d.team !== undefined ? { team: d.team } : {}), ...(d.tp && !endTournament ? { tp: d.tp, tpLast: d.tpLast } : {}) },
     });
   }
   const now = Date.now();
@@ -573,6 +590,7 @@ export type HostView = {
   /** Teams: each team's total and place (null without teams), and the channel with every team's chat. */
   teams: TeamScore[] | null;
   teamsTopic: string | null;
+  tournament: TournamentView | null;
   /** Memory Party: the shared board for the big screen. */
   mp?: MpView;
   serverNow: number;
@@ -617,6 +635,7 @@ export async function hostView(code: string, session: Session): Promise<HostView
     players: players.map((p) => ({ id: p.id, name: p.name, score: p.score, correct: p.correct, answered: p.answered, streak: p.streak, finished: !!p.finished_at, avatar: avatarOf(p), team: teamIndex((g.settings as GameSettings).teams, dataOf(p).team) })),
     teams: teamsOf(g, players),
     teamsTopic: (g.settings as GameSettings).teams ? teamTopicOf(g, "host") : null,
+    tournament: tournamentOf(g, players),
     ...(g.mode === "mparty" ? { mp: mpView(g.id, null, players, Date.now()) } : {}),
     serverNow: Date.now(),
   };
@@ -638,6 +657,7 @@ export type PlayerView = {
   top: { name: string; score: number; you: boolean; avatar: Avatar | null }[];
   /** Teams: how they're picked, my team (null until I'm on one), every team's total, and my team's chat channel. */
   teams: { pick: TeamPick; mine: number | null; scores: TeamScore[]; topic: string | null } | null;
+  tournament: TournamentView | null;
   endsAt: number | null;
   /** Classic: the question being played (no answers), what I answered, and at reveal the right answer. */
   question: (PlayerQuestion & { index: number; total: number }) | null;
@@ -748,6 +768,7 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
           return { pick: settings.teams.pick, mine, scores: teamsOf(g, all)!, topic: mine !== null ? teamTopicOf(g, mine) : null };
         })()
       : null,
+    tournament: tournamentOf(g, all, me.id),
     endsAt: s.endsAt ?? null,
     question: classicQ ? { ...forPlayers(classicQ), index: s.q!, total: s.order!.length } : null,
     myAnswer: classicQ ? (d.answers?.[String(s.q)] ?? null) : null,
@@ -908,6 +929,8 @@ type HostAction =
   | { action: "teams"; teams: unknown }
   | { action: "team-set"; playerId: string; team: number }
   | { action: "teams-shuffle" }
+  // Tournaments: on to the next round (with everyone's points kept).
+  | { action: "next-round" }
   // Snake Arena: the host's screen runs the arena and reports everyone's longest snake.
   | { action: "snake-scores"; scores: Record<string, number> };
 
@@ -942,6 +965,14 @@ export async function hostAction(code: string, session: Session, body: HostActio
     if (!(g.settings as GameSettings).teams) return;
     await dealTeams(g, await liveStore().players(g.id));
     await push(g, "players");
+    return;
+  }
+  if (body.action === "next-round") {
+    const t = (g.settings as GameSettings).tournament;
+    if (!t || g.status !== "ended") throw new LiveError("Finish this round first.", 409);
+    if (t.round + 1 >= t.rounds.length) throw new LiveError("That was the last round!", 409);
+    const next = await bump(g, { settings: { ...(g.settings as GameSettings), tournament: { ...t, round: t.round + 1 } } });
+    await playAgain(next, t.rounds[t.round + 1], true);
     return;
   }
   if (body.action === "again") {
@@ -1042,6 +1073,58 @@ export async function startSoloGame(
   return { code, token, ...(pin ? { pin } : {}) };
 }
 
+// ---------- Tournaments ----------
+
+/** End of a tournament round: points by place to every player (and team). Returns the new settings, or null outside tournaments. */
+async function scoreRound(g: LiveGameRow): Promise<GameSettings | null> {
+  const settings = g.settings as GameSettings;
+  const t = settings.tournament;
+  if (!t || (t.scored ?? 0) > t.round) return null;
+  const all = ranked(await liveStore().players(g.id));
+  // Ties share a place.
+  let place = 0;
+  for (let i = 0; i < all.length; i++) {
+    if (i === 0 || all[i].score !== all[i - 1].score) place = i + 1;
+    const pts = pointsFor(place);
+    const d = dataOf(all[i]);
+    await liveStore().updatePlayer(g.id, all[i].id, { data: { ...d, tp: (d.tp ?? 0) + pts, tpLast: pts } });
+  }
+  const teamPoints = [...(t.teamPoints ?? [])];
+  for (const ts of teamsOf(g, all) ?? []) teamPoints[ts.team] = (teamPoints[ts.team] ?? 0) + (ts.players ? pointsFor(ts.rank) : 0);
+  return { ...settings, tournament: { ...t, scored: t.round + 1, teamPoints } };
+}
+
+export type TournamentView = {
+  rounds: LiveMode[];
+  round: number;
+  /** The last round is over: these are the final standings. */
+  done: boolean;
+  standings: { name: string; avatar: Avatar | null; tp: number; last: number; you?: boolean; place: number }[];
+  teams: { team: number; name: string; icon: string; color: string; tp: number; place: number }[] | null;
+};
+
+/** Tournament standings, most points first (null outside tournaments). */
+function tournamentOf(g: LiveGameRow, all: LivePlayerRow[], me?: string): TournamentView | null {
+  const settings = g.settings as GameSettings;
+  const t = settings.tournament;
+  if (!t) return null;
+  const rows = all.map((p) => ({ id: p.id, name: p.name, avatar: avatarOf(p), tp: dataOf(p).tp ?? 0, last: dataOf(p).tpLast ?? 0 })).sort((a, b) => b.tp - a.tp || a.name.localeCompare(b.name));
+  let place = 0;
+  const standings = rows.map((r, i) => {
+    if (i === 0 || r.tp !== rows[i - 1].tp) place = i + 1;
+    return { name: r.name, avatar: r.avatar, tp: r.tp, last: r.last, place, ...(me && r.id === me ? { you: true } : {}) };
+  });
+  const teams = settings.teams
+    ? TEAMS.slice(0, settings.teams.count)
+        .map((tm, i) => ({ team: i, name: tm.name, icon: tm.icon, color: tm.color, tp: t.teamPoints?.[i] ?? 0, place: 0 }))
+        .sort((a, b) => b.tp - a.tp)
+        .map((r, i, arr) => ({ ...r, place: i > 0 && r.tp === arr[i - 1].tp ? 0 : i + 1 }))
+    : null;
+  // Ties share the place above.
+  if (teams) for (let i = 1; i < teams.length; i++) if (!teams[i].place) teams[i].place = teams[i - 1].place;
+  return { rounds: t.rounds, round: t.round, done: g.status === "ended" && t.round + 1 >= t.rounds.length, standings, teams };
+}
+
 // ---------- Teams ----------
 
 /** Everyone spread evenly over the teams, in a random order. */
@@ -1081,7 +1164,8 @@ async function endGame(g: LiveGameRow, winner?: string) {
     const patch = kingFinal(all, Date.now());
     if (patch) await applyPatches(g, [patch], all);
   }
-  const ended = await bump(g, { status: "ended", ended_at: new Date().toISOString(), state: { ...s, phase: "ended", ...(winner ? { winner } : {}) } });
+  const settings = await scoreRound(g);
+  const ended = await bump(g, { status: "ended", ended_at: new Date().toISOString(), state: { ...s, phase: "ended", ...(winner ? { winner } : {}) }, ...(settings ? { settings } : {}) });
   await giveXp(ended);
   await saveReport(ended);
   await push(ended);

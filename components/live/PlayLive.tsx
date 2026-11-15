@@ -13,6 +13,7 @@ import { ChatButton, ChatPanel } from "./ChatPanel";
 import { GlobalBoardOptIn } from "./GlobalBoardOptIn";
 import { PlayerTeamPicker, TeamBoard } from "./HostTeams";
 import { TeamBadge } from "./TeamSetup";
+import { TournamentBoard } from "./Tournament";
 import { VolumeButton } from "@/components/site/SeasonFx";
 import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
@@ -219,6 +220,11 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           <p className="text-muted">
             {score(view, view.me.score)} · {view.me.correct}/{view.me.answered} right
           </p>
+          {view.tournament && (
+            <div className="w-full">
+              <TournamentBoard t={view.tournament} />
+            </div>
+          )}
           {view.teams && (
             <div className="w-full">
               <TeamBoard teams={view.teams.scores} big mine={view.teams.mine} />

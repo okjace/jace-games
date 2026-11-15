@@ -9,6 +9,7 @@ import { MAX_MINUTES, MIN_MINUTES, MODES, type LiveMode, type SetSummary } from 
 import { guestAvatar } from "./LiveAvatar";
 import { RejoinBanner } from "./RejoinBanner";
 import { TeamSetup } from "./TeamSetup";
+import { TournamentSetup } from "./Tournament";
 import type { TeamSettings } from "@/lib/live/teams";
 import { MapCard, type MapSummaryView } from "./MapList";
 import { card, primary, secondary, setPin, setToken } from "./ui";
@@ -41,6 +42,7 @@ export function HostSetup() {
   const [shuffle, setShuffle] = useState(false);
   const [listed, setListed] = useState(false);
   const [teams, setTeams] = useState<TeamSettings | null>(null);
+  const [rounds, setRounds] = useState<LiveMode[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,7 +84,7 @@ export function HostSetup() {
   // Classic needs questions, so with them off it becomes Gold Rush.
   const mode = noSet && MODES[pickedMode].needsSet ? "gold" : pickedMode === "rare" && !chosen?.rare ? "classic" : pickedMode;
 
-  const picks = () => ({ setId: noSet ? null : setId, mode, settings: { minutes, shuffle, public: listed, teams: mode === "tug" ? null : teams, mapId: mode === "tower" ? mapId : null, gameId: mode === "custom" ? gameId : null } });
+  const picks = () => ({ setId: noSet ? null : setId, mode, settings: { minutes, shuffle, public: listed, teams: mode === "tug" ? null : teams, tournament: rounds ? { rounds } : null, mapId: mode === "tower" ? mapId : null, gameId: mode === "custom" ? gameId : null } });
 
   const playSolo = async () => {
     setBusy(true);
@@ -297,6 +299,11 @@ export function HostSetup() {
           {!soloFirst && user && mode !== "tug" && (
             <div className="w-full">
               <TeamSetup value={teams} onChange={setTeams} />
+            </div>
+          )}
+          {!soloFirst && user && (
+            <div className="w-full">
+              <TournamentSetup rounds={rounds} onChange={setRounds} noSet={noSet} />
             </div>
           )}
           {!soloFirst && user && (

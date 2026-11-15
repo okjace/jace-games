@@ -19,6 +19,7 @@ import { PlayLive } from "./PlayLive";
 import { ask } from "@/components/site/ConfirmBox";
 import { HostTeamLobby, TeamBoard } from "./HostTeams";
 import { JoinLink } from "./JoinLink";
+import { TournamentBoard } from "./Tournament";
 import { clock } from "./ui";
 import { useGameMusic } from "@/lib/gameMusic";
 
@@ -137,6 +138,7 @@ export function HostScreen({ code }: { code: string }) {
               <h1 className="text-xl font-bold">
                 {mode.name}
                 {view.setTitle ? ` · ${view.setTitle}` : view.settings.noSet ? " · no questions" : ""}
+                {view.tournament && <span className="ml-2 rounded-full bg-accent/15 px-2 py-0.5 text-sm">🏆 round {view.tournament.round + 1}/{view.tournament.rounds.length}</span>}
               </h1>
               <p className="text-sm text-muted">
                 Join at <b className="text-foreground">{joinUrl}</b> w/ code <b className="font-mono tracking-widest text-foreground">{view.code}</b>
@@ -234,6 +236,7 @@ export function HostScreen({ code }: { code: string }) {
         )}
         {view.status === "playing" && view.mode !== "classic" && view.mode !== "snake" && view.mode !== "mparty" && <SelfPaced view={view} secondsLeft={secondsLeft} />}
 
+        {view.status === "ended" && view.tournament && <TournamentBoard t={view.tournament} busy={busy} onNext={() => void act("next-round")} />}
         {view.status === "ended" && view.teams && <TeamBoard teams={view.teams} big />}
         {view.status === "ended" && <Podium view={view} />}
         {view.status === "ended" && <PlayAgain view={view} busy={busy} onAgain={(m) => act("again", { mode: m })} />}
