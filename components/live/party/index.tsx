@@ -6,6 +6,7 @@ import { MODES, type LiveMode } from "@/lib/live/types";
 import { GameQuestion, type AnswerResult } from "../fx/GameQuestion";
 import { Juice, useCountUp, useJuice } from "../fx/Juice";
 import { VolumeButton } from "@/components/site/SeasonFx";
+import { useScores } from "@/components/ScoresProvider";
 import { sfx } from "../fx/sfx";
 import { clock } from "../ui";
 import { TeamBadge } from "../TeamSetup";
@@ -25,7 +26,7 @@ import type { Act } from "./shared";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "../fx/useStageFullscreen";
 import { LiveAvatar, LiveName } from "../LiveAvatar";
 import { Markdown } from "../Markdown";
-import { RejoinPin } from "../PlayLive";
+import { GameCodeLine, GameSettingsMenu } from "../GameSettingsMenu";
 import { StudioMode } from "./StudioMode";
 import { TowerSiege } from "./TowerSiege";
 import { ChatButton, useChatShown } from "../ChatPanel";
@@ -123,7 +124,8 @@ export type StageProps = {
   setEarnHidden?: (hidden: boolean) => void;
 };
 
-export function PartyPlay(props: { view: PlayerView; busy: boolean; act: Act; chat?: React.ReactNode; embedded?: boolean }) {
+/** `overlay`: things floating over the game (power-up banner, emotes) that must stay in fullscreen too. */
+export function PartyPlay(props: { view: PlayerView; busy: boolean; act: Act; chat?: React.ReactNode; embedded?: boolean; overlay?: React.ReactNode }) {
   return (
     <Juice>
       <Stage {...props} />
@@ -131,8 +133,9 @@ export function PartyPlay(props: { view: PlayerView; busy: boolean; act: Act; ch
   );
 }
 
-function Stage({ view, busy, act, chat, embedded = false }: { view: PlayerView; busy: boolean; act: Act; chat?: React.ReactNode; embedded?: boolean }) {
+function Stage({ view, busy, act, chat, embedded = false, overlay }: { view: PlayerView; busy: boolean; act: Act; chat?: React.ReactNode; embedded?: boolean; overlay?: React.ReactNode }) {
   const juice = useJuice();
+  const { user } = useScores();
   const mode = view.mode;
   const theme = THEMES[mode] ?? THEMES.gold;
   const def = MODES[mode];
@@ -234,6 +237,8 @@ function Stage({ view, busy, act, chat, embedded = false }: { view: PlayerView; 
       className={`relative px-4 pb-10 pt-4 text-white sm:px-6 ${embedded ? "min-h-[calc(100vh-9rem)] rounded-3xl" : "-mx-4 -mt-6 min-h-[calc(100vh-4rem)] sm:-mx-6 sm:-mt-8"} ${full.on ? FULLSCREEN_CLASS : ""}`}
       style={{ background: theme.bg }}
     >
+      {/* Inside the stage, so they still show when the stage goes fullscreen. */}
+      {overlay}
       {/* The game in the middle; chat beside it on wide screens, under it on phones. */}
       <div className={`mx-auto flex w-full max-w-xl flex-col gap-4 ${chatShown ? "lg:max-w-[60rem] lg:flex-row lg:items-start lg:justify-center" : ""}`}>
       <div className="flex w-full min-w-0 max-w-xl flex-col gap-4">
@@ -261,6 +266,7 @@ function Stage({ view, busy, act, chat, embedded = false }: { view: PlayerView; 
           )}
           {chat && <ChatButton className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 text-lg text-white backdrop-blur" />}
           <VolumeButton className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 text-lg text-white backdrop-blur hover:bg-black/40" />
+          {!view.solo && <GameSettingsMenu code={view.code} signedIn={!!user} className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 text-lg text-white backdrop-blur hover:bg-black/40" />}
           <FullscreenButton on={full.on} toggle={full.toggle} className="bg-black/25 backdrop-blur" />
           {view.solo && (
             <button
@@ -308,7 +314,7 @@ function Stage({ view, busy, act, chat, embedded = false }: { view: PlayerView; 
         {mode === "snake" && <SnakeArena {...stageProps} />}
         {mode === "mparty" && <MemoryParty {...stageProps} />}
 
-        <RejoinPin code={view.code} small />
+        <GameCodeLine code={view.code} solo={!!view.solo} />
         <ol className="flex flex-col gap-1.5 rounded-3xl bg-black/25 p-3 text-sm backdrop-blur">
           {view.top.map((p, i) => (
             <li key={p.name} className={`flex items-center gap-2 rounded-xl px-3 py-1.5 transition-colors ${p.you ? "bg-white/20 font-bold" : ""}`}>

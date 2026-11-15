@@ -18,14 +18,14 @@ import { PovRecorder, ReplayRecorder } from "./ReplayRecorder";
 import { EmoteBar, EmoteLayer } from "./Emotes";
 import { PowerBanner } from "./PowerBanner";
 import { InviteFriends } from "./InviteFriends";
-import { CallPanel } from "./CallPanel";
+import { GameCodeLine, GameSettingsMenu } from "./GameSettingsMenu";
 import { leaveCall } from "./callClient";
 import { VolumeButton } from "@/components/site/SeasonFx";
 import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { PARTY_MODES, PartyPlay } from "./party";
-import { card, getPin, getToken, input, primary, secondary, setPin, setToken } from "./ui";
+import { card, getToken, input, primary, secondary, setPin, setToken } from "./ui";
 import { ask } from "@/components/site/ConfirmBox";
 import { useGameMusic } from "@/lib/gameMusic";
 
@@ -194,27 +194,30 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
       <>
         {povRec}
         {soloRec}
-        {view.event && (
-          <div className="fixed inset-x-0 top-16 z-[60] mx-auto w-[min(92vw,30rem)]">
-            <PowerBanner event={view.event} serverNow={view.serverNow} />
-          </div>
-        )}
-        {view.callsOn && user && <CallPanel code={code} hasTeam={view.teams?.mine !== null && view.teams?.mine !== undefined} />}
-        {view.emotesOn && token && (
-          <>
-            <EmoteLayer topic={view.topic} />
-            <div className="fixed bottom-3 left-1/2 z-[60] -translate-x-1/2">
-              <EmoteBar code={code} token={token} tone="stage" />
-            </div>
-          </>
-        )}
-        {error && <p className="fixed inset-x-0 top-20 z-[60] mx-auto w-fit rounded-full bg-red-500 px-4 py-1.5 text-sm font-bold text-white shadow-lg">{error}</p>}
         <PartyPlay
           view={view}
           busy={busy}
           act={act}
           embedded={embedded}
-          chat={view.solo || !view.chatOn ? null : <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} teamTopic={view.teams?.topic ?? null} myTeam={view.teams?.mine ?? null} tone="stage" className="h-72 lg:h-[calc(100vh-8rem)]" />}
+          overlay={
+            <>
+              {view.event && (
+                <div className="fixed inset-x-0 top-16 z-[75] mx-auto w-[min(92vw,30rem)]">
+                  <PowerBanner event={view.event} serverNow={view.serverNow} />
+                </div>
+              )}
+              {view.emotesOn && token && (
+                <>
+                  <EmoteLayer topic={view.topic} />
+                  <div className="fixed bottom-3 left-1/2 z-[75] -translate-x-1/2">
+                    <EmoteBar code={code} token={token} tone="stage" />
+                  </div>
+                </>
+              )}
+              {error && <p className="fixed inset-x-0 top-20 z-[75] mx-auto w-fit rounded-full bg-red-500 px-4 py-1.5 text-sm font-bold text-white shadow-lg">{error}</p>}
+            </>
+          }
+          chat={view.solo || (!view.chatOn && !view.callsOn) ? null : <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} teamTopic={view.teams?.topic ?? null} myTeam={view.teams?.mine ?? null} call={view.callsOn && user ? { hasTeam: view.teams?.mine !== null && view.teams?.mine !== undefined } : null} tone="stage" className="h-72 lg:h-[calc(100vh-8rem)]" />}
         />
       </>
     );
@@ -232,8 +235,9 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           {view.teams && <TeamBadge team={view.teams.mine} small />}
         </span>
         <span className="flex items-center gap-3 text-sm">
-          {!view.solo && view.chatOn && view.status !== "ended" && <ChatButton className="-my-2 text-lg text-muted hover:text-foreground" />}
+          {!view.solo && (view.chatOn || view.callsOn) && view.status !== "ended" && <ChatButton className="-my-2 text-lg text-muted hover:text-foreground" />}
           <VolumeButton className="-my-2 text-lg text-muted hover:text-foreground" />
+          {!view.solo && <GameSettingsMenu code={view.code} signedIn={!!user} className="-my-2 text-lg text-muted hover:text-foreground" />}
           <FullscreenButton on={full.on} toggle={full.toggle} className="-my-2 text-muted hover:text-foreground" />
           {view.solo && view.status === "playing" && (
             <button
@@ -252,9 +256,8 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
         </span>
       </div>
       {error && <p className="text-center text-sm text-danger">{error}</p>}
-      {view.status === "playing" && <RejoinPin code={view.code} small />}
+      {view.status === "playing" && <GameCodeLine code={view.code} solo={!!view.solo} />}
       {view.status === "playing" && <PowerBanner event={view.event} serverNow={view.serverNow} />}
-      {view.callsOn && user && view.status !== "ended" && <CallPanel code={code} hasTeam={view.teams?.mine !== null && view.teams?.mine !== undefined} />}
       {view.emotesOn && token && view.status !== "ended" && (
         <>
           <EmoteLayer topic={view.topic} />
@@ -270,7 +273,6 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           <p className="text-sm text-muted">{view.playerCount} playing</p>
           {user && !view.solo && <InviteFriends code={view.code} className="rounded-full border border-line px-4 py-2 text-sm font-semibold hover:bg-accent/10" />}
           {view.teams && <PlayerTeamPicker teams={view.teams} busy={busy} onPick={(team) => void act({ action: "team", team })} />}
-          <RejoinPin code={view.code} />
         </Centered>
       )}
 
@@ -312,7 +314,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           </Link>
         </Centered>
       )}
-      {!view.solo && view.chatOn && view.status !== "ended" && <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} teamTopic={view.teams?.topic ?? null} myTeam={view.teams?.mine ?? null} className="h-72" />}
+      {!view.solo && (view.chatOn || view.callsOn) && view.status !== "ended" && <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} teamTopic={view.teams?.topic ?? null} myTeam={view.teams?.mine ?? null} call={view.callsOn && user ? { hasTeam: view.teams?.mine !== null && view.teams?.mine !== undefined } : null} className="h-72" />}
     </div>
     </div>
   );
@@ -375,8 +377,8 @@ function JoinForm({ code, defaultName, note, onJoined }: { code: string; default
           onChange={(e) => setPinText(e.target.value.replace(/\D/g, "").slice(0, 4))}
           inputMode="numeric"
           autoComplete="off"
-          placeholder="Rejoin PIN"
-          aria-label="Rejoin PIN"
+          placeholder="Rejoin code"
+          aria-label="Rejoin code"
           autoFocus
           className={`${input} h-12 text-center font-mono text-2xl tracking-[0.4em]`}
         />
@@ -385,33 +387,11 @@ function JoinForm({ code, defaultName, note, onJoined }: { code: string; default
       <button type="submit" disabled={!name.trim() || busy || (needsPin && pin.length > 0 && pin.length < 4)} className={primary}>
         {busy ? "Joining…" : needsPin && pin.length === 4 ? "Rejoin" : "Join"}
       </button>
-      <p className="text-center text-xs text-muted">Left by accident? Join w/ the same name. Signed in, ur back right away; as a guest, enter the PIN u were shown.</p>
+      <p className="text-center text-xs text-muted">Left by accident? Join w/ the same name. Signed in, ur back right away; as a guest, use ur rejoin code (its in ⚙️ game settings).</p>
     </form>
   );
 }
 
-/** A guest's rejoin PIN, so they can get back in from another device if they leave by accident. */
-export function RejoinPin({ code, small = false }: { code: string; small?: boolean }) {
-  const [pin, setPinState] = useState<string | null>(null);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPinState(getPin(code));
-  }, [code]);
-  if (!pin) return null;
-  if (small) {
-    return (
-      <p className="text-center text-xs text-muted" title="If u leave by accident, join again w/ the same name and this PIN.">
-        🔑 Game <b className="font-mono tracking-widest text-foreground">{code}</b> · Rejoin PIN <b className="font-mono tracking-widest text-foreground">{pin}</b>
-      </p>
-    );
-  }
-  return (
-    <p className="rounded-xl bg-foreground/[.05] px-4 py-2 text-sm">
-      🔑 Your rejoin PIN: <b className="font-mono text-lg tracking-widest">{pin}</b>
-      <span className="block text-xs text-muted">Left by accident? Join game {code} again with the same name and this PIN.</span>
-    </p>
-  );
-}
 
 function useSecondsLeft(endsAt: number | null, skew: number) {
   const [left, setLeft] = useState<number | null>(null);

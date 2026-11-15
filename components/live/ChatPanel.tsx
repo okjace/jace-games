@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { TEAMS } from "@/lib/live/teams";
+import { CallControls, useInCall } from "./CallPanel";
 import { CHAT_MAX, type ChatMessage } from "@/lib/live/chat";
 import { openRoomChannel } from "@/lib/realtime/client";
 
@@ -95,6 +96,7 @@ export function ChatPanel({
   className = "",
   teamTopic = null,
   myTeam = null,
+  call = null,
 }: {
   code: string;
   topic: string;
@@ -105,6 +107,8 @@ export function ChatPanel({
   teamTopic?: string | null;
   /** A player's team (they get an "everyone / my team" switch). */
   myTeam?: number | null;
+  /** Voice calls are on and this player can use them: a 📞 button opens the call controls here. */
+  call?: { hasTeam: boolean } | null;
   tone?: "panel" | "stage";
   className?: string;
 }) {
@@ -114,6 +118,8 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [chatOn, setChatOn] = useState(on);
   const [toTeam, setToTeam] = useState(false);
+  const [showCall, setShowCall] = useState(false);
+  const callNow = useInCall(code);
   const teamChat = !host && myTeam !== null;
   const shownRef = useRef(shown);
   const seen = useRef<Set<string> | null>(null);
@@ -210,7 +216,8 @@ export function ChatPanel({
     if (res?.ok) setChatOn(!chatOn);
   };
 
-  if ((!chatOn && !host) || !shown) return null;
+  // Chat off for players: the box still shows when there's a call to get to.
+  if ((!chatOn && !host && !call) || !shown) return null;
 
   // Players see one chat at a time: everyone's, or their team's.
   const visible = teamChat ? messages.filter((m) => (toTeam ? m.team === myTeam : m.team === null || m.team === undefined)) : messages;
@@ -225,6 +232,18 @@ export function ChatPanel({
         <p className="flex-1 font-semibold">
           💬 Chat {!chatOn && <span className={`text-xs font-normal ${muted}`}>(off for playas)</span>}
         </p>
+        {call && (
+          <button
+            type="button"
+            onClick={() => setShowCall((v) => !v)}
+            aria-expanded={showCall}
+            aria-label={callNow.inCall ? (callNow.muted ? "Voice call (in a call, muted)" : "Voice call (in a call, talking)") : "Voice call"}
+            title="voice call w/ friends"
+            className={`shrink-0 rounded-full px-2 py-0.5 text-base ${callNow.inCall ? (callNow.muted ? "bg-amber-400 text-black" : "bg-emerald-500 text-white") : `border ${line}`}`}
+          >
+            {callNow.inCall ? (callNow.muted ? "🔇" : "🎙️") : "📞"}
+          </button>
+        )}
         {host && (
           <button type="button" onClick={() => void toggle()} className={`shrink-0 rounded-full border px-2 py-0.5 text-xs ${line}`}>
             {chatOn ? "Turn off for playas" : "Turn on for playas"}
@@ -234,6 +253,11 @@ export function ChatPanel({
           ✕
         </button>
       </div>
+      {call && showCall && (
+        <div className={`border-b ${line}`}>
+          <CallControls code={code} hasTeam={call.hasTeam} tone={tone} />
+        </div>
+      )}
       {teamChat && (
         <div className={`flex gap-1 border-b p-1.5 text-xs font-bold ${line}`} role="tablist" aria-label="Which chat">
           {[false, true].map((t) => (
