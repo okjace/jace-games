@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { StreakCheck } from "@/components/site/StreakCheck";
 import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import { Notices } from "@/components/site/Notices";
 import { EasterEggs } from "@/components/site/EasterEggs";
@@ -59,6 +60,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <MoreEggs />
           <EggMenu />
           <ConfirmHost />
+          <StreakCheck />
         </ScoresProvider>
         </SeasonProvider>
       </body>

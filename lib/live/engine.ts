@@ -8,6 +8,9 @@ import { submitBest, type BoardDetails } from "@/lib/db/liveBoards";
 import { cleanTournament, pointsFor, type Tournament } from "./tournament";
 import { REPLAY_MAX_BYTES, cleanReplay } from "./replay";
 import { EMOTES } from "./emotes";
+import { DROP_CHANCE, SEASON_DROPS, featuredMode, weekOf } from "./weekly";
+import { submitWeekly } from "@/lib/db/liveWeekly";
+import { seasonFor } from "@/lib/seasons";
 import { NO_POWERUPS, POWERS, bonusFor, eventOn, nextGap, rollEvent, type PowerEvent } from "./powerups";
 import { savePov, saveReplay } from "@/lib/db/liveReplays";
 
@@ -16,7 +19,7 @@ const POV_MAX_BYTES = 1_200_000;
 import { TEAMS, cleanTeams, shuffledTeams, smallestTeam, teamIndex, teamScores, type TeamPick, type TeamScore, type TeamSettings } from "./teams";
 import { reportStore } from "@/lib/db/liveReports";
 import { studioStore } from "@/lib/db/studio";
-import { addGameToStats, cleanAvatar, levelInfo, safePicture, xpForGame, type Avatar, type XpPart } from "./locker";
+import { addGameToStats, cleanAvatar, grantName as dropName, levelInfo, safePicture, xpForGame, type Avatar, type XpPart } from "./locker";
 import { GO_BANANAS_MS, bananaBase, boostBananas, rollBanana } from "./banana";
 import { CHAT_GAP_MS, cleanChat, type ChatMessage } from "./chat";
 import { RARE_ROUNDS, RARE_SECONDS, RARE_TIERS, isRareSet, rareMatch, rarestAnswers } from "./rare";
@@ -164,6 +167,8 @@ type PlayerData = PartyData & {
   /** Tournaments: points so far, and what the last round gave. */
   tp?: number;
   tpLast?: number;
+  /** Power-up jackpots won this game (for the Jackpot! badge). */
+  jackpotsWon?: number;
   /** Self-paced modes: every answer, for the review at the end. */
   log?: { qi: number; a: unknown; correct: boolean }[];
 };
@@ -859,6 +864,11 @@ export async function submitToBoard(code: string, token: unknown, session: Sessi
     playedAt: g.ended_at,
   };
   const res = await submitBest({ user_id: session.user.id, mode: g.mode, best: me.score, username: session.user.displayName || session.user.username, avatar: avatarOf(me), game_code: g.code, details });
+  // This week's challenge mode: it counts for the weekly board too.
+  const week = weekOf();
+  if (featuredMode(week) === g.mode) {
+    await submitWeekly({ week, user_id: session.user.id, mode: g.mode, best: me.score, username: session.user.displayName || session.user.username, avatar: avatarOf(me) }).catch(() => {});
+  }
   return { ...res, score: me.score };
 }
 
@@ -1552,6 +1562,11 @@ async function saveReport(g: LiveGameRow) {
 async function giveXp(g: LiveGameRow) {
   const store = liveStore();
   const players = ranked(await store.players(g.id));
+  const settings = g.settings as GameSettings;
+  const teams = teamsOf(g, players);
+  // The tournament champion, once the last round is over (most points).
+  const t = settings.tournament;
+  const champ = t && t.round + 1 >= t.rounds.length ? [...players].sort((a, b) => (dataOf(b).tp ?? 0) - (dataOf(a).tp ?? 0))[0]?.id : null;
   await Promise.all(
     players.map(async (p, i) => {
       const d = dataOf(p);
@@ -1577,11 +1592,33 @@ async function giveXp(g: LiveGameRow) {
       await lockerStore()
         .addXp(p.user_id, total)
         .catch(() => {});
-      // Stats for badges.
+      // Stats for badges (and achievements: team wins, tournaments, jackpots, modes played…).
       const won = players.length > 1 && i === 0 && p.score > 0;
+      const myTeam = teamIndex(settings.teams, d.team);
+      const teamWon = myTeam !== null && (teams?.[0]?.team === myTeam) && (teams?.[0]?.score ?? 0) > 0;
+      const tourneyWon = !!champ && champ === p.id;
       await lockerStore()
-        .addStats(p.user_id, (st) => addGameToStats(st, { won, perfect: p.answered >= 5 && p.correct === p.answered, right: p.correct, bestStreak }))
+        .addStats(p.user_id, (st) =>
+          addGameToStats(st, { won, perfect: p.answered >= 5 && p.correct === p.answered, right: p.correct, bestStreak, mode: g.mode, teamWon, tourneyWon, jackpots: d.jackpotsWon ?? 0, score: p.score }),
+        )
         .catch(() => {});
+      // Seasonal drops: a limited item u don't have yet, sometimes, while the season is on.
+      const drops = SEASON_DROPS[seasonFor()];
+      if (drops && Math.random() < DROP_CHANCE) {
+        const locker = await lockerStore().get(p.user_id).catch(() => null);
+        const have = new Set(locker?.granted_badges ?? []);
+        const missing = drops.filter((x) => !have.has(x));
+        if (locker && missing.length) {
+          const grant = missing[Math.floor(Math.random() * missing.length)];
+          await lockerStore()
+            .setGranted(p.user_id, [...have, grant])
+            .then(async () => {
+              const fresh = (await store.players(g.id)).find((x) => x.id === p.id);
+              if (fresh) await store.updatePlayer(g.id, p.id, { data: { ...dataOf(fresh), xpParts: [...(dataOf(fresh).xpParts ?? []), { label: `🎁 limited drop: ${dropName(grant)}!`, xp: 0 }] } });
+            })
+            .catch(() => {});
+        }
+      }
     }),
   );
 }
@@ -1651,7 +1688,8 @@ export async function playerAction(code: string, token: unknown, body: PlayerAct
     }
   }
   const d = dataOf(me);
-  me = (await store.updatePlayer(g.id, me.id, coins ? { data: { ...d, bank: (d.bank ?? 0) + extra, last: { ...(d.last ?? {}), power: extra } } } : { score: me.score + extra, data: { ...d, last: { ...(d.last ?? {}), power: extra } } }))!;
+  const won = jackpot ? { jackpotsWon: (d.jackpotsWon ?? 0) + 1 } : {};
+  me = (await store.updatePlayer(g.id, me.id, coins ? { data: { ...d, ...won, bank: (d.bank ?? 0) + extra, last: { ...(d.last ?? {}), power: extra } } } : { score: me.score + extra, data: { ...d, ...won, last: { ...(d.last ?? {}), power: extra } } }))!;
   return buildPlayerView(await getGame(code), me, await store.players(g.id));
 }
 

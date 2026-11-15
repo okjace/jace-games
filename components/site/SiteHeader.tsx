@@ -18,6 +18,7 @@ const LINKS: { href: string; label: string; icon: string; signedIn?: boolean; ma
   { href: "/live/discover", label: "Discover", icon: "🔎", match: (p) => p.startsWith("/live/discover") },
   { href: "/live/sets", label: "My sets", icon: "📚", match: (p) => p.startsWith("/live/sets") },
   { href: "/leaderboards", label: "Top", icon: "🏆", match: (p) => p.startsWith("/leaderboards") },
+  { href: "/challenge", label: "Challenge", icon: "🗓️", match: (p) => p.startsWith("/challenge") },
   { href: "/live/maps", label: "Maps", icon: "🗺️", match: (p) => p.startsWith("/live/maps") },
   { href: "/live/locker", label: "Locker", icon: "🎽", match: (p) => p.startsWith("/live/locker") || p === "/locker" },
   { href: "/live/reports", label: "Reports", icon: "📋", signedIn: true, match: (p) => p.startsWith("/live/reports") },

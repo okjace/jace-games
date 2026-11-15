@@ -6,7 +6,10 @@
  * browser.
  */
 
-export type LockerItem = { id: string; name: string; level: number };
+/** `how`: items you can't unlock by level (level 999) say how to win them instead. */
+export type LockerItem = { id: string; name: string; level: number; how?: string };
+/** Won, never unlocked by level. */
+export const PRIZE_LEVEL = 999;
 export type IconItem = LockerItem & { emoji: string };
 export type FrameItem = LockerItem & { ring: string };
 export type TitleItem = LockerItem & { color: string };
@@ -76,6 +79,18 @@ export const ICONS: IconItem[] = [
   { id: "diamondcrown", emoji: "🫅", name: "Royalty", level: 90 },
   { id: "goat", emoji: "🐐", name: "Greatest", level: 95 },
   { id: "jstar", emoji: "🌟", name: "Superstar", level: 99 },
+  // Prizes: weekly challenge top 3, and seasonal drops (only while that season is on).
+  { id: "wk-trophy", emoji: "🏆", name: "Weekly Champ", level: PRIZE_LEVEL, how: "🏆 top 3 in a weekly challenge" },
+  { id: "wk-medal", emoji: "🎖️", name: "Challenger", level: PRIZE_LEVEL, how: "🏆 top 3 in a weekly challenge" },
+  { id: "s-pumpkin", emoji: "🎃", name: "Jack", level: PRIZE_LEVEL, how: "🎃 Halloween drop" },
+  { id: "s-turkey", emoji: "🦃", name: "Gobbler", level: PRIZE_LEVEL, how: "🦃 Thanksgiving drop" },
+  { id: "s-snowman", emoji: "⛄", name: "Frosty", level: PRIZE_LEVEL, how: "🎄 Christmas drop" },
+  { id: "s-reindeer", emoji: "🦌", name: "Reindeer", level: PRIZE_LEVEL, how: "❄️ winter drop" },
+  { id: "s-firework", emoji: "🎆", name: "Countdown", level: PRIZE_LEVEL, how: "🎆 New Year drop" },
+  { id: "s-heart", emoji: "💘", name: "Cupid", level: PRIZE_LEVEL, how: "💘 Valentine's drop" },
+  { id: "s-clover", emoji: "🍀", name: "Lucky", level: PRIZE_LEVEL, how: "🍀 St. Patrick's drop" },
+  { id: "s-bunny", emoji: "🐰", name: "Hopper", level: PRIZE_LEVEL, how: "🐣 Easter drop" },
+  { id: "s-sun", emoji: "😎", name: "Summer Vibes", level: PRIZE_LEVEL, how: "🏖️ summer drop" },
 ];
 
 export const FRAMES: FrameItem[] = [
@@ -97,6 +112,10 @@ export const FRAMES: FrameItem[] = [
   { id: "sunburst", name: "Sunburst", level: 80, ring: "repeating-conic-gradient(#facc15 0 15deg,#f97316 15deg 30deg)" },
   { id: "obsidian", name: "Obsidian", level: 90, ring: "linear-gradient(135deg,#000,#4b5563,#000)" },
   { id: "mythic", name: "Mythic", level: 99, ring: "conic-gradient(#ef4444,#f59e0b,#eab308,#22c55e,#06b6d4,#6366f1,#d946ef,#ef4444)" },
+  { id: "wk-gold", name: "Weekly Gold", level: PRIZE_LEVEL, how: "🏆 #1 in a weekly challenge", ring: "conic-gradient(#fde68a,#f59e0b,#fef3c7,#d97706,#fde68a)" },
+  { id: "s-spooky", name: "Spooky", level: PRIZE_LEVEL, how: "🎃 Halloween drop", ring: "repeating-linear-gradient(45deg,#f97316 0 6px,#1f2937 6px 12px)" },
+  { id: "s-candycane", name: "Candy Cane", level: PRIZE_LEVEL, how: "🎄 Christmas drop", ring: "repeating-linear-gradient(45deg,#ef4444 0 6px,#fff 6px 12px)" },
+  { id: "s-harvest", name: "Harvest", level: PRIZE_LEVEL, how: "🦃 Thanksgiving drop", ring: "linear-gradient(135deg,#92400e,#f59e0b,#b45309)" },
 ];
 
 /** Titles: a word or two under your name in games. */
@@ -116,6 +135,9 @@ export const TITLES: TitleItem[] = [
   { id: "legend", name: "Legend", level: 70, color: "#f59e0b" },
   { id: "mythic", name: "Mythic", level: 85, color: "#d946ef" },
   { id: "grandmaster", name: "Grandmaster", level: 99, color: "#facc15" },
+  { id: "wk-champ", name: "Weekly Champ", level: PRIZE_LEVEL, how: "🏆 top 3 in a weekly challenge", color: "#f59e0b" },
+  { id: "s-spooky", name: "Spooky", level: PRIZE_LEVEL, how: "🎃 Halloween drop", color: "#f97316" },
+  { id: "s-merry", name: "Merry", level: PRIZE_LEVEL, how: "🎄 Christmas drop", color: "#16a34a" },
 ];
 
 /** The custom frame maker unlocks at level 10; fancier styles later. */
@@ -196,6 +218,17 @@ export type LiveStats = {
   /** Presents won today (they're capped per day). */
   giftDay?: string;
   giftWins?: number;
+  /** Achievements: wins with a team, tournaments won, jackpots won, modes played, best snake and sled run. */
+  teamWins?: number;
+  tourneyWins?: number;
+  jackpots?: number;
+  modes?: string[];
+  snakeBest?: number;
+  sledBest?: number;
+  /** Daily streak: days in a row ur on Jace Live (signed in), the best ever, and the last day (UTC). */
+  loginStreak?: number;
+  loginBest?: number;
+  loginDay?: string;
 };
 
 /** Kinds of locker items that can be unlocked by a gift or a free pick (kept as "item:<kind>:<id>" with granted badges). */
@@ -219,6 +252,15 @@ export const BADGES: { id: string; emoji: string; name: string; how: string; ear
   { id: "streak25", emoji: "☄️", name: "Unstoppable", how: "Get 25 right in a row", earned: (s) => s.bestStreak >= 25, progress: (s) => [s.bestStreak, 25] },
   { id: "right100", emoji: "🧠", name: "Brainiac", how: "Answer 100 questions right", earned: (s) => s.right >= 100, progress: (s) => [s.right, 100] },
   { id: "right1000", emoji: "🎓", name: "Encyclopedia", how: "Answer 1,000 questions right", earned: (s) => s.right >= 1000, progress: (s) => [s.right, 1000] },
+  { id: "team", emoji: "🤝", name: "Team Player", how: "Win 5 games w/ ur team", earned: (s) => (s.teamWins ?? 0) >= 5, progress: (s) => [s.teamWins ?? 0, 5] },
+  { id: "tourney", emoji: "🏟️", name: "Champion", how: "Win a tournament", earned: (s) => (s.tourneyWins ?? 0) >= 1 },
+  { id: "jackpot", emoji: "🎰", name: "Jackpot!", how: "Win a power-up jackpot", earned: (s) => (s.jackpots ?? 0) >= 1 },
+  { id: "explorer", emoji: "🧭", name: "Explorer", how: "Play 10 different game modes", earned: (s) => (s.modes?.length ?? 0) >= 10, progress: (s) => [s.modes?.length ?? 0, 10] },
+  { id: "allround", emoji: "🌈", name: "All-Rounder", how: "Play 20 different game modes", earned: (s) => (s.modes?.length ?? 0) >= 20, progress: (s) => [s.modes?.length ?? 0, 20] },
+  { id: "noodle", emoji: "🐍", name: "Long Noodle", how: "Grow a snake to 150 in Snake Arena", earned: (s) => (s.snakeBest ?? 0) >= 150, progress: (s) => [s.snakeBest ?? 0, 150] },
+  { id: "sledder", emoji: "🛷", name: "Speed Sledder", how: "Score 1,000 in one Sled Dash run", earned: (s) => (s.sledBest ?? 0) >= 1000, progress: (s) => [s.sledBest ?? 0, 1000] },
+  { id: "week", emoji: "📆", name: "Every Day", how: "7-day streak", earned: (s) => (s.loginBest ?? 0) >= 7, progress: (s) => [Math.min(s.loginBest ?? 0, 7), 7] },
+  { id: "month", emoji: "🗓️", name: "Never Misses", how: "30-day streak", earned: (s) => (s.loginBest ?? 0) >= 30, progress: (s) => [Math.min(s.loginBest ?? 0, 30), 30] },
   { id: "lvl25", emoji: "🥉", name: "Bronze Star", how: "Reach level 25", earned: (_, l) => l >= 25 },
   { id: "lvl50", emoji: "🥈", name: "Silver Star", how: "Reach level 50", earned: (_, l) => l >= 50 },
   { id: "lvl99", emoji: "🌟", name: "Max Level", how: "Reach level 99", earned: (_, l) => l >= 99 },
@@ -322,7 +364,11 @@ export function cleanAvatar(raw: unknown, level: number, picture: string | null,
 }
 
 /** Folds one finished game into someone's stats. */
-export function addGameToStats(s: LiveStats, g: { won: boolean; perfect: boolean; right: number; bestStreak: number }): LiveStats {
+export function addGameToStats(
+  s: LiveStats,
+  g: { won: boolean; perfect: boolean; right: number; bestStreak: number; mode?: string; teamWon?: boolean; tourneyWon?: boolean; jackpots?: number; score?: number },
+): LiveStats {
+  const modes = g.mode && !(s.modes ?? []).includes(g.mode) ? [...(s.modes ?? []), g.mode] : s.modes;
   return {
     ...s,
     games: s.games + 1,
@@ -330,8 +376,25 @@ export function addGameToStats(s: LiveStats, g: { won: boolean; perfect: boolean
     perfect: s.perfect + (g.perfect ? 1 : 0),
     right: s.right + g.right,
     bestStreak: Math.max(s.bestStreak, g.bestStreak),
+    teamWins: (s.teamWins ?? 0) + (g.teamWon ? 1 : 0),
+    tourneyWins: (s.tourneyWins ?? 0) + (g.tourneyWon ? 1 : 0),
+    jackpots: (s.jackpots ?? 0) + (g.jackpots ?? 0),
+    ...(modes ? { modes } : {}),
+    ...(g.mode === "snake" ? { snakeBest: Math.max(s.snakeBest ?? 0, g.score ?? 0) } : {}),
+    ...(g.mode === "sled" ? { sledBest: Math.max(s.sledBest ?? 0, g.score ?? 0) } : {}),
   };
 }
+
+/** The daily streak after today's visit (UTC days): +1 if they were here yesterday, else back to 1. */
+export function nextLoginStreak(s: LiveStats, today: string): { streak: number; best: number; isNew: boolean } {
+  if (s.loginDay === today) return { streak: s.loginStreak ?? 1, best: s.loginBest ?? 1, isNew: false };
+  const yesterday = new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  const streak = s.loginDay === yesterday ? (s.loginStreak ?? 0) + 1 : 1;
+  return { streak, best: Math.max(s.loginBest ?? 0, streak), isNew: true };
+}
+
+/** XP for showing up on day N of a streak: 10 per day, up to 100. */
+export const streakXp = (streak: number) => Math.min(100, streak * 10);
 
 /** Only https pictures are shown. */
 export const safePicture = (url: string | null | undefined) => (url && /^https:\/\/[^\s"'<>]+$/.test(url) ? url : null);
@@ -340,4 +403,16 @@ export const safePicture = (url: string | null | undefined) => (url && /^https:\
 export function itemOf(kind: ItemKind, id: string): LockerItem | undefined {
   const find = { icon: iconById, frame: frameById, fx: fxById, title: titleById, nameColor: nameColorById, effect: effectById }[kind];
   return find(id);
+}
+
+/** A granted item's name ("item:icon:s-pumpkin" → "🎃 Jack"). */
+export function grantName(grant: string): string {
+  const [, kind, id] = grant.split(":");
+  if (kind === "icon") {
+    const i = iconById(id);
+    return i ? `${i.emoji} ${i.name}` : id;
+  }
+  if (kind === "frame") return `${frameById(id)?.name ?? id} frame`;
+  if (kind === "title") return `"${titleById(id)?.name ?? id}" title`;
+  return id;
 }

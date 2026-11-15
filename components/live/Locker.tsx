@@ -205,11 +205,11 @@ export function Locker() {
                 disabled={locked && picks < 1}
                 onClick={() => (locked ? tapLocked("icon", i.id, i.name) : choose({ ...look, icon: i.id }))}
                 aria-pressed={look.icon === i.id}
-                aria-label={locked ? `${i.name}, unlocks at level ${i.level}` : i.name}
+                aria-label={locked ? `${i.name}, ${unlockText(i)}` : i.name}
                 className={tile(look.icon === i.id, locked)}
               >
                 <span className="text-3xl">{i.emoji}</span>
-                {locked ? `🔒 Lv ${i.level}` : i.name}
+                {locked ? `🔒 ${lockLabel(i)}` : i.name}
               </button>
             );
           })}
@@ -229,11 +229,11 @@ export function Locker() {
                 disabled={locked && picks < 1}
                 onClick={() => (locked ? tapLocked("frame", f.id, `${f.name} frame`) : choose({ ...look, frame: f.id }))}
                 aria-pressed={look.frame === f.id}
-                aria-label={locked ? `${f.name} frame, unlocks at level ${f.level}` : `${f.name} frame`}
+                aria-label={locked ? `${f.name} frame, ${unlockText(f)}` : `${f.name} frame`}
                 className={tile(look.frame === f.id, locked)}
               >
                 <LiveAvatar avatar={{ ...look, frame: f.id, picture: data?.picture }} size={44} />
-                {locked ? `🔒 Lv ${f.level}` : f.name}
+                {locked ? `🔒 ${lockLabel(f)}` : f.name}
               </button>
             );
           })}
@@ -333,13 +333,13 @@ export function Locker() {
                 disabled={locked && !!t.id && picks < 1}
                 onClick={() => (locked && t.id ? tapLocked("title", t.id, `${t.name} title`) : choose({ ...look, title: t.id || undefined }))}
                 aria-pressed={selected}
-                aria-label={locked && t.id ? `${t.name} title, unlocks at level ${t.level}` : `${t.name}`}
+                aria-label={locked && t.id ? `${t.name} title, ${unlockText(t)}` : `${t.name}`}
                 className={tile(selected, locked && !!t.id)}
               >
                 <span className="text-sm font-black uppercase tracking-wider" style={{ color: t.color || undefined }}>
                   {t.id ? t.name : "—"}
                 </span>
-                {locked && t.id ? `🔒 Lv ${t.level}` : t.id ? `Lv ${t.level}` : "No title"}
+                {locked && t.id ? `🔒 ${lockLabel(t)}` : t.id ? (t.how ? "🏆 prize" : `Lv ${t.level}`) : "No title"}
               </button>
             );
           })}
@@ -537,11 +537,11 @@ function Picker<T extends { id: string; name: string; level: number }>({
               disabled={locked && (picks < 1 || !signedIn)}
               onClick={() => (locked ? onLocked(kind, it.id, it.name) : onPick(it.id))}
               aria-pressed={selected === it.id}
-              aria-label={locked ? `${it.name}, unlocks at level ${it.level}` : it.name}
+              aria-label={locked ? `${it.name}, ${unlockText(it)}` : it.name}
               className={tileClass(selected === it.id, locked)}
             >
               <span className="flex h-10 items-center">{render(it)}</span>
-              {locked ? `🔒 Lv ${it.level}` : it.name}
+              {locked ? `🔒 ${lockLabel(it)}` : it.name}
             </button>
           );
         })}
@@ -767,3 +767,7 @@ function Badges({
     </section>
   );
 }
+
+/** A locked item: its level, or how to win it (prize items aren't unlocked by level). */
+const lockLabel = (it: { level: number; how?: string }) => (it.how ? it.how : `Lv ${it.level}`);
+const unlockText = (it: { level: number; how?: string }) => (it.how ? `win it: ${it.how}` : `unlocks at level ${it.level}`);
