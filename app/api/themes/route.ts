@@ -1,14 +1,19 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { themeStore } from "@/lib/db/themes";
+import { themeStore, type MarketSort } from "@/lib/db/themes";
 import { allow } from "@/lib/rateLimit";
 import { getSession } from "@/lib/session";
 import { ThemeError, createTheme, summary } from "@/lib/themesServer";
 
-/** GET ?sort=popular|new&q= → the theme market. POST { data } → make a theme (signed in). */
+/** GET ?sort=trending|popular|liked|new&q= → the theme market (+ which I liked). POST { data } → make a theme (signed in). */
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const sort = req.nextUrl.searchParams.get("sort") === "new" ? "new" : "popular";
+  const asked = req.nextUrl.searchParams.get("sort");
+  const sort: MarketSort = asked === "new" || asked === "liked" || asked === "popular" ? asked : "trending";
   const q = (req.nextUrl.searchParams.get("q") ?? "").slice(0, 40);
-  return NextResponse.json({ themes: (await themeStore.market(sort, q)).map(summary) });
+  const rows = await themeStore.market(sort, q);
+  // Which ones I've liked (signed in).
+  const session = await getSession();
+  const liked = session ? [...(await themeStore.likedBy(session.user.id, rows.map((r) => r.id)).catch(() => new Set<string>()))] : [];
+  return NextResponse.json({ themes: rows.map(summary), liked });
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

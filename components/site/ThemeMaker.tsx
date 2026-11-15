@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
 import { DEFAULT_THEME, FONTS, SHOW_PARTS, cleanTheme, type FontPick, type MusicMood, type ShowPart, type ThemeData, type ThemeSummary, type TreeKind } from "@/lib/customThemes";
@@ -87,6 +87,23 @@ export function ThemeMaker({ id }: { id?: string }) {
     if (!okKind) return setUploadError(what === "music" ? "thats a picture, not music lol" : "thats music, not a picture lol");
     setData((d) => ({ ...d, [what]: out.path }));
   };
+
+  // Remix: start from someone's market theme (credited on the market).
+  const remixId = useSearchParams().get("remix");
+  const [remixLoaded, setRemixLoaded] = useState(false);
+  useEffect(() => {
+    if (id || !remixId || remixLoaded) return;
+    fetch(`/api/themes/${remixId}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        setRemixLoaded(true);
+        if (!d?.theme) return;
+        const src = d.theme as ThemeSummary;
+        setData({ ...cleanTheme(src.data), name: `${src.name} remix`.slice(0, 40), remixOf: src.data.remixOf ?? { id: src.id, name: src.name, owner: src.owner_name } });
+        setStatus(`🎨 remixing "${src.name}" by ${src.owner_name}. make it ur own!`);
+      })
+      .catch(() => setRemixLoaded(true));
+  }, [id, remixId, remixLoaded]);
 
   useEffect(() => {
     if (!id) return;

@@ -48,6 +48,8 @@ export type ThemeData = {
   bgImage: string;
   /** How see-through the background picture is (0.1–1). */
   bgOpacity: number;
+  /** A remix: the theme it started from (credit on the market). */
+  remixOf?: { id: string; name: string; owner: string } | null;
   particles: string[];
   motion: Motion;
   density: number;
@@ -63,6 +65,8 @@ export type ThemeData = {
 };
 
 export type ThemeSummary = {
+  /** Likes on the market. */
+  likes?: number;
   id: string;
   owner_id: string;
   owner_name: string;
@@ -137,6 +141,7 @@ export function cleanTheme(raw: unknown): ThemeData {
   const f = (r.fonts ?? {}) as Record<string, unknown>;
   const sh = (r.show ?? {}) as Record<string, unknown>;
   const dk = r.dark as Record<string, unknown> | null | undefined;
+  const rm = r.remixOf as Record<string, unknown> | null | undefined;
   const d = DEFAULT_THEME;
   const hills = Array.isArray(r.hills) ? r.hills : [];
   return {
@@ -161,6 +166,7 @@ export function cleanTheme(raw: unknown): ThemeData {
     music: typeof r.music === "string" && UPLOAD_PATH.test(r.music) && /\.(mp3|ogg|wav|m4a)$/.test(r.music) ? r.music : "",
     bgImage: typeof r.bgImage === "string" && UPLOAD_PATH.test(r.bgImage) && /\.(png|jpg|gif|webp)$/.test(r.bgImage) ? r.bgImage : "",
     bgOpacity: num(r.bgOpacity, 0.1, 1, 0.35),
+    remixOf: rm && typeof rm.id === "string" && /^[0-9a-f-]{36}$/i.test(rm.id) ? { id: rm.id, name: text(rm.name, 40, "a theme"), owner: text(rm.owner, 40, "someone") } : null,
     particles: emojiList(r.particles, 8, d.particles),
     motion: pick(r.motion, ["fall", "snow", "rise", "twinkle", "drift"] as const, d.motion),
     density: Math.max(0, Math.min(60, Math.round(Number(r.density) || 0))),

@@ -8,7 +8,9 @@ import { supabase, usingSupabase } from "./rooms";
 export type ThemeRow = ThemeSummary & { created_at: string };
 export type ThemeReport = { id: string; theme_id: string; reporter_id: string; reason: string; created_at: string };
 
-const g = globalThis as unknown as { __jlThemes?: Map<string, ThemeRow>; __jlThemeReports?: ThemeReport[] };
+const g = globalThis as unknown as { __jlThemes?: Map<string, ThemeRow>; __jlThemeReports?: ThemeReport[]; __jlThemeLikes?: { theme_id: string; user_id: string; created_at: string }[] };
+const memLikes = () => (g.__jlThemeLikes ??= []);
+export type MarketSort = "trending" | "popular" | "liked" | "new";
 const mem = () => (g.__jlThemes ??= new Map());
 const memReports = () => (g.__jlThemeReports ??= []);
 const dev = () => {
@@ -65,17 +67,57 @@ export const themeStore = {
     if (!usingSupabase()) return ok.map((id) => mem().get(id)).filter((t): t is ThemeRow => !!t);
     return check(await supabase().from("user_themes").select().in("id", ok)) as ThemeRow[];
   },
-  async market(sort: "popular" | "new", q: string): Promise<ThemeRow[]> {
+  async market(sort: MarketSort, q: string): Promise<ThemeRow[]> {
+    // Trending: likes from the last week count most, then all likes and installs.
+    const trending = async (rows: ThemeRow[]) => {
+      const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+      const recent = usingSupabase()
+        ? ((check(await supabase().from("theme_likes").select("theme_id").gt("created_at", since).limit(5000)) as { theme_id: string }[]) ?? [])
+        : memLikes().filter((l) => l.created_at > since);
+      const week = new Map<string, number>();
+      for (const l of recent) week.set(l.theme_id, (week.get(l.theme_id) ?? 0) + 1);
+      const score = (t: ThemeRow) => (week.get(t.id) ?? 0) * 3 + (t.likes ?? 0) * 0.5 + t.installs * 0.2;
+      return [...rows].sort((a, b) => score(b) - score(a));
+    };
     if (!usingSupabase()) {
-      return [...mem().values()]
-        .filter((t) => t.published && !t.removed && (!q || t.name.toLowerCase().includes(q.toLowerCase())))
-        .sort((a, b) => (sort === "new" ? b.updated_at.localeCompare(a.updated_at) : b.installs - a.installs))
-        .slice(0, 60);
+      const rows = [...mem().values()].filter((t) => t.published && !t.removed && (!q || t.name.toLowerCase().includes(q.toLowerCase())));
+      if (sort === "trending") return (await trending(rows)).slice(0, 60);
+      return rows.sort((a, b) => (sort === "new" ? b.updated_at.localeCompare(a.updated_at) : sort === "liked" ? (b.likes ?? 0) - (a.likes ?? 0) : b.installs - a.installs)).slice(0, 60);
     }
     let query = supabase().from("user_themes").select().eq("published", true).eq("removed", false);
     if (q) query = query.ilike("name", `%${q.replace(/[%_]/g, "")}%`);
-    query = sort === "new" ? query.order("updated_at", { ascending: false }) : query.order("installs", { ascending: false });
+    if (sort === "trending") return (await trending(check(await query.order("updated_at", { ascending: false }).limit(300)) as ThemeRow[])).slice(0, 60);
+    query = sort === "new" ? query.order("updated_at", { ascending: false }) : sort === "liked" ? query.order("likes", { ascending: false }) : query.order("installs", { ascending: false });
     return check(await query.limit(60)) as ThemeRow[];
+  },
+  /** Like (or unlike) a theme; returns its new like count. One like per person. */
+  async like(theme_id: string, user_id: string, on: boolean): Promise<number> {
+    if (!usingSupabase()) {
+      const list = memLikes();
+      const i = list.findIndex((l) => l.theme_id === theme_id && l.user_id === user_id);
+      if (on && i < 0) list.push({ theme_id, user_id, created_at: new Date().toISOString() });
+      if (!on && i >= 0) list.splice(i, 1);
+      const likes = list.filter((l) => l.theme_id === theme_id).length;
+      const t = mem().get(theme_id);
+      if (t) mem().set(theme_id, { ...t, likes });
+      return likes;
+    }
+    if (on) {
+      const res = await supabase().from("theme_likes").insert({ theme_id, user_id });
+      if (res.error && res.error.code !== "23505") throw new Error(res.error.message);
+    } else check(await supabase().from("theme_likes").delete().eq("theme_id", theme_id).eq("user_id", user_id));
+    // Count again (not +1/-1), so the number is always right.
+    const { count } = await supabase().from("theme_likes").select("theme_id", { count: "exact", head: true }).eq("theme_id", theme_id);
+    const likes = count ?? 0;
+    check(await supabase().from("user_themes").update({ likes }).eq("id", theme_id));
+    return likes;
+  },
+  /** Which of these themes the person has liked. */
+  async likedBy(user_id: string, ids: string[]): Promise<Set<string>> {
+    if (!ids.length) return new Set();
+    if (!usingSupabase()) return new Set(memLikes().filter((l) => l.user_id === user_id && ids.includes(l.theme_id)).map((l) => l.theme_id));
+    const rows = check(await supabase().from("theme_likes").select("theme_id").eq("user_id", user_id).in("theme_id", ids.slice(0, 100))) as { theme_id: string }[];
+    return new Set(rows.map((r) => r.theme_id));
   },
   async addInstall(id: string): Promise<void> {
     const t = await this.get(id);

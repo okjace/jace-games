@@ -30,7 +30,8 @@ function Swatch({ t }: { t: ThemeSummary }) {
 export function ThemeMarket() {
   const { user } = useScores();
   const mine = useMyThemeChoice();
-  const [sort, setSort] = useState<"popular" | "new">("popular");
+  const [sort, setSort] = useState<"trending" | "popular" | "liked" | "new">("trending");
+  const [liked, setLiked] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [market, setMarket] = useState<ThemeSummary[] | null>(null);
   const [made, setMade] = useState<ThemeSummary[]>([]);
@@ -43,7 +44,10 @@ export function ThemeMarket() {
   const loadMarket = useCallback(() => {
     fetch(`/api/themes?sort=${sort}&q=${encodeURIComponent(q)}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { themes: [] }))
-      .then((d) => setMarket(d.themes ?? []))
+      .then((d) => {
+        setMarket(d.themes ?? []);
+        setLiked(new Set(d.liked ?? []));
+      })
       .catch(() => setMarket([]));
   }, [sort, q]);
   const loadMine = useCallback(() => {
@@ -67,6 +71,21 @@ export function ThemeMarket() {
   useEffect(() => {
     loadMine();
   }, [loadMine]);
+
+  const like = async (t: ThemeSummary) => {
+    if (!user) return setMsg("sign in w/ Jace to like themes ❤️");
+    const on = !liked.has(t.id);
+    // Show it right away, then use the real count.
+    setLiked((cur) => {
+      const next = new Set(cur);
+      if (on) next.add(t.id);
+      else next.delete(t.id);
+      return next;
+    });
+    const res = await fetch(`/api/themes/${t.id}/like`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on }) }).catch(() => null);
+    const body = await res?.json().catch(() => null);
+    if (res?.ok) setMarket((cur) => cur?.map((x) => (x.id === t.id ? { ...x, likes: body.likes } : x)) ?? cur);
+  };
 
   const install = async (t: ThemeSummary) => {
     if (!user) return (window.location.href = signInHref("/themes"));
@@ -173,9 +192,9 @@ export function ThemeMarket() {
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <input value={q} onChange={(e) => setQ(e.target.value.slice(0, 40))} placeholder="find a theme…" aria-label="Find a theme" className="h-10 min-w-0 flex-1 rounded-full border border-line bg-panel px-4 text-sm outline-none focus:border-accent" />
-          {(["popular", "new"] as const).map((s) => (
+          {(["trending", "popular", "liked", "new"] as const).map((s) => (
             <button key={s} type="button" onClick={() => setSort(s)} aria-pressed={sort === s} className={`rounded-full px-4 py-2 text-sm font-semibold ${sort === s ? "bg-accent text-on-accent" : "border border-line bg-panel"}`}>
-              {s === "popular" ? "🔥 popular" : "✨ new"}
+              {s === "trending" ? "🔥 trending" : s === "popular" ? "⭐ most installed" : s === "liked" ? "❤️ most liked" : "✨ new"}
             </button>
           ))}
         </div>
@@ -192,7 +211,20 @@ export function ThemeMarket() {
                 <p className="text-xs text-muted">
                   by {t.owner_name} · {t.installs} install{t.installs === 1 ? "" : "s"}
                 </p>
+                {t.data.remixOf && (
+                  <p className="text-xs text-muted">
+                    🎨 remix of <b className="text-foreground">{t.data.remixOf.name}</b> by {t.data.remixOf.owner}
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-1.5">
+                  <button type="button" onClick={() => void like(t)} aria-pressed={liked.has(t.id)} aria-label={liked.has(t.id) ? `Unlike ${t.name}` : `Like ${t.name}`} className={`${pill} border ${liked.has(t.id) ? "border-pink-400 bg-pink-500/15 text-pink-600 dark:text-pink-300" : "border-line"}`}>
+                    {liked.has(t.id) ? "❤️" : "🤍"} {t.likes ?? 0}
+                  </button>
+                  {user && (
+                    <a href={`/themes/new?remix=${t.id}`} className={`${pill} border border-line`} title="Make ur own version of this theme">
+                      🎨 remix
+                    </a>
+                  )}
                   {installed.some((x) => x.id === t.id) || made.some((x) => x.id === t.id) ? (
                     applyBtn(t)
                   ) : (

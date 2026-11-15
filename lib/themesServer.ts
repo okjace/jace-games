@@ -17,7 +17,7 @@ export class ThemeError extends Error {
 }
 
 const MAX_THEMES = 50;
-export const summary = (t: ThemeRow): ThemeSummary => ({ id: t.id, owner_id: t.owner_id, owner_name: t.owner_name, name: t.name, icon: t.icon, published: t.published, installs: t.installs, removed: t.removed, updated_at: t.updated_at, data: t.data });
+export const summary = (t: ThemeRow): ThemeSummary => ({ id: t.id, owner_id: t.owner_id, owner_name: t.owner_name, name: t.name, icon: t.icon, published: t.published, installs: t.installs, likes: t.likes ?? 0, removed: t.removed, updated_at: t.updated_at, data: t.data });
 
 export async function createTheme(session: Session, raw: unknown) {
   const mine = await themeStore.byOwner(session.user.id);
