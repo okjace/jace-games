@@ -210,3 +210,11 @@ export function chordOf(scale: number[], root: number): [number, number, number,
   const fifth = has(root + 7) ? root + 7 : has(root + 6) ? root + 6 : root + 7;
   return [root, third, fifth, root + 12];
 }
+
+/**
+ * Every theme's and mood's song, recorded ahead of time (3 min MP3s on a
+ * GitHub release of this site's repo), so downloading it is instant.
+ * Made with scripts/record-theme-songs (re-record when songs change and bump the tag).
+ */
+export const SONG_FILES = "https://github.com/okjace/jace-games/releases/download/theme-songs-v1";
+export const songFileName = (id: string) => `jace-live-${id}.mp3`;
