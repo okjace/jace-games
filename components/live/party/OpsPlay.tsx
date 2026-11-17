@@ -5,6 +5,7 @@ import { MAPS, Ops, SHOP, TEAM_INFO, drawOps, slide, type OpsMode, type OpsSnaps
 import { openRoomChannel } from "@/lib/realtime/client";
 import { useJuice } from "../fx/Juice";
 import { sfx } from "../fx/sfx";
+import { recordOps } from "../ReplayRecorder";
 import { Banner, Score } from "../OpsHost";
 import type { StageProps } from "./index";
 
@@ -44,6 +45,11 @@ export function OpsPlay({ view, act, earn }: StageProps) {
   const [hud, setHud] = useState<{ snap: OpsSnapshot | null; now: number }>({ snap: null, now: 0 });
   const solo = !!view.solo;
   const myId = view.me.id;
+  // act changes on every render; the game loop shouldn't restart because of it.
+  const actRef = useRef(act);
+  useEffect(() => {
+    actRef.current = act;
+  }, [act]);
 
   // Right answers: shop coins (the server tells the host; a solo game hears it here).
   const coinKey = view.last?.kind === "ops-coins" ? `${view.me.answered}` : "";
@@ -110,9 +116,10 @@ export function OpsPlay({ view, act, earn }: StageProps) {
         if (me && !me.frozen && o.phase === "play") slide(map, me, ix * o.speedOf(me, Date.now()) * dt, iy * o.speedOf(me, Date.now()) * dt);
         o.step(dt, Date.now());
         snap = o.snapshot(Date.now());
+        recordOps(snap);
         if (now - lastReport > 5000) {
           lastReport = now;
-          void act({ action: "snake-score", score: o.scores()[myId] ?? 0 });
+          void actRef.current({ action: "snake-score", score: o.scores()[myId] ?? 0 });
         }
       } else {
         // Everyone else: ~110ms behind the host, sliding between snapshots.
@@ -181,7 +188,7 @@ export function OpsPlay({ view, act, earn }: StageProps) {
       window.removeEventListener("keydown", keyDown);
       window.removeEventListener("keyup", keyUp);
     };
-  }, [mode, solo, myId, view.topic, view.me.name, act]);
+  }, [mode, solo, myId, view.topic, view.me.name]);
 
   const send = (event: string, extra: Record<string, unknown> = {}) => {
     if (solo) {

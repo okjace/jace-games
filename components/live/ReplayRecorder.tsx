@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { ReplayEvent, ReplayQuestion, ScoreFrame, SnakeFrame } from "@/lib/live/replay";
+import type { OpsFrame, ReplayEvent, ReplayQuestion, ScoreFrame, SnakeFrame } from "@/lib/live/replay";
+import type { OpsSnapshot } from "@/lib/live/ops";
 import type { Snapshot } from "@/lib/live/snake";
 import { TEAMS, type TeamScore } from "@/lib/live/teams";
 
@@ -10,7 +11,7 @@ import { TEAMS, type TeamScore } from "@/lib/live/teams";
  * Lives (hidden) on the host's screen, or on the player's in a solo game.
  */
 
-type Rec = { code: string; start: number; frames: ScoreFrame[]; events: ReplayEvent[]; questions: ReplayQuestion[]; snake: SnakeFrame[]; snakeAt: number; snakeSeen: Set<string>; qSeen: Set<number>; saved: boolean };
+type Rec = { code: string; start: number; frames: ScoreFrame[]; events: ReplayEvent[]; questions: ReplayQuestion[]; snake: SnakeFrame[]; ops: OpsFrame[]; snakeAt: number; snakeSeen: Set<string>; qSeen: Set<number>; saved: boolean };
 let rec: Rec | null = null;
 
 /** Snake Arena's host screen hands each snapshot here (kept ~4 times a second, bodies thinned out). */
@@ -35,6 +36,32 @@ export function recordSnake(snap: Snapshot) {
     rec.events.push({ t, text: e });
   }
 }
+
+/** Beacon Rush / Flag Frenzy: the host's screen (or a solo phone) hands each snapshot here, kept ~4 times a second. */
+export function recordOps(snap: OpsSnapshot) {
+  if (!rec) return;
+  const now = Date.now();
+  if (now - rec.snakeAt < 250 || rec.ops.length >= 6000) return;
+  rec.snakeAt = now;
+  const t = now - rec.start;
+  const b = snap.beacon;
+  rec.ops.push({
+    t,
+    ph: snap.phase,
+    r: snap.round,
+    at: snap.attack,
+    w: [...snap.wins],
+    p: snap.p.map(([id, name, team, x, y, frozen, , carrying]) => [id, name, team, x, y, frozen, carrying]),
+    b: b ? [b.x, b.y, b.planted ? 1 : 0, b.carrier ? 1 : 0] : null,
+    f: snap.flags.map((f) => [f.x, f.y, f.carrier ? 1 : 0]),
+  });
+  // Events come newest first; the new ones are those above the newest we saw last time.
+  const at = opsTop === null ? -1 : snap.events.indexOf(opsTop);
+  const fresh = at === -1 ? snap.events : snap.events.slice(0, at);
+  for (const e of [...fresh].reverse()) rec.events.push({ t, text: e });
+  opsTop = snap.events[0] ?? opsTop;
+}
+let opsTop: string | null = null;
 
 type P = { id: string; name: string; score: number; streak: number; team: number | null };
 
@@ -66,7 +93,8 @@ export function ReplayRecorder({
   // Start a fresh recording when a game starts (a new one each Play again / round).
   useEffect(() => {
     if (status !== "playing") return;
-    if (!rec || rec.code !== code || rec.saved) rec = { code, start: Date.now(), frames: [], events: [], questions: [], snake: [], snakeAt: 0, snakeSeen: new Set(), qSeen: new Set(), saved: false };
+    if (!rec || rec.code !== code || rec.saved) rec = { code, start: Date.now(), frames: [], events: [], questions: [], snake: [], ops: [], snakeAt: 0, snakeSeen: new Set(), qSeen: new Set(), saved: false };
+    if (rec.ops.length === 0) opsTop = null;
     const r = rec;
     let leader = "";
     let teamLeader = -1;
@@ -129,7 +157,7 @@ export function ReplayRecorder({
     void fetch(`/api/live/games/${code}/replay`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(token ? { "X-Live-Token": token } : {}) },
-      body: JSON.stringify({ replay: { startedAt: r.start, length: t, frames: r.frames, events: r.events, questions: r.questions, snake: r.snake } }),
+      body: JSON.stringify({ replay: { startedAt: r.start, length: t, frames: r.frames, events: r.events, questions: r.questions, snake: r.snake, ops: r.ops } }),
     }).catch(() => {
       r.saved = false;
     });

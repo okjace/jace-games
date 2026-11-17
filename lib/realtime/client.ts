@@ -60,7 +60,7 @@ function sharedChannel(topic: string, me: { userId: string; username: string } |
   return shared;
 }
 
-type DevShared = { source: EventSource; key: string | undefined; listeners: Set<Listener> };
+type DevShared = { source: EventSource; key: string | undefined; page: string; listeners: Set<Listener> };
 const devStreams = new Map<string, DevShared>();
 
 function devShared(topic: string, me: { userId: string; username: string } | null): DevShared {
@@ -72,11 +72,12 @@ function devShared(topic: string, me: { userId: string; username: string } | nul
     q.set("meta", JSON.stringify(me));
   }
   const source = new EventSource(`/api/dev/realtime?${q}`);
-  const shared: DevShared = { source, key: me?.userId, listeners: new Set() };
+  const shared: DevShared = { source, key: me?.userId, page: Math.random().toString(36).slice(2), listeners: new Set() };
   source.onmessage = (e) => {
     const msg = JSON.parse(e.data) as { event: string; payload: unknown };
     if (msg.event === "__presence") shared.listeners.forEach((l) => l.presence(msg.payload as PresenceMember[]));
-    else if ((msg.payload as { __from?: string } | null)?.__from !== shared.key || !shared.key) shared.listeners.forEach((l) => l.emit(msg.event, unwrap(msg.payload)));
+    // Our own sends were already handed to this page's other listeners (like Supabase, no echo).
+    else if ((msg.payload as { __from?: string } | null)?.__from !== shared.page) shared.listeners.forEach((l) => l.emit(msg.event, unwrap(msg.payload)));
   };
   devStreams.set(topic, shared);
   return shared;
@@ -131,12 +132,14 @@ export function openRoomChannel(topic: string, me: { userId: string; username: s
   shared.listeners.add(listener);
   let closed = false;
   return {
-    send: (event, payload) =>
+    send: (event, payload) => {
       void fetch("/api/dev/realtime", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, event, payload: { __from: shared.key, __p: payload } }),
-      }),
+        body: JSON.stringify({ topic, event, payload: { __from: shared.page, __p: payload } }),
+      });
+      shared.listeners.forEach((l) => l !== listener && l.emit(event, payload));
+    },
     on,
     onPresence,
     close: () => {

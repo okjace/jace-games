@@ -28,6 +28,9 @@ function pickSong(season: SeasonId, game: boolean): Song {
   return game ? { ...base, bpm: base.bpm + 20, beat: base.beat === "none" ? "half" : base.beat } : base;
 }
 
+/** What makes two songs different (game pages make a fresh copy of the theme's song each time). */
+const songKey = (s: Song) => `${s.seed}|${s.bpm}|${s.key}|${s.scale}|${s.lead}|${s.beat}`;
+
 /** An uploaded song playing instead of the made-up music (a custom theme's own music). */
 type Track = { src: string; el: HTMLAudioElement };
 type Engine = { ctx: AudioContext; master: GainNode; timer: ReturnType<typeof setInterval> | null; next: number; step: number; track: Track | null };
@@ -124,16 +127,21 @@ export function Music({ season }: { season: SeasonId }) {
           e.next = ctx.currentTime + 0.1;
           return;
         }
-        while (e.next < ctx.currentTime + 0.3) {
-          const beat = e.step % 8;
-          if (beat === 0) {
-            const want = pickSong(settings.current.season, settings.current.game);
-            // A different song starts from its beginning.
-            if (want.seed !== song.seed || want.bpm !== song.bpm) e.step = 0;
-            song = want;
-          }
-          const eighth = synth.play(song, e.step, e.next, settings.current.game);
-          e.next += eighth;
+        // A different song (a new game mode, theme or page) starts right away, from its beginning,
+        // instead of waiting for the end of the bar.
+        const want = pickSong(settings.current.season, settings.current.game);
+        if (songKey(want) !== songKey(song)) {
+          song = want;
+          e.step = 0;
+          e.next = Math.max(ctx.currentTime + 0.05, Math.min(e.next, ctx.currentTime + 0.12));
+        }
+        while (e.next < ctx.currentTime + 0.2) {
+          // A bad note never stalls the clock (that would pile up sounds every tick).
+          let eighth = 60 / song.bpm / 2;
+          try {
+            eighth = synth.play(song, e.step, e.next, settings.current.game);
+          } catch {}
+          e.next += Number.isFinite(eighth) && eighth > 0.02 ? eighth : 0.25;
           e.step++;
         }
       };

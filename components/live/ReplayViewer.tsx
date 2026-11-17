@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { scoresAt, type ReplayData, type SnakeFrame } from "@/lib/live/replay";
+import { scoresAt, type OpsFrame, type ReplayData, type SnakeFrame } from "@/lib/live/replay";
+import { drawOps, type OpsMode, type OpsSnapshot } from "@/lib/live/ops";
 import type { PlayerView } from "@/lib/live/engine";
 import { drawArena, radiusOf, type Snapshot } from "@/lib/live/snake";
 import { TEAMS } from "@/lib/live/teams";
@@ -110,7 +111,7 @@ function Replay({ id, data, povs, t, setT, playing, setPlaying, speed, setSpeed 
     setReplayQuiet(true);
     return () => setReplayQuiet(false);
   }, []);
-  const watchable = data.players.filter((p) => povs.includes(p.id) || data.snake.length > 0);
+  const watchable = data.players.filter((p) => povs.includes(p.id) || data.snake.length > 0 || (data.ops ?? []).length > 0);
   const names = useMemo(() => new Map(data.players.map((p) => [p.id, p])), [data.players]);
   const scores = scoresAt(data.frames, t);
   const board = data.players.map((p) => ({ ...p, score: scores[p.id] ?? 0 })).sort((a, b) => b.score - a.score);
@@ -184,6 +185,8 @@ function Replay({ id, data, povs, t, setT, playing, setPlaying, speed, setSpeed 
         <section className="flex flex-col gap-2">
           {data.snake.length > 0 ? (
             <SnakeReplay frames={data.snake} t={t} names={names} follow={watch} />
+          ) : (data.ops ?? []).length > 0 ? (
+            <OpsReplay frames={data.ops} mode={data.mode as OpsMode} t={t} follow={watch} />
           ) : pov?.id === watch ? (
             <PovScreen frames={pov.frames} t={t} />
           ) : (
@@ -195,6 +198,7 @@ function Replay({ id, data, povs, t, setT, playing, setPlaying, speed, setSpeed 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
           {data.snake.length > 0 && !watch && <SnakeReplay frames={data.snake} t={t} names={names} />}
+          {(data.ops ?? []).length > 0 && !watch && <OpsReplay frames={data.ops} mode={data.mode as OpsMode} t={t} />}
           {q && (
             <section className={`${card} flex flex-col gap-2`}>
               <p className="text-xs font-bold text-muted">❓ question {data.questions.indexOf(q) + 1} of {data.questions.length}</p>
@@ -324,6 +328,65 @@ function SnakeReplay({ frames, t, names, follow }: { frames: SnakeFrame[]; t: nu
     drawArena(ctx, w, h, snap, follow ? cam : null, follow ?? null, performance.now());
   }, [frames, t, names, follow]);
   return <canvas ref={ref} className="aspect-square w-full max-w-2xl self-center rounded-3xl shadow-xl" aria-label="The Snake Arena, replayed" />;
+}
+
+/** Beacon Rush / Flag Frenzy's map at time t, sliding between frames; watching someone follows them like their phone did. */
+function OpsReplay({ frames, mode, t, follow }: { frames: OpsFrame[]; mode: OpsMode; t: number; follow?: string }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const a = lastAt(frames, t);
+    if (!a) return;
+    const b = frames[frames.indexOf(a) + 1];
+    const k = b ? Math.min(1, (t - a.t) / Math.max(1, b.t - a.t)) : 0;
+    const later = b ? new Map(b.p.map((x) => [x[0], x])) : null;
+    // Big jumps (a respawn) don't slide across the map.
+    const mix = (from: number, to: number | undefined) => (to === undefined || Math.abs(to - from) > 120 ? from : from + (to - from) * k);
+    const snap: OpsSnapshot = {
+      t: a.t,
+      mode,
+      phase: a.ph,
+      phaseEnds: 0,
+      round: a.r,
+      attack: a.at,
+      wins: a.w,
+      p: a.p.map(([id, name, team, x, y, frozen, carrying]) => {
+        const n = later?.get(id);
+        return [id, name, team, mix(x, n?.[3]), mix(y, n?.[4]), frozen, 0, carrying, 0, 0, 0, 0];
+      }),
+      beacon: a.b ? { x: a.b[0], y: a.b[1], carrier: a.b[3] ? "x" : null, planted: !!a.b[2], site: null, endsAt: Infinity, plant: 0, defuse: 0 } : null,
+      flags: a.f.map(([x, y, carried]) => ({ x, y, carrier: carried ? "x" : null, home: false })),
+      events: [],
+      winner: null,
+      c: {},
+    };
+    const ctx = canvas.getContext("2d")!;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (canvas.width !== Math.round(w * dpr)) {
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const me = follow ? snap.p.find((x) => x[0] === follow) : null;
+    const cam = me ? { x: me[3], y: me[4], zoom: Math.max(w / 720, h / 520) } : null;
+    drawOps(ctx, w, h, snap, cam, follow ?? null, performance.now());
+  }, [frames, mode, t, follow]);
+  const last = lastAt(frames, t);
+  return (
+    <div className="relative">
+      <canvas ref={ref} className={`w-full rounded-3xl shadow-xl ${follow ? "aspect-[4/3] max-w-2xl" : "aspect-[16/9]"}`} aria-label={`${mode === "beacon" ? "Beacon Rush" : "Flag Frenzy"}, replayed`} />
+      {last && (
+        <p className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1 font-display text-lg font-black text-white">
+          <span className="text-amber-400">{last.w[0]}</span>
+          <span className="text-xs font-semibold">{mode === "beacon" ? `round ${last.r}${last.ph === "buy" ? " · shop" : ""}` : "captures"}</span>
+          <span className="text-blue-400">{last.w[1]}</span>
+        </p>
+      )}
+    </div>
+  );
 }
 
 /** One player's own screen at time t, shown with the real game screens (nothing clickable). */

@@ -25,6 +25,11 @@ export function SnakeArena({ view, act, earn }: StageProps) {
   const [me, setMe] = useState<{ len: number; best: number; alive: boolean; rank: number; inArena: boolean }>({ len: 0, best: 0, alive: true, rank: 0, inArena: false });
   const solo = !!view.solo;
   const myId = view.me.id;
+  // act changes on every render; the arena loop shouldn't restart because of it.
+  const actRef = useRef(act);
+  useEffect(() => {
+    actRef.current = act;
+  }, [act]);
 
   // Right answers: grow (the server tells the host's arena; a solo arena hears it here).
   const fedKey = view.last?.kind === "feed" ? `${view.me.answered}` : "";
@@ -89,7 +94,7 @@ export function SnakeArena({ view, act, earn }: StageProps) {
         if (now - lastReport > 5000) {
           lastReport = now;
           const sn = local.current.snakes.get(myId);
-          if (sn) void act({ action: "snake-score", score: sn.best });
+          if (sn) void actRef.current({ action: "snake-score", score: sn.best });
         }
         snap = snapRef.current;
       } else {
@@ -184,7 +189,7 @@ export function SnakeArena({ view, act, earn }: StageProps) {
       off?.();
       ch?.close();
     };
-  }, [solo, myId, view.topic, view.me.name, act]);
+  }, [solo, myId, view.topic, view.me.name]);
 
   // Point (or drag) to steer: the angle from the middle of the screen to the pointer.
   const aim = (e: React.PointerEvent<HTMLCanvasElement>) => {

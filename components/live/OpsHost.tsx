@@ -5,6 +5,7 @@ import type { HostView } from "@/lib/live/engine";
 import { MAPS, Ops, SHOP, TEAM_INFO, drawOps, type OpsMode, type OpsSnapshot, type ShopItem } from "@/lib/live/ops";
 import { openRoomChannel } from "@/lib/realtime/client";
 import { card, clock } from "./ui";
+import { recordOps } from "./ReplayRecorder";
 
 /**
  * Beacon Rush / Flag Frenzy on the host's big screen: this runs the match
@@ -72,6 +73,7 @@ export function OpsHost({ view, secondsLeft, onScores }: { view: HostView; secon
         o.step(dt, Date.now());
       }
       latest = o.snapshot(Date.now());
+      recordOps(latest);
       if (now - lastSent > 50) {
         lastSent = now;
         ch.send("ops-state", latest);

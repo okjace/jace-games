@@ -18,6 +18,22 @@ export type ReplayQuestion = { t: number; prompt: string; choices: string[] | nu
 /** Snake Arena: snakes as [id, colour, alive, length, body x,y,x,y…] (thinned), a few times a second. */
 export type SnakeFrame = { t: number; s: [string, string, 0 | 1, number, number[]][] };
 
+/**
+ * Beacon Rush / Flag Frenzy: the map a few times a second. Players as
+ * [id, name, team, x, y, frozen, carrying (0 nothing, 1 beacon, 2 flag)];
+ * the beacon as [x, y, planted, carried] or null; flags as [x, y, carried].
+ */
+export type OpsFrame = {
+  t: number;
+  ph: "buy" | "play" | "post" | "over";
+  r: number;
+  at: 0 | 1;
+  w: [number, number];
+  p: [string, string, 0 | 1, number, number, 0 | 1, 0 | 1 | 2][];
+  b: [number, number, 0 | 1, 0 | 1] | null;
+  f: [number, number, 0 | 1][];
+};
+
 export type ReplayData = {
   v: 1;
   code: string;
@@ -33,6 +49,7 @@ export type ReplayData = {
   events: ReplayEvent[];
   questions: ReplayQuestion[];
   snake: SnakeFrame[];
+  ops: OpsFrame[];
 };
 
 export const REPLAY_MAX_BYTES = 2_500_000;
@@ -75,8 +92,29 @@ export function cleanReplay(raw: unknown, known: { code: string; mode: LiveMode;
       }),
     };
   });
+  const bit = (v: unknown) => (v ? 1 : 0) as 0 | 1;
+  const ops: OpsFrame[] = arr(r.ops, 6000).map((f) => {
+    const o = (f ?? {}) as Record<string, unknown>;
+    const b = Array.isArray(o.b) ? o.b : null;
+    return {
+      t: Math.max(0, Math.round(num(o.t))),
+      ph: (["buy", "play", "post", "over"] as const).find((x) => x === o.ph) ?? "play",
+      r: Math.max(1, Math.round(num(o.r))),
+      at: bit(o.at),
+      w: [Math.round(num(arr(o.w, 2)[0])), Math.round(num(arr(o.w, 2)[1]))],
+      p: arr(o.p, 40).map((x) => {
+        const a = Array.isArray(x) ? x : [];
+        return [str(a[0], 64), str(a[1], 40), bit(a[2]), Math.round(num(a[3])), Math.round(num(a[4])), bit(a[5]), Math.min(2, Math.max(0, Math.round(num(a[6])))) as 0 | 1 | 2];
+      }),
+      b: b ? [Math.round(num(b[0])), Math.round(num(b[1])), bit(b[2]), bit(b[3])] : null,
+      f: arr(o.f, 2).map((x) => {
+        const a = Array.isArray(x) ? x : [];
+        return [Math.round(num(a[0])), Math.round(num(a[1])), bit(a[2])] as [number, number, 0 | 1];
+      }),
+    };
+  });
   const length = Math.max(0, Math.round(num(r.length)));
-  return { v: 1, code: known.code, mode: known.mode, setTitle: known.setTitle, host: known.host, startedAt: Math.round(num(r.startedAt)), length, teams: known.teams, players: known.players, frames, events, questions, snake };
+  return { v: 1, code: known.code, mode: known.mode, setTitle: known.setTitle, host: known.host, startedAt: Math.round(num(r.startedAt)), length, teams: known.teams, players: known.players, frames, events, questions, snake, ops };
 }
 
 /** Scores at time t (the last frame at or before it). */
