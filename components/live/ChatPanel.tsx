@@ -97,6 +97,7 @@ export function ChatPanel({
   teamTopic = null,
   myTeam = null,
   call = null,
+  messagesOff = false,
 }: {
   code: string;
   topic: string;
@@ -109,6 +110,8 @@ export function ChatPanel({
   myTeam?: number | null;
   /** Voice calls are on and this player can use them: a 📞 button opens the call controls here. */
   call?: { hasTeam: boolean } | null;
+  /** The player turned chat off for themself: only the call part shows. */
+  messagesOff?: boolean;
   tone?: "panel" | "stage";
   className?: string;
 }) {
@@ -118,7 +121,8 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const [chatOn, setChatOn] = useState(on);
   const [toTeam, setToTeam] = useState(false);
-  const [showCall, setShowCall] = useState(false);
+  const [showCallState, setShowCall] = useState(false);
+  const showCall = showCallState || messagesOff;
   const callNow = useInCall(code);
   const teamChat = !host && myTeam !== null;
   const shownRef = useRef(shown);
@@ -258,7 +262,7 @@ export function ChatPanel({
           <CallControls code={code} hasTeam={call.hasTeam} tone={tone} />
         </div>
       )}
-      {teamChat && (
+      {teamChat && !messagesOff && (
         <div className={`flex gap-1 border-b p-1.5 text-xs font-bold ${line}`} role="tablist" aria-label="Which chat">
           {[false, true].map((t) => (
             <button
@@ -274,6 +278,7 @@ export function ChatPanel({
           ))}
         </div>
       )}
+          {!messagesOff && <>
           <ol ref={listRef} className="flex min-h-40 flex-1 flex-col gap-1.5 overflow-y-auto p-3 text-sm" aria-live="polite">
             {visible.length === 0 && <li className={`m-auto text-center text-xs ${muted}`}>{teamChat && toTeam ? "Just ur team sees this chat. Make a plan! 🤫" : "No messages yet. Say hi! 👋"}</li>}
             {visible.map((m) => (
@@ -325,6 +330,7 @@ export function ChatPanel({
             <p className={`border-t p-3 text-center text-xs ${line} ${muted}`}>The host turned chat off.</p>
           )}
           {error && <p className="px-3 pb-2 text-xs text-danger">{error}</p>}
+          </>}
     </section>
   );
 }

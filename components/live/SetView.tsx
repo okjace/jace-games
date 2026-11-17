@@ -1,5 +1,6 @@
 "use client";
 
+import { AiBadge, AiNotice } from "@/components/AiHelper";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useScores } from "@/components/ScoresProvider";
@@ -40,7 +41,11 @@ export function SetView({ id }: { id: string }) {
             <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight">
               {set.title}
               {set.verified && <VerifiedBadge />}
+              <AiBadge ai={set.ai} />
             </h1>
+            <div className="mt-1">
+              <AiNotice ai={set.ai} what="set" />
+            </div>
             <p className="text-sm text-muted">
               by {set.owner_name} · {set.questions.length} questions · played {set.plays} time{set.plays === 1 ? "" : "s"}
             </p>

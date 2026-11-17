@@ -1,4 +1,5 @@
 import "server-only";
+import { nextAiMark } from "@/lib/live/types";
 import { NextResponse } from "next/server";
 import { studioStore, type CommunityGameRow, type GameSummary } from "@/lib/db/studio";
 import { JaceUnauthorized, getUserInfo } from "@/lib/jace";
@@ -55,6 +56,7 @@ function publicGame(row: CommunityGameRow): PublicGame | null {
     kind: row.kind,
     multiplayer: row.multiplayer,
     live_mode: row.live_mode,
+    ai: row.ai ?? null,
     plays: row.plays,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -103,6 +105,8 @@ export type GameInput = {
   blocks_json?: unknown;
   multiplayer?: unknown;
   live_mode?: unknown;
+  /** Made with AI: "helper", "self", or null/false. */
+  ai?: unknown;
 };
 
 function cleanTitle(v: unknown): string {
@@ -171,6 +175,7 @@ export async function createGame(session: Session, input: GameInput): Promise<Co
     multiplayer: null,
     // Jace Live is only Live: every Studio game can be hosted as a Live mode.
     live_mode: true,
+    ...(input.ai !== undefined ? { ai: nextAiMark(null, input.ai) } : {}),
   });
   await store.addVersion(row.id, row.html, row.blocks_json);
   return row;
@@ -188,6 +193,8 @@ export async function saveGame(session: Session, id: string, input: GameInput): 
   patch.multiplayer = null;
   // Every Studio game is a Live mode now (saving turns it on for older games too).
   patch.live_mode = true;
+  // Made with AI: the AI helper's mark stays on for good.
+  if (input.ai !== undefined) patch.ai = nextAiMark(row.ai, input.ai);
   if (input.kind === "code" && row.kind === "blocks") patch.kind = "code"; // "Convert to code" is one-way
   const kind = patch.kind ?? row.kind;
   let codeChanged = false;

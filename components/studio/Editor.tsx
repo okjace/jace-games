@@ -8,6 +8,9 @@ import { useScores } from "@/components/ScoresProvider";
 import { signInHref } from "@/components/site/SiteHeader";
 import { timeAgo } from "@/lib/format";
 import { MAX_GAME_BYTES, gameBytes } from "@/lib/studio/limits";
+import { BLOCKS_LIVE_TEXT, SDK_ITEMS, SDK_LIMITS_TEXT } from "@/lib/studio/sdkDocs";
+import { gamePrompt, readGameAnswer } from "@/lib/aiHelper";
+import { AiBadge, CopyPaste, MadeWithAi } from "@/components/AiHelper";
 import { GameFrame, type LogEntry, type RoomLink } from "./GameFrame";
 import { api, card, input, primary, secondary, small } from "./ui";
 import { ask } from "@/components/site/ConfirmBox";
@@ -21,7 +24,7 @@ function EditorLoading() {
 }
 
 type Multiplayer = { mode: "race" | "live"; min: number; max: number } | null;
-type Meta = { title: string; description: string; icon: string; multiplayer: Multiplayer; live_mode: boolean };
+type Meta = { title: string; description: string; icon: string; multiplayer: Multiplayer; live_mode: boolean; ai: "helper" | "self" | null };
 type GameResponse = {
   meta: Meta & { id: string; kind: "code" | "blocks"; published: boolean; removed: boolean; owner_id: string };
   game: { html: string } | null;
@@ -38,7 +41,7 @@ export function Editor({ id }: { id: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [kind, setKind] = useState<"code" | "blocks">("code");
-  const [meta, setMeta] = useState<Meta>({ title: "", description: "", icon: "🎮", multiplayer: null, live_mode: false });
+  const [meta, setMeta] = useState<Meta>({ title: "", description: "", icon: "🎮", multiplayer: null, live_mode: false, ai: null });
   const [html, setHtml] = useState("");
   const [blocks, setBlocks] = useState<object | null>(null);
   const [blocksKey, setBlocksKey] = useState(0);
@@ -48,7 +51,9 @@ export function Editor({ id }: { id: string }) {
   const [publishedHtml, setPublishedHtml] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: "error" | "info"; text: string } | null>(null);
-  const [panel, setPanel] = useState<"settings" | "versions" | null>(null);
+  const [panel, setPanel] = useState<"settings" | "versions" | "ai" | null>(null);
+  const [aiIdea, setAiIdea] = useState("");
+  const [aiChange, setAiChange] = useState(false);
   const [versions, setVersions] = useState<Version[] | null>(null);
   const [blocksCode, setBlocksCode] = useState("");
 
@@ -69,7 +74,7 @@ export function Editor({ id }: { id: string }) {
           setLoadError("You can only edit your own games.");
           return;
         }
-        const m: Meta = { title: d.meta.title, description: d.meta.description, icon: d.meta.icon, multiplayer: d.meta.multiplayer, live_mode: !!d.meta.live_mode };
+        const m: Meta = { title: d.meta.title, description: d.meta.description, icon: d.meta.icon, multiplayer: d.meta.multiplayer, live_mode: !!d.meta.live_mode, ai: d.meta.ai ?? null };
         setKind(d.meta.kind);
         setMeta(m);
         setHtml(d.draft.html);
@@ -256,7 +261,10 @@ export function Editor({ id }: { id: string }) {
             {meta.icon}
           </span>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold tracking-tight">{meta.title || "Untitled"}</h1>
+            <h1 className="flex min-w-0 items-center gap-2 truncate text-xl font-bold tracking-tight">
+              <span className="truncate">{meta.title || "Untitled"}</span>
+              <AiBadge ai={meta.ai} />
+            </h1>
             <p className="text-xs text-muted">
               {kind === "blocks" ? "Blocks" : "Code"} · {(bytes / 1024).toFixed(1)} / {MAX_GAME_BYTES / 1024} KB ·{" "}
               {removed ? (
@@ -275,6 +283,9 @@ export function Editor({ id }: { id: string }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className={small} onClick={() => setPanel(panel === "ai" ? null : "ai")} aria-expanded={panel === "ai"}>
+            ✨ AI helper
+          </button>
           <button type="button" className={small} onClick={() => setPanel(panel === "settings" ? null : "settings")} aria-expanded={panel === "settings"}>
             ⚙️ Settings
           </button>
@@ -315,6 +326,40 @@ export function Editor({ id }: { id: string }) {
         </p>
       )}
 
+      {panel === "ai" && (
+        <div className={`${card} flex flex-col gap-3 p-4`}>
+          <h2 className="font-display text-lg font-extrabold">✨ AI helper</h2>
+          {kind === "blocks" ? (
+            <p className="text-sm text-muted">the AI helper writes code, so it works in code games. use &ldquo;Convert to code&rdquo; first (or make a new code game).</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-2 text-sm" role="radiogroup" aria-label="Make a new game or change this one">
+                {[false, true].map((c) => (
+                  <button key={String(c)} type="button" role="radio" aria-checked={aiChange === c} onClick={() => setAiChange(c)} className={`rounded-full px-3 py-1.5 font-semibold ${aiChange === c ? "bg-accent text-on-accent" : "border border-line hover:bg-accent/10"}`}>
+                    {c ? "🛠️ change my game" : "🆕 make a new game"}
+                  </button>
+                ))}
+              </div>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-semibold">{aiChange ? "what should change?" : "describe ur game idea"}</span>
+                <textarea value={aiIdea} onChange={(e) => setAiIdea(e.target.value.slice(0, 1500))} rows={3} placeholder={aiChange ? "make the rocks faster n add a shield u can buy for 20 coins" : "a fishing game where u spend coins on bait n rods, rarer fish = more points"} className="w-full rounded-xl border border-line bg-background/60 p-2 outline-none focus:border-accent" />
+              </label>
+              <CopyPaste
+                prompt={gamePrompt(aiIdea || "(describe ur idea above)", aiChange ? html : undefined)}
+                disabled={!aiIdea.trim()}
+                pasteLabel="🎮 use this code"
+                onPaste={(text) => {
+                  const code = readGameAnswer(text);
+                  if (!code) return "couldnt find game code in that. paste the AI's whole answer (with the ```html part).";
+                  setHtml(code);
+                  setMeta((m) => ({ ...m, ai: "helper" }));
+                  return null;
+                }}
+              />
+            </>
+          )}
+        </div>
+      )}
       {panel === "settings" && (
         <Settings meta={meta} setMeta={setMeta} onDelete={remove} published={published} onUnpublish={() => publish(false)} />
       )}
@@ -461,6 +506,9 @@ function Settings({
           onChange={(e) => setMeta({ ...meta, description: e.target.value })}
         />
       </label>
+      <div className="sm:col-span-2">
+        <MadeWithAi value={meta.ai} onChange={(ai) => setMeta({ ...meta, ai })} />
+      </div>
       <label className="flex items-start gap-2 text-sm sm:col-span-2">
         <span aria-hidden="true" className="mt-0.5">📺</span>
         <span>
@@ -490,22 +538,17 @@ function Settings({
 function SdkHelp() {
   return (
     <details className={`${card} p-4 text-sm`}>
-      <summary className="cursor-pointer font-semibold">The Jace game SDK (window.jace)</summary>
-      <div className="mt-3 grid gap-1 font-mono text-xs leading-relaxed text-muted">
-        <p><span className="text-foreground">jace.player.name</span> — who&apos;s playin</p>
-        <p><span className="text-foreground">jace.submitScore(n)</span> — saves a whole-number score (higher is better; best per player)</p>
-        <p><span className="text-foreground">jace.gameOver()</span> — the round is over (in a race, ur last score is ur result)</p>
-        <p><span className="text-foreground">jace.onReady(cb)</span> — runs cb once the page is ready</p>
-        <p><span className="text-foreground">jace.random()</span> / <span className="text-foreground">jace.seed</span> — the same random numbers for every player in a room</p>
-        <p><span className="text-foreground">jace.room</span> — null when playing alone; in a room: mode, isHost, mySeat, players [{"{ seat, name, you, host }"}]</p>
-        <p><span className="text-foreground">jace.room.send(event, data)</span> — to evryone else (short event name, JSON data up to 8 KB, 20 a second)</p>
-        <p><span className="text-foreground">jace.room.on(event, (data, fromSeat) =&gt; …)</span> — hear the others</p>
-        <p><span className="text-foreground">jace.gameOver({"{ winners: [seat] }"})</span> — live games: the host ends da game and names the winners</p>
+      <summary className="cursor-pointer font-semibold">The Jace game SDK (window.jace) for Live</summary>
+      <p className="mt-2 text-xs text-muted">evry Studio game is a Jace Live mode: playas earn coins by answering questions, and ur game is what they spend them on.</p>
+      <div className="mt-3 grid gap-1.5 text-xs leading-relaxed text-muted">
+        {SDK_ITEMS.map(([k, v]) => (
+          <p key={k}>
+            <span className="font-mono text-foreground">{k}</span> — {v}
+          </p>
+        ))}
       </div>
-      <p className="mt-3 text-xs text-muted">
-        Games run in a locked-down frame: no network (fetch, WebSocket, images from other sites), no cookies or storage, no popups. Put
-        images and sounds in the game as data: URLs. Up to {MAX_GAME_BYTES / 1024} KB per game.
-      </p>
+      <p className="mt-3 text-xs text-muted">{BLOCKS_LIVE_TEXT}</p>
+      <p className="mt-2 text-xs text-muted">{SDK_LIMITS_TEXT}</p>
     </details>
   );
 }

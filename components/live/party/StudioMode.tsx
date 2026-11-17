@@ -1,5 +1,6 @@
 "use client";
 
+import { AiBadge } from "@/components/AiHelper";
 import { useEffect, useState } from "react";
 import { GameFrame } from "@/components/studio/GameFrame";
 import { getToken } from "../ui";
@@ -34,7 +35,7 @@ export function StudioMode({ view, act, earn }: PartyProps) {
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between rounded-xl bg-panel px-4 py-2 text-sm">
         <span className="truncate font-semibold">
-          {info?.icon ?? "🧩"} {info?.title ?? "Studio game"}
+          {info?.icon ?? "🧩"} {info?.title ?? "Studio game"} <AiBadge ai={view.ai} />
           {info?.owner && <span className="font-normal text-muted"> by {info.owner}</span>}
         </span>
         <span className="shrink-0">🪙 {coins}</span>

@@ -1,5 +1,6 @@
 "use client";
 
+import { AiNotice } from "@/components/AiHelper";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -94,6 +95,7 @@ export function CommunityGame({ view }: { view: GameView & { meta: GameSummary }
             {meta.icon}
           </span>
           <div className="min-w-0">
+            <AiNotice ai={meta.ai} what="game" />
             <h1 className="text-2xl font-bold tracking-tight">
               {meta.title}
               {meta.multiplayer && (

@@ -7,6 +7,8 @@ import { LIMITS, isPlayable, type LiveSet, type Question, type QuestionType } fr
 import { plainText } from "@/lib/live/media";
 import { HTML_TEMPLATE, HtmlFrame } from "./HtmlFrame";
 import { ImportQuestions } from "./ImportQuestions";
+import { AiBadge, CopyPaste, MadeWithAi } from "@/components/AiHelper";
+import { readSetAnswer, setPrompt } from "@/lib/aiHelper";
 import { PromptEditor } from "./PromptEditor";
 import { ANSWER_COLORS, ANSWER_SHAPES, card, input, primary, secondary } from "./ui";
 import { ask } from "@/components/site/ConfirmBox";
@@ -43,6 +45,11 @@ export function SetEditor({ id }: { id: string }) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiGrade, setAiGrade] = useState("");
+  const [aiCount, setAiCount] = useState(10);
+  const [aiKinds, setAiKinds] = useState<("choice" | "truefalse" | "type")[]>(["choice"]);
   const dirty = useRef(false);
 
   useEffect(() => {
@@ -70,6 +77,7 @@ export function SetEditor({ id }: { id: string }) {
           tags: s.tags,
           visibility: s.visibility,
           questions: s.questions,
+          ai: s.ai ?? null,
         }),
       }).catch(() => null);
       const body = await res?.json().catch(() => null);
@@ -127,6 +135,7 @@ export function SetEditor({ id }: { id: string }) {
             ←
           </Link>
           <h1 className="text-2xl font-bold tracking-tight">Edit set</h1>
+          <AiBadge ai={set.ai} />
           <span className={`text-xs ${status === "error" ? "text-danger" : "text-muted"}`} aria-live="polite">
             {status === "saving" ? "Saving…" : status === "unsaved" ? "Unsaved changes" : status === "error" ? saveError : "All changes saved"}
           </span>
@@ -170,6 +179,7 @@ export function SetEditor({ id }: { id: string }) {
               <option value="public">Public: listed in Discover</option>
             </select>
           </div>
+          <MadeWithAi value={set.ai} onChange={(ai) => update({ ai })} />
         </div>
       </section>
 
@@ -237,7 +247,52 @@ export function SetEditor({ id }: { id: string }) {
         <button type="button" disabled={set.questions.length >= LIMITS.questions} onClick={() => setImporting(true)} className={secondary}>
           ⬆️ Import
         </button>
+        <button type="button" disabled={set.questions.length >= LIMITS.questions} onClick={() => setAiOpen((o) => !o)} aria-expanded={aiOpen} className={secondary}>
+          ✨ AI helper
+        </button>
       </div>
+      {aiOpen && (
+        <section className={`${card} flex flex-col gap-3`}>
+          <h2 className="font-display text-lg font-extrabold">✨ AI helper: make questions</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+              <span className="font-semibold">topic</span>
+              <input value={aiTopic} onChange={(e) => setAiTopic(e.target.value.slice(0, 300))} placeholder="the water cycle, fractions, world capitals…" className={input} />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-semibold">for who? (optional)</span>
+              <input value={aiGrade} onChange={(e) => setAiGrade(e.target.value.slice(0, 60))} placeholder="4th grade, beginners…" className={input} />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-semibold">how many ({aiCount})</span>
+              <input type="range" min={3} max={Math.max(3, Math.min(30, LIMITS.questions - set.questions.length))} value={aiCount} onChange={(e) => setAiCount(Number(e.target.value))} className="accent-[var(--accent)]" />
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-3 text-sm">
+            {(["choice", "truefalse", "type"] as const).map((k) => (
+              <label key={k} className="flex items-center gap-1.5">
+                <input type="checkbox" checked={aiKinds.includes(k)} onChange={(e) => setAiKinds((cur) => (e.target.checked ? [...cur, k] : cur.filter((x) => x !== k)))} />
+                {k === "choice" ? "multiple choice" : k === "truefalse" ? "true/false" : "type the answer"}
+              </label>
+            ))}
+          </div>
+          <CopyPaste
+            prompt={setPrompt({ topic: aiTopic || "(type a topic above)", count: aiCount, grade: aiGrade, kinds: aiKinds })}
+            disabled={!aiTopic.trim()}
+            pasteLabel="➕ add these questions"
+            onPaste={(text) => {
+              const got = readSetAnswer(text);
+              if (!got.ok) return got.error;
+              const room = LIMITS.questions - set.questions.length;
+              if (room <= 0) return "this set is full.";
+              // New ids, so they never clash with questions already here.
+              const qs = got.questions.slice(0, room).map((q) => ({ ...q, id: newId() }));
+              update({ questions: [...set.questions, ...qs], ai: "helper" });
+              return null;
+            }}
+          />
+        </section>
+      )}
       {importing && (
         <ImportQuestions
           room={LIMITS.questions - set.questions.length}

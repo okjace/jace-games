@@ -1,5 +1,6 @@
 "use client";
 
+import { AiBadge } from "@/components/AiHelper";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -18,14 +19,14 @@ import { card, primary, secondary, setPin, setToken } from "./ui";
  * Choose what to host: a set (or none: players just tap a button) and a game
  * mode, then make the game and go to the host screen.
  */
-type StudioPick = { id: string; title: string; icon: string; owner_name: string; plays: number; published: boolean; mine?: boolean };
+type StudioPick = { id: string; title: string; icon: string; owner_name: string; plays: number; published: boolean; mine?: boolean; ai?: "helper" | "self" | null };
 
 export function HostSetup() {
   const { user } = useScores();
   const router = useRouter();
   const params = useSearchParams();
   const [setId, setSetId] = useState<string | null>(params.get("set"));
-  const [chosen, setChosen] = useState<{ id: string; title: string; cover: string; questionCount: number; rare?: boolean } | null>(null);
+  const [chosen, setChosen] = useState<{ id: string; title: string; cover: string; questionCount: number; rare?: boolean; ai?: "helper" | "self" | null } | null>(null);
   const [mine, setMine] = useState<SetSummary[]>([]);
   const [noSet, setNoSet] = useState(false);
   const [pickedMode, setMode] = useState<LiveMode>(() => {
@@ -44,6 +45,8 @@ export function HostSetup() {
   const [teams, setTeams] = useState<TeamSettings | null>(null);
   const [rounds, setRounds] = useState<LiveMode[] | null>(null);
   const [powerups, setPowerups] = useState(true);
+  // Solo: the name to play as (starts as ur Jace name when signed in).
+  const [soloName, setSoloName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,7 +81,7 @@ export function HostSetup() {
     if (!setId) return;
     fetch(`/api/live/sets/${setId}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setChosen({ id: setId, title: d.set.title, cover: d.set.cover, questionCount: d.set.questions.length, rare: !!d.rare }))
+      .then((d) => d && setChosen({ id: setId, title: d.set.title, cover: d.set.cover, questionCount: d.set.questions.length, rare: !!d.rare, ai: d.set.ai ?? null }))
       .catch(() => {});
   }, [setId]);
 
@@ -90,7 +93,7 @@ export function HostSetup() {
   const playSolo = async () => {
     setBusy(true);
     setError(null);
-    const res = await fetch("/api/live/solo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...picks(), avatar: guestAvatar() }) }).catch(() => null);
+    const res = await fetch("/api/live/solo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...picks(), avatar: guestAvatar(), name: soloName.trim() || undefined }) }).catch(() => null);
     const body = await res?.json().catch(() => null);
     if (res?.ok) {
       setToken(body.code, body.token);
@@ -141,7 +144,9 @@ export function HostSetup() {
               <div className="flex items-center gap-3 rounded-xl bg-accent/10 p-3 ring-1 ring-accent/40">
                 <span className="text-3xl">{chosen.cover}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{chosen.title}</p>
+                  <p className="flex items-center gap-1.5 truncate font-semibold">
+                    {chosen.title} <AiBadge ai={chosen.ai} />
+                  </p>
                   <p className="text-xs text-muted">{chosen.questionCount} questions</p>
                 </div>
                 <button type="button" onClick={() => setSetId(null)} className="text-sm text-muted hover:text-foreground">
@@ -233,6 +238,7 @@ export function HostSetup() {
                   >
                     <span className="text-2xl">{g.icon}</span>
                     <span className="mt-1 block truncate text-sm font-semibold">{g.title}</span>
+                    <AiBadge ai={g.ai} />
                     <span className="block text-xs text-muted">
                       {g.mine ? (g.published ? "yours" : "yours · draft") : `by ${g.owner_name} · ${g.plays} plays`}
                     </span>
@@ -323,6 +329,16 @@ export function HostSetup() {
       </section>
 
       {error && <p className="text-sm text-danger">{error}</p>}
+      <label className="flex max-w-sm flex-col gap-1 text-sm">
+        <span className="font-semibold">🎮 ur name for solo games</span>
+        <input
+          value={soloName}
+          onChange={(e) => setSoloName(e.target.value.slice(0, 20))}
+          placeholder={user ? (user.displayName || user.username) : "You"}
+          aria-label="Your name for solo games"
+          className="h-10 rounded-full border border-line bg-background px-4 outline-none focus:border-accent"
+        />
+      </label>
       <div className="flex flex-wrap gap-2">
         {soloFirst || !user ? (
           <>

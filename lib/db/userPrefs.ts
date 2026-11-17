@@ -7,6 +7,9 @@ export type Prefs = {
   theme?: string;
   modes?: string[];
   effectsOff?: boolean;
+  /** No chat / no voice calls in any game. */
+  noChat?: boolean;
+  noCalls?: boolean;
   /** Light, dark or auto. */
   look?: "light" | "dark" | "auto";
   /** Theme market themes they installed. */

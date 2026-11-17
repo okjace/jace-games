@@ -9,7 +9,7 @@ export async function GET(): Promise<NextResponse> {
   try {
     const store = studioStore();
     const [mine, published] = await Promise.all([session ? store.gamesByOwner(session.user.id) : [], store.published(200)]);
-    const pick = (g: (typeof published)[number]) => ({ id: g.id, title: g.title, icon: g.icon, owner_name: g.owner_name, plays: g.plays, published: g.published });
+    const pick = (g: (typeof published)[number]) => ({ id: g.id, title: g.title, icon: g.icon, owner_name: g.owner_name, plays: g.plays, published: g.published, ai: g.ai ?? null });
     return NextResponse.json({
       mine: mine.filter((g) => g.live_mode && !g.removed).map(pick),
       public: published.filter((g) => g.live_mode && !g.removed && g.owner_id !== session?.user.id).map(pick),

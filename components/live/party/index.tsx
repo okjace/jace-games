@@ -5,7 +5,6 @@ import type { PlayerView } from "@/lib/live/engine";
 import { MODES, type LiveMode } from "@/lib/live/types";
 import { GameQuestion, type AnswerResult } from "../fx/GameQuestion";
 import { Juice, useCountUp, useJuice } from "../fx/Juice";
-import { VolumeButton } from "@/components/site/SeasonFx";
 import { useScores } from "@/components/ScoresProvider";
 import { sfx } from "../fx/sfx";
 import { clock } from "../ui";
@@ -23,7 +22,7 @@ import { Shop } from "./Shop";
 import { SnackShack } from "./SnackShack";
 import { SledDash } from "./SledDash";
 import type { Act } from "./shared";
-import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "../fx/useStageFullscreen";
+import { FULLSCREEN_CLASS, useStageFullscreen } from "../fx/useStageFullscreen";
 import { LiveAvatar, LiveName } from "../LiveAvatar";
 import { Markdown } from "../Markdown";
 import { GameCodeLine, GameSettingsMenu } from "../GameSettingsMenu";
@@ -265,9 +264,15 @@ function Stage({ view, busy, act, chat, embedded = false, overlay }: { view: Pla
             </button>
           )}
           {chat && <ChatButton className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 text-lg text-white backdrop-blur" />}
-          <VolumeButton className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 text-lg text-white backdrop-blur hover:bg-black/40" />
-          {!view.solo && <GameSettingsMenu code={view.code} signedIn={!!user} className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 text-lg text-white backdrop-blur hover:bg-black/40" />}
-          <FullscreenButton on={full.on} toggle={full.toggle} className="bg-black/25 backdrop-blur" />
+          <GameSettingsMenu
+            code={view.code}
+            signedIn={!!user}
+            solo={!!view.solo}
+            fullscreen={full}
+            chatAvailable={view.chatOn}
+            callsAvailable={view.callsOn && !!user}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/20 text-lg text-white backdrop-blur hover:bg-black/40"
+          />
           {view.solo && (
             <button
               type="button"

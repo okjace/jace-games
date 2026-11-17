@@ -7,6 +7,7 @@ import { ProfileName } from "@/components/ProfileName";
 import { UserAvatar } from "@/components/UserLook";
 import { SiteThemePicker } from "@/components/site/SiteThemePicker";
 import { SpecialModesCard } from "@/components/site/SpecialModesCard";
+import { PrivacyCard } from "@/components/site/PrivacyCard";
 import { PublicProfileCard } from "@/components/site/People";
 
 export function ProfileView() {
@@ -52,6 +53,7 @@ export function ProfileView() {
       {user && <PublicProfileCard />}
       <SiteThemePicker />
       <SpecialModesCard />
+      <PrivacyCard />
     </div>
   );
 }

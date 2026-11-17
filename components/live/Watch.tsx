@@ -1,5 +1,6 @@
 "use client";
 
+import { GameSettingsMenu } from "./GameSettingsMenu";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { SpectatorView } from "@/lib/live/engine";
@@ -69,6 +70,7 @@ export function Watch({ code }: { code: string }) {
               🎮 join instead
             </Link>
           )}
+          <GameSettingsMenu code={view.code} signedIn={false} watching className="flex h-10 w-10 items-center justify-center rounded-full border border-line text-lg hover:bg-accent/10" />
         </div>
       </div>
 

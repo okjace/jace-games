@@ -1,5 +1,6 @@
 "use client";
 
+import { NO_CALLS_KEY, NO_CHAT_KEY, notifyPrivacy } from "./privacy";
 import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { isSeasonId, type SeasonId } from "@/lib/seasons";
 import { cleanTheme, registerCustom, themeCss, type ThemeData, type ThemeSummary } from "@/lib/customThemes";
@@ -163,7 +164,14 @@ export function onPrefsLoaded(fn: () => void) {
 /** Saves this device's theme settings to ur account (ignored when signed out). */
 export function pushPrefs() {
   try {
-    const body = { theme: readTheme(), modes: readModes(), effectsOff: localStorage.getItem(EFFECTS_KEY) === "1", look: readLook() };
+    const body = {
+      theme: readTheme(),
+      modes: readModes(),
+      effectsOff: localStorage.getItem(EFFECTS_KEY) === "1",
+      look: readLook(),
+      noChat: localStorage.getItem(NO_CHAT_KEY) === "1",
+      noCalls: localStorage.getItem(NO_CALLS_KEY) === "1",
+    };
     void fetch("/api/me/prefs", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {});
   } catch {}
 }
@@ -172,7 +180,7 @@ export function pushPrefs() {
 export async function loadPrefs() {
   const res = await fetch("/api/me/prefs", { cache: "no-store" }).catch(() => null);
   if (!res?.ok) return;
-  const { prefs } = (await res.json().catch(() => ({}))) as { prefs?: { theme?: string; modes?: string[]; effectsOff?: boolean; look?: Look } | null };
+  const { prefs } = (await res.json().catch(() => ({}))) as { prefs?: { theme?: string; modes?: string[]; effectsOff?: boolean; look?: Look; noChat?: boolean; noCalls?: boolean } | null };
   if (!prefs) return pushPrefs();
   // A custom theme from the account: fetch it (it may have changed since this device last saw it).
   if (typeof prefs.theme === "string" && prefs.theme.startsWith("custom:")) {
@@ -193,12 +201,15 @@ export async function loadPrefs() {
       for (const m of SPECIAL_MODES) document.documentElement.classList.toggle(`jl-mode-${m.id}`, prefs.modes.includes(m.id));
     }
     if (typeof prefs.effectsOff === "boolean") localStorage.setItem(EFFECTS_KEY, prefs.effectsOff ? "1" : "0");
+    if (typeof prefs.noChat === "boolean") localStorage.setItem(NO_CHAT_KEY, prefs.noChat ? "1" : "0");
+    if (typeof prefs.noCalls === "boolean") localStorage.setItem(NO_CALLS_KEY, prefs.noCalls ? "1" : "0");
     if (prefs.look === "light" || prefs.look === "dark" || prefs.look === "auto") {
       localStorage.setItem(LOOK_KEY, prefs.look);
       applyLook(prefs.look);
     }
   } catch {}
   notify();
+  notifyPrivacy();
   prefsListeners.forEach((f) => f());
 }
 export function toggleMode(m: SpecialMode) {

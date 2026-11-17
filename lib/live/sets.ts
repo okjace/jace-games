@@ -5,7 +5,7 @@ import type { Session } from "@/lib/session";
 import { allow } from "@/lib/rateLimit";
 import { isSiteOwner } from "@/lib/studio/server";
 import { LiveError } from "./engine";
-import { LIMITS, cleanQuestions, type LiveSet } from "./types";
+import { nextAiMark, LIMITS, cleanQuestions, type LiveSet } from "./types";
 
 /**
  * Question sets: anyone signed in with Jace can make them. Public sets show
@@ -56,6 +56,8 @@ export async function saveSet(session: Session, id: string | null, body: Record<
     tags: body.tags !== undefined ? cleanTags(body.tags) : (existing?.tags ?? []),
     visibility,
     questions: cleaned.questions,
+    // Made with AI: the AI helper's mark stays on for good.
+    ai: body.ai !== undefined ? nextAiMark(existing?.ai, body.ai) : (existing?.ai ?? null),
   };
   if (existing) return (await store.updateSet(existing.id, fields))!;
   if (!allow(`live-create:${session.user.id}`, 20, 3_600_000)) throw new LiveError("You've made a lot of sets this hour.", 429);

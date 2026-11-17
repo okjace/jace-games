@@ -60,7 +60,7 @@ import {
 
 /** Modes with the upgrade shop (score is also the currency). */
 const SHOP_MODES: LiveMode[] = ["gold", "hack"];
-import { DEVICE_MODES, MAX_MINUTES, MIN_MINUTES, MODES, cleanName, forPlayers, isCorrect, isPlayable, type LiveMode, type PlayerQuestion, type Question } from "./types";
+import { DEVICE_MODES, MAX_MINUTES, MIN_MINUTES, MODES, type AiMark, cleanName, forPlayers, isCorrect, isPlayable, type LiveMode, type PlayerQuestion, type Question } from "./types";
 
 /**
  * Jace Live, on the server. The host runs the game from a Jace
@@ -109,6 +109,8 @@ export type GameSettings = { noSet: boolean; minutes: number; shuffle: boolean; 
   powerups?: boolean;
   /** Voice calls between Jace Social friends (off unless the host turns them on). */
   calls?: boolean;
+  /** The set or Studio game was made with AI (shown to everyone in the game). */
+  ai?: AiMark;
   /** Solo: what was picked, so "Play again" can make the same game. */
   setId?: string | null;
   mapId?: string | null;
@@ -313,11 +315,13 @@ export async function createLiveGame(
   if (noSet && MODES[mode].needsSet) throw new LiveError(`${MODES[mode].name} needs a question set.`);
   let questions: Question[] | null = null;
   let setTitle: string | null = null;
+  let ai: AiMark = null;
   if (opts.setId) {
     const set = await store.getSet(opts.setId);
     const canUse = set && !set.removed && (set.visibility !== "private" || set.owner_id === session.user.id);
     if (!set || !canUse) throw new LiveError("That set isn't available.", 404);
     questions = set.questions.filter(isPlayable);
+    ai = set.ai ?? null;
     if (questions.length === 0) throw new LiveError("That set has no finished questions yet.");
     setTitle = set.title;
   }
@@ -359,8 +363,10 @@ export async function createLiveGame(
     const html = row.owner_id === session.user.id ? row.html : row.published ? row.published_html : null;
     if (!html?.trim()) throw new LiveError("That Studio game isn't published yet.", 404);
     settings.custom = { gameId: row.id, title: row.title, icon: row.icon, owner: row.owner_name, html };
+    if (row.ai) ai = row.ai;
     await studioStore().addPlay(row.id).catch(() => {});
   }
+  if (ai) settings.ai = ai;
   for (let attempt = 0; attempt < 6; attempt++) {
     try {
       const g = await store.createGame({
@@ -689,6 +695,8 @@ export type PlayerView = {
   emotesOn: boolean;
   /** The host turned voice calls on (never in solo games). */
   callsOn: boolean;
+  /** The set or Studio game was made with AI. */
+  ai: AiMark;
   /** Solo games: what was picked, for "Play again". */
   solo: { setId: string | null; minutes: number; shuffle: boolean; mapId: string | null; gameId: string | null } | null;
   phase: string;
@@ -801,6 +809,7 @@ function buildPlayerView(g: LiveGameRow, me: LivePlayerRow, all: LivePlayerRow[]
     chatOn: settings.chat !== false && !settings.solo,
     emotesOn: settings.emotes !== false && !settings.solo,
     callsOn: settings.calls === true && !settings.solo,
+    ai: settings.ai ?? null,
     solo: settings.solo
       ? { setId: settings.setId ?? null, minutes: settings.minutes, shuffle: settings.shuffle, mapId: settings.mapId ?? null, gameId: settings.gameId ?? null }
       : null,
@@ -1128,10 +1137,13 @@ export async function startSoloGame(
   session: Session | null,
   opts: { setId: string | null; mode: LiveMode; settings: Record<string, unknown> },
   avatar?: unknown,
+  /** The name they picked for this solo game (otherwise their Jace name, or "You"). */
+  rawName?: unknown,
 ): Promise<{ code: string; token: string; pin?: string }> {
   const host: Session = session ?? { token: "", iat: Date.now(), user: { id: `solo:${randomBytes(9).toString("base64url")}`, username: "Solo", picture: null } };
   const code = await createLiveGame(host, { ...opts, settings: { ...opts.settings, solo: true } });
-  const { token, pin } = await joinLiveGame(code, session ? session.user.displayName || session.user.username : "You", session, avatar);
+  const picked = cleanName(rawName);
+  const { token, pin } = await joinLiveGame(code, picked || (session ? session.user.displayName || session.user.username : "You"), session, avatar);
   await step(await getGame(code), "start");
   return { code, token, ...(pin ? { pin } : {}) };
 }

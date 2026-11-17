@@ -1,5 +1,6 @@
 "use client";
 
+import { AiBadge } from "@/components/AiHelper";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -20,6 +21,7 @@ type Summary = {
   multiplayer: unknown;
   plays: number;
   updated_at: string;
+  ai?: "helper" | "self" | null;
 };
 
 /** The blocks version of the 2-player template is a simpler game than the code one. */
@@ -171,6 +173,7 @@ export function StudioHome() {
                     <span className="block truncate font-semibold">
                       {g.title}
                       {!!g.multiplayer && <span title="Multiplayer"> 👥</span>}
+                      <AiBadge ai={g.ai} className="ml-1.5" />
                     </span>
                     <span className="block text-xs text-muted">
                       {g.kind === "blocks" ? "Blocks" : "Code"} · {g.removed ? <span className="text-danger">Taken down</span> : g.published ? `Published · ${g.plays} plays` : "Draft"} · {timeAgo(g.updated_at)}

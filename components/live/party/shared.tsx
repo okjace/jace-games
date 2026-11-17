@@ -46,18 +46,22 @@ export function useSaved<T>(code: string, mode: string, initial: () => T): [T, (
 export function useReport(act: Act, score: number) {
   const sent = useRef(-1);
   const latest = useRef(score);
+  // The page hands down a new `act` on every redraw; keep the newest without restarting the timer
+  // (restarting it every redraw meant it never fired, so device-mode scores were never sent).
+  const actRef = useRef(act);
   useEffect(() => {
     latest.current = score;
-  }, [score]);
+    actRef.current = act;
+  }, [score, act]);
   useEffect(() => {
     const t = setInterval(() => {
       if (latest.current !== sent.current) {
         sent.current = latest.current;
-        void act({ action: "report", score: Math.floor(latest.current) });
+        void actRef.current({ action: "report", score: Math.floor(latest.current) });
       }
     }, 2000);
     return () => clearInterval(t);
-  }, [act]);
+  }, []);
 }
 
 /**

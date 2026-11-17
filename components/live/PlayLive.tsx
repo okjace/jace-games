@@ -1,5 +1,7 @@
 "use client";
 
+import { useGameOff } from "@/components/site/privacy";
+import { AiNotice } from "@/components/AiHelper";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,10 +22,9 @@ import { PowerBanner } from "./PowerBanner";
 import { InviteFriends } from "./InviteFriends";
 import { GameCodeLine, GameSettingsMenu } from "./GameSettingsMenu";
 import { leaveCall } from "./callClient";
-import { VolumeButton } from "@/components/site/SeasonFx";
 import { Celebration, LiveAvatar, LiveName, guestAvatar } from "./LiveAvatar";
 import { Markdown } from "./Markdown";
-import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
+import { FULLSCREEN_CLASS, useStageFullscreen } from "./fx/useStageFullscreen";
 import { PARTY_MODES, PartyPlay } from "./party";
 import { card, getToken, input, primary, secondary, setPin, setToken } from "./ui";
 import { ask } from "@/components/site/ConfirmBox";
@@ -99,6 +100,8 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
   }, [topic, myId, load, code]);
 
   useGameMusic(view?.mode);
+  // Chat and calls turned off for me (this game, or my whole account).
+  const off = useGameOff(code);
 
   // Voice call: leaving the game page (or the game ending) leaves the call.
   const gameOver = view?.status === "ended";
@@ -173,6 +176,8 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
   if (!token) return <JoinForm code={code} defaultName={user?.displayName || user?.username || ""} note={error} onJoined={(t) => (setToken(code, t), setTok(t))} />;
   if (!view) return <Centered>{error ? <p className="text-muted">{error}</p> : <p className="animate-pulse text-muted">Joining…</p>}</Centered>;
 
+  const chatForMe = view.chatOn && !off.chat;
+  const callsForMe = view.callsOn && !!user && !off.calls;
   // What this screen shows, for "watch as" in the replay.
   const povRec = token ? <PovRecorder code={code} token={token} view={view} skew={skew} /> : null;
   // Solo games: no host screen, so this one records the replay.
@@ -217,7 +222,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
               {error && <p className="fixed inset-x-0 top-20 z-[75] mx-auto w-fit rounded-full bg-red-500 px-4 py-1.5 text-sm font-bold text-white shadow-lg">{error}</p>}
             </>
           }
-          chat={view.solo || (!view.chatOn && !view.callsOn) ? null : <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} teamTopic={view.teams?.topic ?? null} myTeam={view.teams?.mine ?? null} call={view.callsOn && user ? { hasTeam: view.teams?.mine !== null && view.teams?.mine !== undefined } : null} tone="stage" className="h-72 lg:h-[calc(100vh-8rem)]" />}
+          chat={view.solo || (!chatForMe && !callsForMe) ? null : <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} teamTopic={view.teams?.topic ?? null} myTeam={view.teams?.mine ?? null} call={callsForMe ? { hasTeam: view.teams?.mine !== null && view.teams?.mine !== undefined } : null} messagesOff={!chatForMe} tone="stage" className="h-72 lg:h-[calc(100vh-8rem)]" />}
         />
       </>
     );
@@ -235,10 +240,16 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           {view.teams && <TeamBadge team={view.teams.mine} small />}
         </span>
         <span className="flex items-center gap-3 text-sm">
-          {!view.solo && (view.chatOn || view.callsOn) && view.status !== "ended" && <ChatButton className="-my-2 text-lg text-muted hover:text-foreground" />}
-          <VolumeButton className="-my-2 text-lg text-muted hover:text-foreground" />
-          {!view.solo && <GameSettingsMenu code={view.code} signedIn={!!user} className="-my-2 text-lg text-muted hover:text-foreground" />}
-          <FullscreenButton on={full.on} toggle={full.toggle} className="-my-2 text-muted hover:text-foreground" />
+          {!view.solo && (chatForMe || callsForMe) && view.status !== "ended" && <ChatButton className="-my-2 text-lg text-muted hover:text-foreground" />}
+          <GameSettingsMenu
+            code={view.code}
+            signedIn={!!user}
+            solo={!!view.solo}
+            fullscreen={full}
+            chatAvailable={view.chatOn}
+            callsAvailable={view.callsOn && !!user}
+            className="-my-2 text-lg text-muted hover:text-foreground"
+          />
           {view.solo && view.status === "playing" && (
             <button
               type="button"
@@ -271,6 +282,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           <p className="text-xl font-bold">Ur in!</p>
           <p className="text-muted">Watch the big screen. The game starts soon.</p>
           <p className="text-sm text-muted">{view.playerCount} playing</p>
+          <AiNotice ai={view.ai} what={view.mode === "custom" ? "game" : "set"} />
           {user && !view.solo && <InviteFriends code={view.code} className="rounded-full border border-line px-4 py-2 text-sm font-semibold hover:bg-accent/10" />}
           {view.teams && <PlayerTeamPicker teams={view.teams} busy={busy} onPick={(team) => void act({ action: "team", team })} />}
         </Centered>
@@ -314,7 +326,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           </Link>
         </Centered>
       )}
-      {!view.solo && (view.chatOn || view.callsOn) && view.status !== "ended" && <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} teamTopic={view.teams?.topic ?? null} myTeam={view.teams?.mine ?? null} call={view.callsOn && user ? { hasTeam: view.teams?.mine !== null && view.teams?.mine !== undefined } : null} className="h-72" />}
+      {!view.solo && (chatForMe || callsForMe) && view.status !== "ended" && <ChatPanel code={code} topic={view.topic} token={token} on={view.chatOn} teamTopic={view.teams?.topic ?? null} myTeam={view.teams?.mine ?? null} call={callsForMe ? { hasTeam: view.teams?.mine !== null && view.teams?.mine !== undefined } : null} messagesOff={!chatForMe} className="h-72" />}
     </div>
     </div>
   );

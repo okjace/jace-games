@@ -39,6 +39,17 @@ export type Question = {
 
 export type PlayerQuestion = Omit<Question, "correct" | "accepted" | "rarity">;
 
+/** Made with AI: "helper" = through the AI helper (locked on), "self" = the maker turned it on. */
+export type AiMark = "helper" | "self" | null;
+
+/** The AI mark after a save: "helper" can never be taken off; otherwise what the maker picked. */
+export function nextAiMark(current: AiMark | undefined, asked: unknown): AiMark {
+  if (current === "helper" || asked === "helper") return "helper";
+  if (asked === "self" || asked === true) return "self";
+  if (asked === null || asked === false || asked === "") return null;
+  return current ?? null;
+}
+
 export type LiveSet = {
   id: string;
   owner_id: string;
@@ -53,6 +64,8 @@ export type LiveSet = {
   removed: boolean;
   /** Checked by the site owner: shown with a ✓ Verified badge. */
   verified?: boolean;
+  /** Made with AI: "helper" (the AI helper; always on) or "self" (the maker said so). */
+  ai?: AiMark;
   created_at: string;
   updated_at: string;
 };

@@ -23,6 +23,8 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   if (typeof body.theme === "string" && (body.theme === "site" || isSeasonId(body.theme) || /^custom:[0-9a-f-]{36}$/i.test(body.theme))) next.theme = body.theme;
   if (Array.isArray(body.modes)) next.modes = body.modes.filter((m): m is string => typeof m === "string" && MODES.includes(m)).slice(0, MODES.length);
   if (typeof body.effectsOff === "boolean") next.effectsOff = body.effectsOff;
+  if (typeof body.noChat === "boolean") next.noChat = body.noChat;
+  if (typeof body.noCalls === "boolean") next.noCalls = body.noCalls;
   if (body.look === "light" || body.look === "dark" || body.look === "auto") next.look = body.look;
   if (typeof body.publicProfile === "boolean") next.publicProfile = body.publicProfile;
   if (typeof body.bio === "string") next.bio = body.bio.replace(/[<>]/g, "").slice(0, 160);

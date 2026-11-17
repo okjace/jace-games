@@ -1,5 +1,6 @@
 "use client";
 
+import { AiBadge } from "@/components/AiHelper";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -168,6 +169,7 @@ export function SetGrid({ sets, mine = false }: { sets: SetSummary[]; mine?: boo
                 <p className="flex items-center gap-1.5 font-semibold">
                   <span className="truncate">{s.title}</span>
                   {s.verified && <VerifiedBadge small />}
+                  <AiBadge ai={s.ai} />
                 </p>
                 <p className="truncate text-xs text-muted">
                   {s.questionCount} question{s.questionCount === 1 ? "" : "s"} · {mine ? s.visibility : `by ${s.owner_name}`}

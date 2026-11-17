@@ -1,5 +1,6 @@
 "use client";
 
+import { AiNotice } from "@/components/AiHelper";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { HostView } from "@/lib/live/engine";
@@ -395,7 +396,8 @@ function Lobby({ view, busy, onStart, onKick, children }: { view: HostView; busy
     <div className={`${card} flex flex-col items-center gap-5 py-10 text-center`}>
       <div className="flex flex-col items-center gap-6 sm:flex-row sm:gap-10">
         <div>
-          <p className="text-sm text-muted">Game code</p>
+          <AiNotice ai={view.settings.ai} what={view.mode === "custom" ? "game" : "set"} />
+      <p className="text-sm text-muted">Game code</p>
           <p className="font-mono text-6xl font-black tracking-[0.25em] sm:text-7xl">{view.code}</p>
           <p className="mt-1 text-sm text-muted">go to {typeof window !== "undefined" ? window.location.host : ""}/join n type it in</p>
         </div>
