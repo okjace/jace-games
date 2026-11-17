@@ -166,8 +166,8 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
       <Centered>
         <p className="text-4xl">👋</p>
         <p className="text-lg font-semibold">The host removed u from this game.</p>
-        <Link href="/live" className={primary}>
-          Back to Live
+        <Link href="/" className={primary}>
+          🏠 Home
         </Link>
       </Centered>
     );
@@ -321,7 +321,7 @@ export function PlayLive({ code, embedded = false }: { code: string; embedded?: 
           <GlobalBoardOptIn code={code} token={token} view={view} />
           <Review view={view} />
           <Top view={view} />
-          <Link href="/live" className={primary}>
+          <Link href="/" className={primary}>
             Done
           </Link>
         </Centered>
@@ -530,7 +530,7 @@ function SoloResults({ view, code, token }: { view: PlayerView; code: string; to
         <Link href="/live/host/new?solo=1" className={secondary}>
           Change game
         </Link>
-        <Link href="/live" className={secondary}>
+        <Link href="/" className={secondary}>
           Done
         </Link>
       </div>

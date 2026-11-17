@@ -131,7 +131,7 @@ export function SetEditor({ id }: { id: string }) {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href="/live" aria-label="Back to Live" className="flex h-9 w-9 items-center justify-center rounded-full text-muted hover:bg-foreground/[.06] hover:text-foreground">
+          <Link href="/live/sets" aria-label="Back to my sets" className="flex h-9 w-9 items-center justify-center rounded-full text-muted hover:bg-foreground/[.06] hover:text-foreground">
             ←
           </Link>
           <h1 className="text-2xl font-bold tracking-tight">Edit set</h1>

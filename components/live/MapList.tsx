@@ -70,9 +70,6 @@ export function MapList() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href="/live" className="text-sm text-muted hover:text-foreground">
-            ← Live
-          </Link>
           <h1 className="font-display text-3xl font-extrabold">🗺️ tower siege maps</h1>
           <p className="text-sm text-muted">draw ur own road, pick a look, n host Tower Siege on it.</p>
         </div>

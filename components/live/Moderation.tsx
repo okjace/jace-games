@@ -41,9 +41,6 @@ export function Moderation() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5">
       <div>
-        <Link href="/live" className="text-sm text-muted hover:text-foreground">
-          ← Live
-        </Link>
         <h1 className="text-3xl font-bold tracking-tight">🚩 Moderation</h1>
         <p className="text-muted">Question sets ppl reported. Taking one down hides it from Discover and stops it being hosted.</p>
       </div>

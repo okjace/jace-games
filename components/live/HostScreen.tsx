@@ -591,8 +591,8 @@ function Podium({ view }: { view: HostView }) {
         <Link href="/live/host/new" className={primary}>
           Host another game
         </Link>
-        <Link href="/live" className={secondary}>
-          Back to Live
+        <Link href="/" className={secondary}>
+          🏠 Home
         </Link>
       </div>
     </div>

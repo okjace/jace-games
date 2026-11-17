@@ -29,9 +29,6 @@ export function ReportList() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5">
       <div>
-        <Link href="/live" className="text-sm text-muted hover:text-foreground">
-          ← Live
-        </Link>
         <h1 className="font-display text-3xl font-extrabold tracking-tight">📋 reports</h1>
         <p className="text-muted">wat evryone answered in the games u hosted, plus ur solo games. kept for 90 days.</p>
       </div>

@@ -365,9 +365,6 @@ export function HostSetup() {
             </button>
           </>
         )}
-        <Link href="/live" className={secondary}>
-          Cancel
-        </Link>
       </div>
     </div>
   );

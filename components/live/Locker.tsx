@@ -25,7 +25,7 @@ import {
 import { ask } from "@/components/site/ConfirmBox";
 import { refreshLook } from "@/components/UserLook";
 import { Celebration, LiveAvatar, LiveName, guestAvatar, setGuestAvatar } from "./LiveAvatar";
-import { card, input, primary } from "./ui";
+import { card, input } from "./ui";
 
 type LockerData = {
   xp: number;
@@ -137,9 +137,6 @@ export function Locker() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5">
       <div>
-        <Link href="/live" className="text-sm text-muted hover:text-foreground">
-          ← Live
-        </Link>
         <h1 className="font-display text-3xl font-extrabold tracking-tight">🎽 ur locker</h1>
         <p className="text-muted">pick how u show up evrywhere on Jace Live. look fresh 😎</p>
       </div>
@@ -354,9 +351,6 @@ export function Locker() {
         />
       )}
 
-      <Link href="/live" className={`${primary} self-start`}>
-        Done
-      </Link>
     </div>
   );
 }
