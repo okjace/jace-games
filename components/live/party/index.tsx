@@ -31,11 +31,12 @@ import { TowerSiege } from "./TowerSiege";
 import { ChatButton, useChatShown } from "../ChatPanel";
 import { KingOfTheHill, MemoryMatch, Minefield, SkyStacker, TerritoryWars, VaultCracker } from "./SkillModes";
 import { SnakeArena } from "./SnakeArena";
+import { OpsPlay } from "./OpsPlay";
 import { MemoryParty } from "./MemoryParty";
 import { ask } from "@/components/site/ConfirmBox";
 
 /** Every self-paced mode plays on this stage. */
-export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom", "banana", "summit", "survival", "boss", "tug", "hatchery", "pinata", "rare", "territory", "vault", "king", "memory", "sweep", "stack", "snake", "mparty", "sled"];
+export const PARTY_MODES: LiveMode[] = ["gold", "rocket", "tower", "snack", "factory", "fishing", "hack", "baseball", "custom", "banana", "summit", "survival", "boss", "tug", "hatchery", "pinata", "rare", "territory", "vault", "king", "memory", "sweep", "stack", "snake", "mparty", "sled", "beacon", "flag"];
 
 /** Each mode's look: background, accent, and its tap button with questions off. */
 export const THEMES: Record<string, { bg: string; accent: string; tap: [string, string] }> = {
@@ -57,6 +58,8 @@ export const THEMES: Record<string, { bg: string; accent: string; tap: [string, 
   rare: { bg: "radial-gradient(circle at 50% 0%, #0ea5e9 0%, #1e3a8a 55%, #0f172a 100%)", accent: "#bae6fd", tap: ["💎 FIND", ""] },
   mparty: { bg: "linear-gradient(160deg, #4c1d95 0%, #7e22ce 50%, #db2777 100%)", accent: "#f0abfc", tap: ["🎴 THINK", "Each think earns a turn (flip 2 cards)."] },
   snake: { bg: "linear-gradient(160deg, #052e16 0%, #14532d 50%, #0f766e 100%)", accent: "#a3e635", tap: ["🐍 SNACK", "Each snack makes ur snake longer."] },
+  beacon: { bg: "radial-gradient(circle at 50% 0%, #334155 0%, #0f172a 60%, #020617 100%)", accent: "#fde047", tap: ["🪙 EARN", "Each tap earns a few shop coins."] },
+  flag: { bg: "linear-gradient(160deg, #1e3a8a 0%, #0f172a 50%, #92400e 100%)", accent: "#fbbf24", tap: ["🪙 EARN", "Each tap earns a few shop coins."] },
   territory: { bg: "linear-gradient(160deg, #14532d 0%, #166534 45%, #0f766e 100%)", accent: "#86efac", tap: ["🗺️ SCOUT", "Each scout earns moves to claim land."] },
   vault: { bg: "linear-gradient(160deg, #0f172a 0%, #1e293b 50%, #334155 100%)", accent: "#fbbf24", tap: ["🔐 LISTEN", "Each listen at the lock earns a guess."] },
   king: { bg: "linear-gradient(160deg, #7c2d12 0%, #b45309 50%, #ca8a04 100%)", accent: "#fde047", tap: ["⚔️ RALLY", "Each rally earns a move."] },
@@ -318,6 +321,7 @@ function Stage({ view, busy, act, chat, embedded = false, overlay }: { view: Pla
         {mode === "sled" && <SledDash {...stageProps} />}
         {mode === "snake" && <SnakeArena {...stageProps} />}
         {mode === "mparty" && <MemoryParty {...stageProps} />}
+        {(mode === "beacon" || mode === "flag") && <OpsPlay {...stageProps} />}
 
         <GameCodeLine code={view.code} solo={!!view.solo} />
         <ol className="flex flex-col gap-1.5 rounded-3xl bg-black/25 p-3 text-sm backdrop-blur">

@@ -19,7 +19,7 @@ export const POWERS: Record<PowerKind, { name: string; icon: string; desc: strin
 };
 
 /** Modes where the host's screen runs the scores (power-ups can't touch those). */
-export const NO_POWERUPS: LiveMode[] = ["snake", "mparty"];
+export const NO_POWERUPS: LiveMode[] = ["snake", "mparty", "beacon", "flag"];
 
 /** Time between events (ms): 2–3 minutes, the first one a minute in. */
 export const nextGap = (first: boolean) => (first ? 60_000 : 120_000 + Math.random() * 60_000);

@@ -881,6 +881,9 @@ export async function submitToBoard(code: string, token: unknown, session: Sessi
   return { ...res, score: me.score };
 }
 
+/** Modes where a screen runs the game (the host's, or a solo player's) and reports scores. */
+const ARENA_MODES: LiveMode[] = ["snake", "beacon", "flag"];
+
 /** Snake Arena: each player's longest snake is their score (it only goes up, and it's capped to stay believable). */
 async function saveSnakeScores(g: LiveGameRow, scores: unknown) {
   if (!scores || typeof scores !== "object") return;
@@ -1050,7 +1053,7 @@ export async function hostAction(code: string, session: Session, body: HostActio
     return;
   }
   if (body.action === "snake-scores") {
-    if (g.mode !== "snake" || g.status !== "playing") return;
+    if (!ARENA_MODES.includes(g.mode) || g.status !== "playing") return;
     await saveSnakeScores(g, body.scores);
     return;
   }
@@ -1830,7 +1833,7 @@ async function playerActionInner(code: string, token: unknown, body: PlayerActio
 
   // Snake Arena solo: the player's own device runs the arena and reports their longest snake.
   if (body.action === "snake-score") {
-    if (g.mode !== "snake" || !(g.settings as GameSettings).solo) throw new LiveError("Unknown action.");
+    if (!ARENA_MODES.includes(g.mode) || !(g.settings as GameSettings).solo) throw new LiveError("Unknown action.");
     await saveSnakeScores(g, { [me.id]: Number((body as { score?: unknown }).score) });
     return buildPlayerView(g, (await store.players(g.id)).find((p) => p.id === me.id) ?? me, await store.players(g.id));
   }
@@ -2069,6 +2072,12 @@ async function playerActionInner(code: string, token: unknown, body: PlayerActio
     const amount = 10 + Math.min(me.streak, 5) * 3;
     await broadcast(topicOf(g), "snake-feed", { playerId: me.id, amount }).catch(() => {});
     me = (await store.updatePlayer(g.id, me.id, { data: { ...fresh, last: { kind: "feed", amount, correct: true } } }))!;
+  } else if (earned && (g.mode === "beacon" || g.mode === "flag")) {
+    // Beacon Rush / Flag Frenzy: a right answer is shop coins, kept wherever the game is running.
+    const fresh = dataOf(me);
+    const amount = tapped ? 4 : 10 + Math.min(me.streak, 5) * 2;
+    await broadcast(topicOf(g), "ops-coins", { playerId: me.id, amount }).catch(() => {});
+    me = (await store.updatePlayer(g.id, me.id, { data: { ...fresh, last: { kind: "ops-coins", amount, correct: true } } }))!;
   } else if (earned && isSkillMode(g.mode)) {
     // The skill modes: a right answer earns moves to play with.
     const fresh = dataOf(me);

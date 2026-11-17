@@ -9,6 +9,7 @@ import { openRoomChannel } from "@/lib/realtime/client";
 import { FULLSCREEN_CLASS, FullscreenButton, useStageFullscreen } from "./fx/useStageFullscreen";
 import { ChatButton, ChatPanel, useChatShown } from "./ChatPanel";
 import { SnakeArenaHost } from "./SnakeArenaHost";
+import { OpsHost } from "./OpsHost";
 import { MpBoard } from "./party/MemoryParty";
 import { VolumeButton } from "@/components/site/SeasonFx";
 import { HostReport } from "./HostReport";
@@ -262,6 +263,9 @@ export function HostScreen({ code }: { code: string }) {
         {view.status === "playing" && view.mode === "snake" && (
           <SnakeArenaHost view={view} secondsLeft={secondsLeft} onScores={(scores) => void act("snake-scores", { scores })} />
         )}
+        {view.status === "playing" && (view.mode === "beacon" || view.mode === "flag") && (
+          <OpsHost view={view} secondsLeft={secondsLeft} onScores={(scores) => void act("snake-scores", { scores })} />
+        )}
         {view.status === "playing" && view.mode === "mparty" && view.mp && (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
             <div className="rounded-3xl bg-gradient-to-br from-violet-900 via-purple-700 to-pink-600 p-4 shadow-xl">
@@ -285,7 +289,7 @@ export function HostScreen({ code }: { code: string }) {
             </div>
           </div>
         )}
-        {view.status === "playing" && view.mode !== "classic" && view.mode !== "snake" && view.mode !== "mparty" && <SelfPaced view={view} secondsLeft={secondsLeft} />}
+        {view.status === "playing" && view.mode !== "classic" && view.mode !== "snake" && view.mode !== "mparty" && view.mode !== "beacon" && view.mode !== "flag" && <SelfPaced view={view} secondsLeft={secondsLeft} />}
 
         {recorder}
         {view.status !== "ended" && view.settings.emotes !== false && <EmoteLayer topic={view.topic} big />}

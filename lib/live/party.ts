@@ -73,6 +73,8 @@ export const TAP_COOLDOWN_MS: Record<LiveMode, number> = {
   snake: 0,
   mparty: 0,
   sled: 0,
+  beacon: 0,
+  flag: 0,
 };
 
 // ---------- Device modes ----------

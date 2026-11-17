@@ -77,7 +77,7 @@ export const MAX_MINUTES = 24 * 60;
 /** The shortest timed game (minutes: 10 seconds). Minutes can have seconds in them (1.5 = 1:30). */
 export const MIN_MINUTES = 10 / 60;
 
-export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata" | "rare" | "territory" | "vault" | "king" | "memory" | "sweep" | "stack" | "snake" | "mparty" | "sled";
+export type LiveMode = "classic" | "gold" | "rocket" | "tower" | "snack" | "factory" | "fishing" | "hack" | "baseball" | "custom" | "banana" | "summit" | "survival" | "boss" | "tug" | "hatchery" | "pinata" | "rare" | "territory" | "vault" | "king" | "memory" | "sweep" | "stack" | "snake" | "mparty" | "sled" | "beacon" | "flag";
 
 export type ModeDef = {
   name: string;
@@ -280,6 +280,22 @@ export const MODES: Record<LiveMode, ModeDef> = {
     name: "Sky Stacker",
     icon: "🏗️",
     blurb: "Timing: every right answer gives you a block swinging over your tower. Tap to drop it; whatever hangs over the edge is cut off. Perfect drops keep your width. It gets faster as you climb.",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => `${num(n)} pts`,
+  },
+  beacon: {
+    name: "Beacon Rush",
+    icon: "🔦",
+    blurb: "Team tactics, no weapons: Gold sneaks a glowing beacon to site A or B, Blue stops them with freeze tag (tap to freeze, stand by a frozen buddy to thaw them). Right ansers = coins for speed boots, shields n dashes. First team to 5 rounds!",
+    needsSet: false,
+    selfPaced: true,
+    unit: (n) => `${num(n)} pts`,
+  },
+  flag: {
+    name: "Flag Frenzy",
+    icon: "🚩",
+    blurb: "Capture the flag: grab the other team's flag n run it home while urs is safe. Freeze tag stops runners (frozen players thaw in a few secs). Right ansers = coins for speed boots, shields n dashes. Most captures wins!",
     needsSet: false,
     selfPaced: true,
     unit: (n) => `${num(n)} pts`,

@@ -308,7 +308,7 @@ export function HostSetup() {
               <TeamSetup value={teams} onChange={setTeams} />
             </div>
           )}
-          {mode !== "snake" && mode !== "mparty" && (
+          {mode !== "snake" && mode !== "mparty" && mode !== "beacon" && mode !== "flag" && (
             <label className="flex items-center gap-2" title="Every couple minutes: double points, jackpots, lucky streaks n more">
               <input type="checkbox" checked={powerups} onChange={(e) => setPowerups(e.target.checked)} />
               ⚡ power-up events (double points, jackpots…)
