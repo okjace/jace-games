@@ -8,6 +8,8 @@ import { UserAvatar } from "@/components/UserLook";
 import { SiteThemePicker } from "@/components/site/SiteThemePicker";
 import { SpecialModesCard } from "@/components/site/SpecialModesCard";
 import { PrivacyCard } from "@/components/site/PrivacyCard";
+import { EmailCard } from "@/components/site/EmailCard";
+import { isSiteOwner } from "@/lib/owner";
 import { PublicProfileCard } from "@/components/site/People";
 
 export function ProfileView() {
@@ -54,6 +56,7 @@ export function ProfileView() {
       <SiteThemePicker />
       <SpecialModesCard />
       <PrivacyCard />
+      {user && <EmailCard moderator={isSiteOwner(user.id)} />}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { getPrefs, savePrefs, type Prefs } from "@/lib/db/userPrefs";
 import { allow } from "@/lib/rateLimit";
 import { isSeasonId } from "@/lib/seasons";
 import { getSession } from "@/lib/session";
+import { isEmailKind } from "@/lib/emailKinds";
 
 const MODES = ["chaos", "chill", "crt", "comic", "rainbow", "bigtext"];
 
@@ -27,6 +28,11 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   if (typeof body.noCalls === "boolean") next.noCalls = body.noCalls;
   if (body.look === "light" || body.look === "dark" || body.look === "auto") next.look = body.look;
   if (typeof body.publicProfile === "boolean") next.publicProfile = body.publicProfile;
+  if (body.emails && typeof body.emails === "object") {
+    const emails = { ...(cur.emails ?? {}) };
+    for (const [k, v] of Object.entries(body.emails as Record<string, unknown>)) if (isEmailKind(k) && typeof v === "boolean") emails[k] = v;
+    next.emails = emails;
+  }
   if (typeof body.bio === "string") next.bio = body.bio.replace(/[<>]/g, "").slice(0, 160);
   // A public profile keeps the name it's found by up to date.
   next.username = session.user.username;

@@ -4,6 +4,7 @@ import { setReportStore } from "@/lib/db/liveSetReports";
 import { canSee } from "@/lib/live/sets";
 import { allow } from "@/lib/rateLimit";
 import { getSession } from "@/lib/session";
+import { siteEmail } from "@/lib/email";
 
 /** Report a set to the site owner: { reason }. Signed in, one report per person per set. */
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/live/sets/[id]/report">): Promise<NextResponse> {
@@ -18,5 +19,13 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/live/sets/[
   const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 500) : "";
   if (reason.length < 3) return NextResponse.json({ error: "Say what's wrong with it." }, { status: 400 });
   const added = await setReportStore().add({ set_id: id, reporter_id: session.user.id, reporter_name: session.user.username, reason });
+  if (added) {
+    siteEmail("reports", {
+      subject: `New report: set ${set.title}`,
+      heading: "🚩 a question set was reported",
+      message: `${session.user.username} reported the set ${set.title} (by ${set.owner_name}).\n\nWhy: ${reason}`,
+      button: { label: "Review reports", url: "/live/moderation" },
+    });
+  }
   return NextResponse.json({ ok: true, already: !added });
 }

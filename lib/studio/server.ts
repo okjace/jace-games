@@ -27,6 +27,7 @@ const MAX_GAMES = 100;
 
 /** The Jace account that runs the site and can take games down (see lib/owner.ts). */
 import { isSiteOwner } from "@/lib/owner";
+import { emailUser, milestone, siteEmail } from "@/lib/email";
 export { isSiteOwner };
 
 // ---------- What people can see ----------
@@ -244,8 +245,19 @@ export async function setPublished(session: Session, id: string, published: bool
 /** Only the site owner (SITE_OWNER_JACE_ID) can take a game down or put it back. */
 export async function setRemoved(session: Session, id: string, removed: boolean): Promise<CommunityGameRow> {
   if (!isSiteOwner(session.user.id)) throw new StudioError("Only the site owner can do that.", 403);
+  const before = await studioStore().getGame(id);
   const updated = await studioStore().updateGame(id, { removed });
   if (!updated) throw new StudioError("That game doesn't exist.", 404);
+  if (before && before.removed !== removed) {
+    emailUser(updated.owner_id, "moderation", {
+      subject: removed ? `Ur Studio game ${updated.title} was taken down` : `Ur Studio game ${updated.title} is back up`,
+      heading: removed ? "🛡️ game taken down" : "✅ game is back",
+      message: removed
+        ? `A moderator took ${updated.icon} ${updated.title} down from Game Studio, usually because it broke the rules after someone reported it. U can still open n edit it.\n\nIf u think it was a mistake, fix what might be wrong n reach out to the Jace Live team.`
+        : `Good news: ${updated.icon} ${updated.title} is back up on Game Studio for evryone to play.`,
+      button: { label: "Open ur game", url: `/studio/${id}` },
+    });
+  }
   return updated;
 }
 
@@ -276,9 +288,18 @@ async function playableGame(id: string): Promise<CommunityGameRow> {
 
 /** Counts a play, at most once per person (or address) per game every 30 minutes. */
 export async function addPlay(id: string, who: string): Promise<void> {
-  await playableGame(id);
+  const row = await playableGame(id);
   if (!allow(`play:${who}:${id}`, 1, 30 * 60_000)) return;
   await studioStore().addPlay(id);
+  const plays = row.plays + 1;
+  if (plays > 1 && milestone(plays)) {
+    emailUser(row.owner_id, "community", {
+      subject: `Ur Studio game ${row.title} hit ${plays} plays!`,
+      heading: `🎮 ${plays} plays!`,
+      message: `${row.icon} ${row.title} has now been played ${plays} times on Game Studio. Keep it up!`,
+      button: { label: "Open ur game", url: `/studio/${id}` },
+    });
+  }
 }
 
 export async function submitScore(session: Session, id: string, score: unknown): Promise<{ best: boolean }> {
@@ -289,8 +310,18 @@ export async function submitScore(session: Session, id: string, score: unknown):
   if (!allow(`score:${session.user.id}:${id}`, 10, 60_000) || !allow(`score:${session.user.id}`, 60, 60_000)) {
     throw new StudioError("Too many scores at once. Slow down a little.", 429);
   }
-  await playableGame(id);
+  const row = await playableGame(id);
+  const top = (await studioStore().topScores(id, 1).catch(() => []))[0];
   const best = await studioStore().submitScore({ game_id: id, user_id: session.user.id, username: session.user.username, score });
+  // Took the #1 spot from someone else: they'd want to know (n come back for it).
+  if (best && top && top.user_id !== session.user.id && score > top.score) {
+    emailUser(top.user_id, "community", {
+      subject: `${session.user.username} beat ur top score in ${row.title}`,
+      heading: "🏆 ur #1 spot was taken!",
+      message: `${session.user.username} scored ${score} in ${row.icon} ${row.title}, beating ur ${top.score}. Think u can get it back?`,
+      button: { label: "Play it again", url: `/studio/${id}` },
+    });
+  }
   return { best };
 }
 
@@ -307,6 +338,12 @@ export async function report(session: Session, id: string, reason: unknown): Pro
   const row = await playableGame(id);
   if (row.owner_id === session.user.id) throw new StudioError("You can't report your own game.");
   await studioStore().addReport({ game_id: id, reporter_id: session.user.id, reason: text });
+  siteEmail("reports", {
+    subject: `New report: Studio game ${row.title}`,
+    heading: "🚩 a Studio game was reported",
+    message: `${session.user.username} reported ${row.icon} ${row.title} (by ${row.owner_name}).\n\nWhy: ${text}`,
+    button: { label: "Review it", url: `/studio/${id}` },
+  });
 }
 
 // ---------- Route helpers ----------

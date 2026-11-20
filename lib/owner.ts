@@ -5,6 +5,12 @@
  */
 const OKJACE = "406a853a-e639-468e-97c8-0794458d909a";
 
+/** Everyone who moderates (gets emailed about new reports). */
+export function siteOwners(): string[] {
+  const owner = process.env.SITE_OWNER_JACE_ID?.trim();
+  return owner && owner !== OKJACE ? [OKJACE, owner] : [OKJACE];
+}
+
 export function isSiteOwner(userId: string | null | undefined): boolean {
   if (!userId) return false;
   const owner = process.env.SITE_OWNER_JACE_ID?.trim();

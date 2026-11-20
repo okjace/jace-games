@@ -29,6 +29,8 @@ const scores = [
   { id: "o-2", user_id: "u-linus", game: "memory", score: 12, created_at: "2025-06-02T10:00:00.000Z" },
 ];
 const invites = [];
+// Emails Jace Live asked Jace to send (POST /api/oauth/email). GET /_emails lists them.
+const emails = [];
 const presence = {};
 const SOCIAL_UUIDS = { "u-oldplayer": "00000000-0000-4000-8000-000000000001", "u-friend": "00000000-0000-4000-8000-000000000002" };
 const friendCard = (a, extra = {}) => ({ uuid: SOCIAL_UUIDS[a.sub], name: a.username, handle: a.username, picture: null, status: "online", activity: null, jace_sub: a.sub, jace_username: a.username, ...extra });
@@ -109,6 +111,18 @@ createServer(async (req, res) => {
       presence[me.username] = body.activity ?? null;
       return json(res, 200, { ok: true });
     }
+  }
+  if (url.pathname === "/_emails") return json(res, 200, { emails });
+  if (url.pathname === "/api/oauth/email" && req.method === "POST") {
+    const basic = (req.headers.authorization ?? "").startsWith("Basic ");
+    const body = JSON.parse((await readBody(req)) || "{}");
+    if (!basic && !authed) return json(res, 401, { error: "invalid_client" });
+    const who = basic ? [USER, FRIEND].find((a) => a.sub === body.user_id) : me;
+    if (!who) return json(res, 404, { error: "not_found" });
+    const bad = typeof body.subject !== "string" || !body.subject.length || body.subject.length > 150 || typeof body.message !== "string" || !body.message.length || body.message.length > 5000 || (body.button_url && !/^https:\/\//.test(body.button_url)) || (body.button_label?.length ?? 0) > 40;
+    if (bad) return json(res, 400, { error: "invalid_request" });
+    emails.push({ to: who.username, ...body, at: new Date().toISOString() });
+    return json(res, 200, { sent: true });
   }
   if (!authed) return json(res, 401, { error: "invalid_token" });
   if (url.pathname === "/api/oauth/userinfo") return json(res, 200, me);

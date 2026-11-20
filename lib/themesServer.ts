@@ -4,6 +4,8 @@ import { themeStore, type ThemeRow } from "@/lib/db/themes";
 import { getPrefs, savePrefs } from "@/lib/db/userPrefs";
 import { isSiteOwner } from "@/lib/owner";
 import type { Session } from "@/lib/session";
+import { emailUser, siteEmail } from "@/lib/email";
+import { allow } from "@/lib/rateLimit";
 
 /** The rules for custom themes and the theme market (see lib/customThemes.ts). */
 
@@ -40,7 +42,20 @@ export async function saveTheme(session: Session, id: string, body: Record<strin
   const owner = isSiteOwner(session.user.id);
   if (t.owner_id !== session.user.id) {
     // The site owner can only take market themes down (or put them back).
-    if (owner && typeof body.removed === "boolean") return summary((await themeStore.update(id, { removed: body.removed, updated_at: t.updated_at }))!);
+    if (owner && typeof body.removed === "boolean") {
+      const updated = summary((await themeStore.update(id, { removed: body.removed, updated_at: t.updated_at }))!);
+      if (body.removed !== t.removed) {
+        emailUser(t.owner_id, "moderation", {
+          subject: body.removed ? `Ur theme ${t.name} was taken off the market` : `Ur theme ${t.name} is back on the market`,
+          heading: body.removed ? "🛡️ theme taken down" : "✅ theme is back",
+          message: body.removed
+            ? `A moderator took ${t.icon} ${t.name} off the theme market, usually because it broke the rules after someone reported it. U still have it, n u can still use it urself.\n\nIf u think it was a mistake, change what might be wrong n reach out to the Jace Live team.`
+            : `Good news: ${t.icon} ${t.name} is back on the theme market.`,
+          button: { label: "Open ur themes", url: "/themes" },
+        });
+      }
+      return updated;
+    }
     throw new ThemeError("Thats not ur theme.", 403);
   }
   const patch: Partial<ThemeRow> = {};
@@ -49,6 +64,19 @@ export async function saveTheme(session: Session, id: string, body: Record<strin
     Object.assign(patch, { data, name: data.name, icon: data.icon });
   }
   if (typeof body.published === "boolean") patch.published = body.published;
+  // Publishing a remix: the theme it came from's maker hears about it (once, the first time).
+  const remixOf = (patch.data ?? t.data)?.remixOf;
+  if (patch.published && !t.published && remixOf?.id && allow(`remix-email:${t.id}`, 1, 7 * 86_400_000)) {
+    const from = await themeStore.get(remixOf.id).catch(() => null);
+    if (from && from.owner_id !== session.user.id) {
+      emailUser(from.owner_id, "community", {
+        subject: `${t.owner_name} remixed ur theme ${from.name}`,
+        heading: "🎨 ur theme got remixed!",
+        message: `${t.owner_name} made their own version of ${from.icon} ${from.name}, called ${patch.name ?? t.name}, n put it on the theme market.`,
+        button: { label: "See the theme market", url: "/themes" },
+      });
+    }
+  }
   if (owner && typeof body.removed === "boolean") patch.removed = body.removed;
   return summary((await themeStore.update(id, patch))!);
 }
@@ -88,5 +116,15 @@ export async function reportTheme(session: Session, id: string, reason: unknown)
   await viewTheme(id, session);
   const why = typeof reason === "string" ? reason.replace(/[<>]/g, "").trim().slice(0, 300) : "";
   if (!why) throw new ThemeError("Say whats wrong with it.");
-  return themeStore.report(id, session.user.id, why);
+  const fresh = await themeStore.report(id, session.user.id, why);
+  if (fresh) {
+    const t = await themeStore.get(id);
+    siteEmail("reports", {
+      subject: `New report: theme ${t?.name ?? id}`,
+      heading: "🚩 a theme was reported",
+      message: `${session.user.username} reported the theme ${t?.icon ?? ""} ${t?.name ?? id} (by ${t?.owner_name ?? "someone"}).\n\nWhy: ${why}`,
+      button: { label: "Review themes", url: "/themes" },
+    });
+  }
+  return fresh;
 }

@@ -60,6 +60,7 @@ import {
 
 /** Modes with the upgrade shop (score is also the currency). */
 const SHOP_MODES: LiveMode[] = ["gold", "hack"];
+import { emailUsers } from "../email";
 import { DEVICE_MODES, MAX_MINUTES, MIN_MINUTES, MODES, type AiMark, cleanName, forPlayers, isCorrect, isPlayable, type LiveMode, type PlayerQuestion, type Question } from "./types";
 
 /**
@@ -1403,6 +1404,37 @@ async function endGame(g: LiveGameRow, winner?: string) {
   await giveXp(ended);
   await saveReport(ended);
   await push(ended);
+  recapEmails(ended, await liveStore().players(g.id)).catch(() => {});
+}
+
+/** "Game over" emails for signed-in players who turned game recaps on (not solo games, not mid-tournament). */
+async function recapEmails(g: LiveGameRow, all: LivePlayerRow[]) {
+  const settings = g.settings as GameSettings;
+  if (settings.solo) return;
+  const t = settings.tournament;
+  if (t && t.round + 1 < t.rounds.length) return;
+  const def = MODES[g.mode];
+  const order = ranked(all);
+  const teams = teamsOf(g, all);
+  const topTeam = teams?.length ? [...teams].sort((a, b) => b.score - a.score)[0] : null;
+  emailUsers(order.map((p) => p.user_id), "games", (userId) => {
+    const i = order.findIndex((p) => p.user_id === userId);
+    const me = order[i];
+    if (!me) return null;
+    const place = i === 0 ? "🥇 1st" : i === 1 ? "🥈 2nd" : i === 2 ? "🥉 3rd" : `#${i + 1}`;
+    const lines = [
+      `${def.icon} ${def.name}${g.set_title ? ` (${g.set_title})` : ""}, hosted by ${g.host_name}.`,
+      `U came ${place} of ${order.length} with ${def.unit(me.score)}.${i > 0 ? ` ${order[0].name} won with ${def.unit(order[0].score)}.` : " U won!! 🎉"}`,
+      ...(topTeam ? [`Winning team: ${topTeam.icon} ${topTeam.name}.`] : []),
+      "The replay (if the host saved one) is on the game's page for 30 days.",
+    ];
+    return {
+      subject: i === 0 ? `U won ${def.name}! 🏆` : `${def.name} recap: u came ${place.replace(/^\S+ /, "")}`,
+      heading: i === 0 ? "🏆 u won!" : "🏁 game over!",
+      message: lines.join("\n\n"),
+      button: { label: "See the results", url: `/live/play/${g.code}` },
+    };
+  });
 }
 
 /**

@@ -1,5 +1,6 @@
 import "server-only";
 import { supabase, usingSupabase } from "./rooms";
+import type { EmailPrefs } from "../emailKinds";
 
 /** Each person's own settings (supabase/migrations/024_user_prefs.sql); in memory during development without Supabase. */
 
@@ -20,6 +21,8 @@ export type Prefs = {
   /** Kept with a public profile so it can be found by name. */
   username?: string;
   displayName?: string;
+  /** Which emails they get from Jace Live (see lib/emailKinds.ts). */
+  emails?: EmailPrefs;
 };
 
 const mem = globalThis as unknown as { __jlPrefs?: Map<string, Prefs> };

@@ -3,6 +3,7 @@ import { liveStore } from "@/lib/db/live";
 import { liveError } from "@/lib/live/http";
 import { canSee, publicSet, saveSet } from "@/lib/live/sets";
 import { getSession } from "@/lib/session";
+import { emailUser } from "@/lib/email";
 import { isSiteOwner } from "@/lib/studio/server";
 import { isRareSet } from "@/lib/live/rare";
 
@@ -50,6 +51,26 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/live/sets/
   if (typeof body.removed === "boolean") patch.removed = body.removed;
   if (typeof body.verified === "boolean") patch.verified = body.verified;
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: "Send removed or verified." }, { status: 400 });
+  const before = await liveStore().getSet(id);
   const set = await liveStore().updateSet(id, patch);
-  return set ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "Not found." }, { status: 404 });
+  if (!set) return NextResponse.json({ error: "Not found." }, { status: 404 });
+  if (before && patch.removed !== undefined && patch.removed !== !!before.removed) {
+    emailUser(set.owner_id, "moderation", {
+      subject: patch.removed ? `Ur set ${set.title} was taken down` : `Ur set ${set.title} is back up`,
+      heading: patch.removed ? "🛡️ set taken down" : "✅ set is back",
+      message: patch.removed
+        ? `A moderator took ur question set ${set.title} down, usually because it broke the rules after someone reported it. U can still open n edit it.\n\nIf u think it was a mistake, fix what might be wrong n reach out to the Jace Live team.`
+        : `Good news: ur question set ${set.title} is back up for evryone.`,
+      button: { label: "Open ur set", url: `/live/sets/${id}` },
+    });
+  }
+  if (before && patch.verified && !before.verified) {
+    emailUser(set.owner_id, "moderation", {
+      subject: `Ur set ${set.title} got verified!`,
+      heading: "✅ verified!",
+      message: `The Jace Live team checked ur question set ${set.title} n gave it a ✓ Verified badge. Great work!`,
+      button: { label: "See ur set", url: `/live/sets/${id}` },
+    });
+  }
+  return NextResponse.json({ ok: true });
 }
