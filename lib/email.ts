@@ -29,12 +29,15 @@ const link = (url: string) => (url.startsWith("/") ? `${SITE_URL}${url}` : url);
 /** Jace user ids only (guests have none). */
 const isJaceId = (id: unknown): id is string => typeof id === "string" && id.length > 0 && id.length <= 80 && !id.startsWith("guest");
 
-async function send(userId: string, kind: EmailKind, email: Email): Promise<void> {
+export type SendResult = "sent" | "no_email" | "turned_off" | "not_signed_up" | "rate_limited" | "off" | "failed";
+
+/** Sends now and says what happened. `kind` null skips their email settings (a test they asked for). */
+export async function sendEmail(userId: string, kind: EmailKind | null, email: Email): Promise<SendResult> {
   const id = process.env.JACE_CLIENT_ID;
   const secret = process.env.JACE_CLIENT_SECRET;
-  if (!id || !secret || process.env.JACE_EMAIL_OFF === "1") return;
+  if (!id || !secret || process.env.JACE_EMAIL_OFF === "1") return "failed";
   try {
-    if (!emailOn((await getPrefs(userId).catch(() => null))?.emails, kind)) return;
+    if (kind && !emailOn((await getPrefs(userId).catch(() => null))?.emails, kind)) return "off";
     const body: Record<string, string> = {
       user_id: userId,
       subject: email.subject.replace(/\s+/g, " ").trim().slice(0, 150),
@@ -54,17 +57,25 @@ async function send(userId: string, kind: EmailKind, email: Email): Promise<void
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
     });
+    const data = (await res.json().catch(() => null)) as { sent?: boolean; reason?: string } | null;
+    if (res.ok && data?.sent) return "sent";
     // { sent: false } (no email, or they turned Jace app emails off) and 404 (never signed in here) are fine.
-    if (!res.ok && res.status !== 404 && res.status !== 429) console.error(`Jace email (${kind}) failed: ${res.status}`);
+    if (res.ok && data?.reason === "no_email") return "no_email";
+    if (res.ok && data?.reason === "turned_off") return "turned_off";
+    if (res.status === 404) return "not_signed_up";
+    if (res.status === 429) return "rate_limited";
+    console.error(`Jace email (${kind ?? "test"}) failed: ${res.status}`);
+    return "failed";
   } catch (e) {
     console.error("Jace email failed", e);
+    return "failed";
   }
 }
 
 /** Emails someone after this response is sent (if they want this kind). */
 export function emailUser(userId: unknown, kind: EmailKind, email: Email): void {
   if (!isJaceId(userId)) return;
-  const job = () => send(userId, kind, email);
+  const job = () => sendEmail(userId, kind, email).then(() => {});
   try {
     after(job);
   } catch {
