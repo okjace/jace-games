@@ -7,7 +7,8 @@ import type { GameReport } from "@/lib/live/report";
 export type ReportRow = { id: string; host_id: string; code: string; mode: string; set_title: string | null; data: GameReport; created_at: string; expires_at: string };
 
 export interface ReportStore {
-  save(r: Pick<ReportRow, "host_id" | "code" | "mode" | "set_title" | "data">): Promise<void>;
+  /** Saves a report; gives back its id. */
+  save(r: Pick<ReportRow, "host_id" | "code" | "mode" | "set_title" | "data">): Promise<string>;
   get(id: string): Promise<ReportRow | null>;
   mine(host: string): Promise<ReportRow[]>;
   remove(id: string): Promise<void>;
@@ -21,7 +22,7 @@ function check<T>(res: { data: T; error: { message: string } | null }): T {
 
 const supabaseStore: ReportStore = {
   async save(r) {
-    check(await supabase().from("live_reports").insert(r));
+    return (check(await supabase().from("live_reports").insert(r).select("id").single()) as { id: string }).id;
   },
   async get(id) {
     return (check(await supabase().from("live_reports").select().eq("id", id).maybeSingle()) as ReportRow | null) ?? null;
@@ -45,6 +46,7 @@ const memoryStore: ReportStore = {
     const now = new Date();
     const row: ReportRow = { ...structuredClone(r), id: crypto.randomUUID(), created_at: now.toISOString(), expires_at: new Date(now.getTime() + 90 * 86_400_000).toISOString() };
     mem().set(row.id, row);
+    return row.id;
   },
   async get(id) {
     const r = mem().get(id);

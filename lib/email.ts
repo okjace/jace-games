@@ -4,6 +4,7 @@ import { getPrefs } from "./db/userPrefs";
 import { JACE_URL } from "./jace";
 import { emailOn, type EmailKind } from "./emailKinds";
 import { siteOwners } from "./owner";
+import { emailThemeFor } from "./emailTheme";
 
 /**
  * Emails a Jace Live player through Jace (POST /api/oauth/email with Jace
@@ -38,12 +39,14 @@ export async function sendEmail(userId: string, kind: EmailKind | null, email: E
   if (!id || !secret || process.env.JACE_EMAIL_OFF === "1") return "failed";
   try {
     if (kind && !emailOn((await getPrefs(userId).catch(() => null))?.emails, kind)) return "off";
-    const body: Record<string, string> = {
+    const body: Record<string, unknown> = {
       user_id: userId,
       subject: email.subject.replace(/\s+/g, " ").trim().slice(0, 150),
       message: email.message.trim().slice(0, 5000),
     };
     if (email.heading) body.heading = email.heading.slice(0, 150);
+    // Looks like the site, in the theme they picked (Jace's own look if Jace doesn't take themes).
+    body.theme = await emailThemeFor(userId, SITE_URL);
     const url = email.button && link(email.button.url);
     // Jace only takes https buttons (a local test site just leaves the button off).
     if (email.button && url?.startsWith("https://")) {

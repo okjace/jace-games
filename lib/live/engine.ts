@@ -60,7 +60,7 @@ import {
 
 /** Modes with the upgrade shop (score is also the currency). */
 const SHOP_MODES: LiveMode[] = ["gold", "hack"];
-import { emailUsers } from "../email";
+import { emailUser, emailUsers } from "../email";
 import { DEVICE_MODES, MAX_MINUTES, MIN_MINUTES, MODES, type AiMark, cleanName, forPlayers, isCorrect, isPlayable, type LiveMode, type PlayerQuestion, type Question } from "./types";
 
 /**
@@ -1597,12 +1597,26 @@ async function checkSkillWin(g: LiveGameRow, me: LivePlayerRow) {
  */
 async function saveReport(g: LiveGameRow) {
   const settings = g.settings as GameSettings;
-  if (settings.noSet || questionsOf(g).length === 0 || g.host_id.startsWith("solo:")) return;
+  if (settings.noSet || questionsOf(g).length === 0) return;
   const players = await liveStore().players(g.id);
   if (players.length === 0) return;
-  await reportStore()
-    .save({ host_id: g.host_id, code: g.code, mode: g.mode, set_title: g.set_title, data: buildReport(g, players) })
-    .catch(() => {});
+  // Solo games: the report is the player's own (only when they're signed in, so they can open it later).
+  const owner = settings.solo || g.host_id.startsWith("solo:") ? players[0]?.user_id : g.host_id;
+  if (!owner) return;
+  const id = await reportStore()
+    .save({ host_id: owner, code: g.code, mode: g.mode, set_title: g.set_title, data: buildReport(g, players) })
+    .catch(() => null);
+  if (!id) return;
+  const def = MODES[g.mode];
+  const solo = !!settings.solo;
+  emailUser(owner, "gameReports", {
+    subject: solo ? `Ur solo ${def.name} report${g.set_title ? `: ${g.set_title}` : ""}` : `Ur game report: ${def.name}${g.set_title ? ` (${g.set_title})` : ""}`,
+    heading: "📊 ur game report is ready",
+    message: solo
+      ? `U played ${def.icon} ${def.name}${g.set_title ? ` with ${g.set_title}` : ""} solo, n ur report is ready: which questions u got right, which ones tripped u up, n how fast u answered.\n\nIt's saved for 90 days.`
+      : `Ur ${def.icon} ${def.name} game${g.set_title ? ` with ${g.set_title}` : ""} just ended (${players.length} ${players.length === 1 ? "player" : "players"}). The report shows how evryone did on each question, so u can see what to go over again.\n\nIt's saved for 90 days.`,
+    button: { label: "Open the report", url: `/live/reports/${id}` },
+  });
 }
 
 /** Locker XP for everyone signed in, once, when a game ends. */
