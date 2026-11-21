@@ -4,7 +4,7 @@ import { allow } from "@/lib/rateLimit";
 import { getSession } from "@/lib/session";
 
 const SAYS: Record<string, string> = {
-  sent: "sent! it can take a couple minutes to show up (check spam too).",
+  sent: "sent! check ur inbox (n spam too).",
   no_email: "ur Jace account doesnt have a confirmed email yet. add one in ur Jace settings first.",
   turned_off: "u turned off \"Emails from Jace's apps\" in ur Jace settings, so Jace didnt send it.",
   not_signed_up: "Jace doesnt know u signed in here yet. sign out n back in, then try again.",
