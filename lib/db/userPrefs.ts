@@ -23,6 +23,8 @@ export type Prefs = {
   displayName?: string;
   /** Which emails they get from Jace Live (see lib/emailKinds.ts). */
   emails?: EmailPrefs;
+  /** Saw Jace's terms notice (it's only shown once). */
+  termsSeen?: boolean;
 };
 
 const mem = globalThis as unknown as { __jlPrefs?: Map<string, Prefs> };

@@ -26,6 +26,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
   if (typeof body.effectsOff === "boolean") next.effectsOff = body.effectsOff;
   if (typeof body.noChat === "boolean") next.noChat = body.noChat;
   if (typeof body.noCalls === "boolean") next.noCalls = body.noCalls;
+  if (body.termsSeen === true) next.termsSeen = true;
   if (body.look === "light" || body.look === "dark" || body.look === "auto") next.look = body.look;
   if (typeof body.publicProfile === "boolean") next.publicProfile = body.publicProfile;
   if (body.emails && typeof body.emails === "object") {

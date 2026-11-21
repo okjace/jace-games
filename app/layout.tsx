@@ -7,6 +7,7 @@ import { MoreEggs } from "@/components/site/MoreEggs";
 import { EggMenu } from "@/components/site/EggMenu";
 import { ConfirmHost } from "@/components/site/ConfirmBox";
 import { SiteFooter } from "@/components/site/SiteFooter";
+import { TermsNotice } from "@/components/site/TermsNotice";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { HEAD_SCRIPT, SeasonProvider } from "@/components/site/ThemeContext";
 import { ThemeLayer, ThemedGarland } from "@/components/site/ThemeLayer";
@@ -55,6 +56,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <Notices />
           <main className="relative mx-auto w-full max-w-6xl flex-1 px-4 pt-6 sm:px-6 sm:pt-8">{children}</main>
           <SiteFooter />
+          <TermsNotice />
           <ThemeLayer />
           <EasterEggs />
           <MoreEggs />
